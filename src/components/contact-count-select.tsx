@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { updateContactCount } from "@/app/actions/update-contact";
 
-const OPTIONS = Array.from({ length: 51 }, (_, i) => i);
+const OPTIONS = Array.from({ length: 4 }, (_, i) => i);
 
 interface ContactCountSelectProps {
   placeId: string;
@@ -40,6 +40,7 @@ export function ContactCountSelect({
         }
       }}
     >
+      <option value={-1}>dead</option>
       {OPTIONS.map((n) => (
         <option key={n} value={n}>
           {n}

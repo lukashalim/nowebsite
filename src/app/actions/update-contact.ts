@@ -12,8 +12,8 @@ export async function updateContactCount(
   }
   if (
     !Number.isInteger(contactCount) ||
-    contactCount < 0 ||
-    contactCount > 50
+    contactCount < -1 ||
+    contactCount > 3
   ) {
     return { ok: false, error: "Invalid contact count" };
   }
@@ -21,7 +21,7 @@ export async function updateContactCount(
   try {
     const supabase = createSupabaseAdmin();
     const { error } = await supabase
-      .from("businesses")
+      .from("businesses_nowebsite")
       .update({ contact_count: contactCount })
       .eq("place_id", placeId);
 

@@ -155,6 +155,7 @@ export async function fetchCrmBusinessRows(
       .from("businesses_nowebsite")
       .select(CRM_BUSINESS_LIST_COLUMNS, { count: "exact" })
       .eq("has_website", p.hasWebsite)
+      .neq("contact_count", -1)
       .gte("reviews", p.minReviews)
       .lte("reviews", p.maxReviews)
       .gte("rating", p.minRating);
@@ -214,6 +215,7 @@ export async function fetchAllDemoCohortPlaceIds(): Promise<string[]> {
       .from("businesses_nowebsite")
       .select("place_id")
       .eq("has_website", c.hasWebsite)
+      .neq("contact_count", -1)
       .gte("reviews", c.minReviews)
       .lte("reviews", c.maxReviews)
       .gte("rating", c.minRating);
@@ -245,6 +247,7 @@ export async function fetchDemoBusinessByPlaceId(
     .from("businesses_nowebsite")
     .select(DEMO_DETAIL_COLUMNS)
     .eq("has_website", c.hasWebsite)
+    .neq("contact_count", -1)
     .gte("reviews", c.minReviews)
     .lte("reviews", c.maxReviews)
     .gte("rating", c.minRating)
@@ -277,6 +280,7 @@ export async function fetchDemoCohortPage(
     .from("businesses_nowebsite")
     .select(DEMO_INDEX_COLUMNS, { count: "exact" })
     .eq("has_website", c.hasWebsite)
+    .neq("contact_count", -1)
     .gte("reviews", c.minReviews)
     .lte("reviews", c.maxReviews)
     .gte("rating", c.minRating);
