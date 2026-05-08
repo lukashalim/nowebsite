@@ -1,5 +1,6 @@
 # dependencies
 /node_modules
+**/node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -13,10 +14,13 @@
 
 # next.js
 /.next/
+**/.next/
 /out/
 
 # production
 /build
+**/build/
+**/dist/
 
 # misc
 .DS_Store
@@ -27,6 +31,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+scrape/_extract_last_run.log
+Same
 
 # env files (can opt-in for committing if needed)
 .env*
