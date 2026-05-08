@@ -1,0 +1,37 @@
+{
+  "name": "nowebsite",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "deploy-workers": "node deploy-workers.mjs",
+    "demo:sync": "node ./scrape/sync-businesses-to-nowebsite.mjs",
+    "demo:backfill-seo": "node --import ./scrape/env-nowebsite-queue.mjs ./scrape/backfill-demo-seo-dispatch.mjs",
+    "demo:pipeline": "node --import ./scrape/env-nowebsite-pipeline-cohort.mjs ./scrape/pipeline.mjs",
+    "demo:poller": "node --import ./scrape/env-nowebsite-queue.mjs ./scrape/poller.mjs",
+    "demo:dispatch": "node --import ./scrape/env-nowebsite-queue.mjs ./scrape/dispatch.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.105.1",
+    "dotenv": "^17.4.2",
+    "lucide-react": "^1.12.0",
+    "next": "16.2.4",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.4",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

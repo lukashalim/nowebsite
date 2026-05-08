@@ -1,0 +1,11 @@
+{
+  "name": "nowebsite-crm-redirect",
+  "private": true,
+  "description": "The Next.js app lives in the parent folder. These scripts forward there.",
+  "scripts": {
+    "dev": "npm run dev --prefix ..",
+    "build": "npm run build --prefix ..",
+    "start": "npm run start --prefix ..",
+    "lint": "npm run lint --prefix .."
+  }
+}

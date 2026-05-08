@@ -1,0 +1,31 @@
+{
+  "name": "nowebsite-scrape",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dispatch": "node dispatch.mjs",
+    "dispatch-nowebsite": "set SCRAPE_JOBS_TABLE=scrape_jobs_nowebsite&& set ENABLE_REVIEWS_EXTRACTION=1&& node dispatch.mjs",
+    "pipeline": "node pipeline.mjs",
+    "pipeline-nowebsite": "set SCRAPE_JOBS_TABLE=scrape_jobs_nowebsite&& set BUSINESSES_TABLE=businesses_nowebsite&& set ENABLE_CATEGORY_VALIDATION=0&& set ENABLE_WEAKNESS_SUMMARY=0&& node pipeline.mjs",
+    "backfill-demo-seo-dispatch": "node backfill-demo-seo-dispatch.mjs",
+    "backfill-demo-seo-dispatch-nowebsite": "set SCRAPE_JOBS_TABLE=scrape_jobs_nowebsite&& set BUSINESSES_TABLE=businesses_nowebsite&& set ENABLE_REVIEWS_EXTRACTION=1&& node backfill-demo-seo-dispatch.mjs",
+    "sync-nowebsite-from-businesses": "node sync-businesses-to-nowebsite.mjs",
+    "pipeline-nowebsite-crm-cohort": "set SCRAPE_JOBS_TABLE=scrape_jobs_nowebsite&& set BUSINESSES_TABLE=businesses_nowebsite&& set ENABLE_CATEGORY_VALIDATION=0&& set ENABLE_WEAKNESS_SUMMARY=0&& set SWEET_SPOT_MIN_REVIEWS=25&& set SWEET_SPOT_MAX_REVIEWS=199&& set SWEET_SPOT_MIN_RATING=4&& node pipeline.mjs",
+    "enrich-dispatch": "node enrich-dispatch.mjs",
+    "enrich-poller": "node enrich-poller.mjs",
+    "enrich-pipeline": "node enrich-pipeline.mjs",
+    "poller": "node poller.mjs",
+    "poller-nowebsite": "set SCRAPE_JOBS_TABLE=scrape_jobs_nowebsite&& node poller.mjs",
+    "ec2-ip": "node scripts/ec2-instance-public-ip.mjs",
+    "ping-botasaurus": "node scripts/ping-botasaurus.mjs",
+    "extract-local-cache": "node extract-local-extractor-cache.mjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ec2": "^3.1035.0",
+    "@supabase/supabase-js": "^2.104.0",
+    "botasaurus-desktop-api": "^4.1.96",
+    "dotenv": "^17.4.2",
+    "undici": "^7.16.0"
+  }
+}
