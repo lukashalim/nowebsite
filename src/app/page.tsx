@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { CrmFilters, CrmPagination } from "@/components/crm-filters";
 import { ContactCountSelect } from "@/components/contact-count-select";
+import { OutreachSpintaxButton } from "@/components/outreach-spintax-button";
+import { isEligibleForFacebookListingOutreach } from "@/lib/outreach-spintax";
 import type { BusinessLead } from "@/lib/business";
 import { fetchCrmBusinessRows } from "@/lib/crm-cohort";
 import { tryParseCrmSearchParams } from "@/lib/crm-params";
@@ -26,6 +28,11 @@ export async function generateMetadata(): Promise<Metadata> {
 
 interface PageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+function isWhatsAppListingUrl(href: string | null | undefined): boolean {
+  if (!href || typeof href !== "string") return false;
+  return /wa\.me|whatsapp\.com/i.test(href);
 }
 
 /** Google query: name + location + facebook (to surface their page). */
@@ -90,7 +97,16 @@ export default async function Home({ searchParams }: PageProps) {
         </h1>
         <p className="max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
           Only listings with review excerpts saved from Maps (for demos). Default:
-          no website, 25–199 reviews, 4+ stars. Adjust filters below.
+          no standalone website (25–199 reviews, 4+ stars). Use Has website to narrow
+          to Facebook / WhatsApp listing URLs or businesses with a real site.{" "}
+          <span className="font-medium text-zinc-700 dark:text-zinc-300">
+            DM spintax
+          </span>{" "}
+          uses DeepSeek (
+          <code className="rounded bg-zinc-100 px-1 text-xs dark:bg-zinc-800">
+            DEEPSEEK_API_KEY
+          </code>
+          ) for Facebook-on-GMB leads.
         </p>
       </header>
 
@@ -123,6 +139,8 @@ export default async function Home({ searchParams }: PageProps) {
                   <th className="px-3 py-3">Reviews</th>
                   <th className="px-3 py-3">Phone</th>
                   <th className="px-3 py-3">Links</th>
+                  <th className="px-3 py-3">DM spintax</th>
+                  <th className="px-3 py-3">Demo</th>
                   <th className="px-3 py-3">Contacted</th>
                 </tr>
               </thead>
@@ -130,7 +148,7 @@ export default async function Home({ searchParams }: PageProps) {
                 {rows.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={10}
                       className="px-3 py-8 text-center text-zinc-500 dark:text-zinc-400"
                     >
                       No rows match these filters.
@@ -139,6 +157,13 @@ export default async function Home({ searchParams }: PageProps) {
                 ) : (
                   rows.map((b) => {
                     const googleLook = googleLookupUrl(b);
+                    const spintaxEligible = isEligibleForFacebookListingOutreach({
+                      place_id: b.place_id,
+                      name: b.name,
+                      facebook_url: b.facebook_url,
+                      crm_contact_surface: b.crm_contact_surface ?? null,
+                      listing_website: b.listing_website,
+                    });
                     return (
                     <tr
                       key={b.place_id}
@@ -230,12 +255,47 @@ export default async function Home({ searchParams }: PageProps) {
                               FB
                             </a>
                           ) : null}
+                          {b.listing_website &&
+                          isWhatsAppListingUrl(b.listing_website) ? (
+                            <a
+                              href={
+                                b.listing_website.startsWith("http")
+                                  ? b.listing_website
+                                  : `https://${b.listing_website}`
+                              }
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-0.5 text-emerald-700 hover:underline dark:text-emerald-400"
+                              title="WhatsApp (Maps listing website)"
+                            >
+                              WA
+                            </a>
+                          ) : null}
+                          {b.crm_contact_surface === "facebook" ||
+                          b.crm_contact_surface === "whatsapp" ? (
+                            <span
+                              className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                              title="Contact surface (generated)"
+                            >
+                              {b.crm_contact_surface}
+                            </span>
+                          ) : null}
                           {!googleLook &&
                           !b.google_maps_link &&
-                          !b.facebook_url
+                          !b.facebook_url &&
+                          !(
+                            b.listing_website &&
+                            isWhatsAppListingUrl(b.listing_website)
+                          )
                             ? "—"
                             : null}
                         </div>
+                      </td>
+                      <td className="px-3 py-3 align-top">
+                        <OutreachSpintaxButton
+                          placeId={b.place_id}
+                          eligible={spintaxEligible}
+                        />
                       </td>
                       <td className="px-3 py-3">
                         <a

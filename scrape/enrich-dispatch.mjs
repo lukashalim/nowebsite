@@ -3,7 +3,7 @@
  * Uses google_maps_scraper with search_links = Maps URLs (+ BOTASAURUS_API_KEY).
  *
  * By default only rows meeting the same sweet-spot thresholds as pipeline.mjs:
- *   SWEET_SPOT_MIN_RATING (default 4), SWEET_SPOT_MIN_REVIEWS (75), SWEET_SPOT_MAX_REVIEWS (200)
+ *   SWEET_SPOT_MIN_RATING (default 4), SWEET_SPOT_MIN_REVIEWS (10), SWEET_SPOT_MAX_REVIEWS (200)
  * Set ENRICH_IGNORE_SWEET_SPOT=1 to enqueue regardless of rating/reviews.
  *
  * Env:
@@ -80,7 +80,7 @@ async function main() {
     process.env.ENRICH_IGNORE_SWEET_SPOT === "true";
 
   const minRating = Number(process.env.SWEET_SPOT_MIN_RATING ?? 4);
-  const minReviews = Number(process.env.SWEET_SPOT_MIN_REVIEWS ?? 75);
+  const minReviews = Number(process.env.SWEET_SPOT_MIN_REVIEWS ?? 10);
   const maxReviews = Number(process.env.SWEET_SPOT_MAX_REVIEWS ?? 200);
 
   const supabase = getSupabase();

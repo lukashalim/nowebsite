@@ -9,6 +9,9 @@
  * Env:
  *   GOOGLE_MAPS_EXTRACTOR_DIR — app root or .../task_results/cache (default: %APPDATA%/googlemapsextractor on Windows)
  *   SWEET_SPOT_* — same as pipeline
+ *   SCRAPE_MIN_REVIEWS_IN_CALENDAR_YEAR — default 2 (need this many reviews dated in the filter year; set 4 to tighten)
+ *   SCRAPE_REVIEWS_YEAR_FILTER — calendar year (default: current year, e.g. 2026)
+ *   SCRAPE_SKIP_MIN_REVIEWS_IN_CALENDAR_YEAR_FILTER=1 — disable the year review count gate
  *
  * Flags:
  *   --root <path>              — same as GOOGLE_MAPS_EXTRACTOR_DIR
@@ -42,6 +45,8 @@ import {
   getSupabase,
   rowToBusiness,
   passesSweetSpotFilters,
+  passesMinReviewsInCalendarYear,
+  getMinReviewsInCalendarYearFilterConfig,
   omitUndefined,
   parseBusinessTypeArg,
 } from "./lib/scrape-pipeline/index.mjs";
@@ -209,6 +214,7 @@ function emptyRunStats(filesCount = 0) {
     noPlaceId: 0,
     hasWebsite: 0,
     sweetSpotFail: 0,
+    skippedMinReviewsInYear: 0,
     emitted: 0,
     businessesUpserted: 0,
     upsertBatchErrors: 0,
@@ -239,6 +245,7 @@ async function persistExtractRunLog(p) {
   try {
     const db = getSupabase();
     const duration_ms = Math.max(0, Date.now() - p.startedMs);
+    const yf = getMinReviewsInCalendarYearFilterConfig();
     const filter_snapshot = {
       allowWebsite: p.allowWebsite,
       noSweetSpot: p.noSweetSpot,
@@ -246,9 +253,13 @@ async function persistExtractRunLog(p) {
         ? null
         : {
             minRating: Number(process.env.SWEET_SPOT_MIN_RATING ?? 4),
-            minReviews: Number(process.env.SWEET_SPOT_MIN_REVIEWS ?? 75),
+            minReviews: Number(process.env.SWEET_SPOT_MIN_REVIEWS ?? 10),
             maxReviews: Number(process.env.SWEET_SPOT_MAX_REVIEWS ?? 200),
           },
+      minReviewsInCalendarYear: {
+        ...yf,
+        skipped: p.stats.skippedMinReviewsInYear ?? 0,
+      },
     };
     const row = {
       duration_ms,
@@ -407,6 +418,11 @@ async function main() {
           continue;
         }
 
+        if (!passesMinReviewsInCalendarYear(raw)) {
+          stats.skippedMinReviewsInYear += 1;
+          continue;
+        }
+
         if (
           !base.postal_code &&
           base.latitude != null &&
@@ -484,9 +500,13 @@ async function main() {
         ? null
         : {
             minRating: Number(process.env.SWEET_SPOT_MIN_RATING ?? 4),
-            minReviews: Number(process.env.SWEET_SPOT_MIN_REVIEWS ?? 75),
+            minReviews: Number(process.env.SWEET_SPOT_MIN_REVIEWS ?? 10),
             maxReviews: Number(process.env.SWEET_SPOT_MAX_REVIEWS ?? 200),
           },
+      minReviewsInCalendarYear: {
+        ...getMinReviewsInCalendarYearFilterConfig(),
+        skipped: stats.skippedMinReviewsInYear,
+      },
     },
   });
 

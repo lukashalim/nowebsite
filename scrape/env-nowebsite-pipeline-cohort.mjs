@@ -3,6 +3,6 @@ import "./env-nowebsite-queue.mjs";
 
 process.env.ENABLE_CATEGORY_VALIDATION = "0";
 process.env.ENABLE_WEAKNESS_SUMMARY = "0";
-process.env.SWEET_SPOT_MIN_REVIEWS = "25";
-process.env.SWEET_SPOT_MAX_REVIEWS = "199";
+process.env.SWEET_SPOT_MIN_REVIEWS = "10";
+process.env.SWEET_SPOT_MAX_REVIEWS = "200";
 process.env.SWEET_SPOT_MIN_RATING = "4";

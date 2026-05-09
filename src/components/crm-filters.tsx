@@ -52,12 +52,15 @@ export function CrmFilters({ params }: CrmFiltersProps) {
         <label className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
           Has website
           <select
-            name="hasWebsite"
-            defaultValue={params.hasWebsite ? "true" : "false"}
+            name="webPresence"
+            defaultValue={params.webPresence}
             className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+            title="No = no standalone site (any FB/WA listing). Facebook / WhatsApp narrow by Maps listing. Yes = real website."
           >
-            <option value="false">No (default)</option>
-            <option value="true">Yes</option>
+            <option value="no">No (no real site)</option>
+            <option value="facebook">Facebook</option>
+            <option value="whatsapp">WhatsApp</option>
+            <option value="yes">Yes</option>
           </select>
         </label>
         <label className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">

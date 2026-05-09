@@ -23,6 +23,19 @@ create table if not exists public.businesses_nowebsite (
   phone text,
   google_maps_link text,
   facebook_url text,
+  listing_website text,
+  crm_contact_surface text generated always as (
+    case
+      when nullif(trim(coalesce(facebook_url, '')), '') is not null then 'facebook'
+      when listing_website is not null
+        and nullif(trim(listing_website), '') is not null
+        and listing_website ~* 'wa\.me|whatsapp\.com' then 'whatsapp'
+      when listing_website is not null
+        and nullif(trim(listing_website), '') is not null
+        and listing_website ~* 'facebook\.com|fb\.com|fb\.me' then 'facebook'
+      else 'none'
+    end
+  ) stored,
   contact_count integer not null default 0,
 
   competitive_weakness text,
@@ -60,6 +73,10 @@ create index if not exists idx_businesses_nowebsite_open_now
 
 create index if not exists idx_businesses_nowebsite_state_type
   on public.businesses_nowebsite (state, business_type);
+
+create index if not exists idx_businesses_nowebsite_crm_contact_surface
+  on public.businesses_nowebsite (crm_contact_surface)
+  where has_website = false;
 
 -- Keep updated_at fresh if you use normal UPDATE statements.
 create or replace function public.set_businesses_nowebsite_updated_at()

@@ -725,7 +725,7 @@ async function main() {
 
           if (!passesSweetSpotFilters(base.rating, base.reviews)) {
             console.log(
-              `Skipping (sweet spot ${process.env.SWEET_SPOT_MIN_RATING ?? 4}+ stars, ${process.env.SWEET_SPOT_MIN_REVIEWS ?? 75}–${process.env.SWEET_SPOT_MAX_REVIEWS ?? 200} reviews): ${base.name ?? base.place_id}`,
+              `Skipping (sweet spot ${process.env.SWEET_SPOT_MIN_RATING ?? 4}+ stars, ${process.env.SWEET_SPOT_MIN_REVIEWS ?? 10}–${process.env.SWEET_SPOT_MAX_REVIEWS ?? 200} reviews): ${base.name ?? base.place_id}`,
             );
             skippedSweetSpot += 1;
             continue;

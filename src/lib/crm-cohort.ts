@@ -7,14 +7,15 @@ import { toFiniteNumber } from "@/lib/demo-enrichment";
 import {
   defaultCrmDemoCohortFilters,
   type CrmSearchParams,
+  type CrmWebPresence,
 } from "@/lib/crm-params";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const CRM_BUSINESS_LIST_COLUMNS =
-  "place_id, name, address, city, state, postal_code, business_type, main_category, rating, reviews, phone, google_maps_link, facebook_url, contact_count" as const;
+  "place_id, name, address, city, state, postal_code, business_type, main_category, rating, reviews, phone, google_maps_link, facebook_url, listing_website, crm_contact_surface, contact_count" as const;
 
 const DEMO_CORE_COLUMNS =
-  "place_id, name, address, city, state, postal_code, business_type, main_category, rating, reviews, phone, google_maps_link, facebook_url, contact_enrichment" as const;
+  "place_id, name, address, city, state, postal_code, business_type, main_category, rating, reviews, phone, google_maps_link, facebook_url, listing_website, crm_contact_surface, contact_enrichment" as const;
 
 export const DEMO_INDEX_COLUMNS = DEMO_CORE_COLUMNS;
 
@@ -22,6 +23,27 @@ export const DEMO_DETAIL_COLUMNS =
   "place_id, name, address, city, state, postal_code, business_type, main_category, rating, reviews, phone, google_maps_link, facebook_url, contact_enrichment, latitude, longitude, is_spending_on_ads, competitive_weakness, review_highlights, services_offered, hours, open_now" as const;
 
 const BATCH = 1000;
+
+function applyWebPresenceFilter<
+  T extends { eq: (column: string, value: unknown) => T },
+>(q: T, webPresence: CrmWebPresence): T {
+  switch (webPresence) {
+    case "yes":
+      return q.eq("has_website", true);
+    case "no":
+      return q.eq("has_website", false);
+    case "plain":
+      return q.eq("has_website", false).eq("crm_contact_surface", "none");
+    case "facebook":
+      return q.eq("has_website", false).eq("crm_contact_surface", "facebook");
+    case "whatsapp":
+      return q.eq("has_website", false).eq("crm_contact_surface", "whatsapp");
+    default: {
+      const _x: never = webPresence;
+      return _x;
+    }
+  }
+}
 
 /** Only businesses with GMaps review excerpts persisted (see pipeline `review_highlights`). */
 function applyReviewExcerptsExtractedFilter<
@@ -106,6 +128,15 @@ function parseHours(value: unknown): DemoBusinessHour[] | null {
   return out.length > 0 ? out : null;
 }
 
+function parseCrmContactSurface(
+  raw: unknown,
+): "facebook" | "whatsapp" | "none" | null {
+  if (raw === "facebook" || raw === "whatsapp" || raw === "none") {
+    return raw;
+  }
+  return null;
+}
+
 function mapRowToDemoBusiness(
   data: Record<string, unknown>,
   detail: boolean,
@@ -125,6 +156,8 @@ function mapRowToDemoBusiness(
     phone: (data.phone as string | null) ?? null,
     google_maps_link: (data.google_maps_link as string | null) ?? null,
     facebook_url: (data.facebook_url as string | null) ?? null,
+    listing_website: (data.listing_website as string | null) ?? null,
+    crm_contact_surface: parseCrmContactSurface(data.crm_contact_surface),
     enrichment,
   };
   if (detail) {
@@ -154,11 +187,12 @@ export async function fetchCrmBusinessRows(
     let q = supabase
       .from("businesses_nowebsite")
       .select(CRM_BUSINESS_LIST_COLUMNS, { count: "exact" })
-      .eq("has_website", p.hasWebsite)
       .neq("contact_count", -1)
       .gte("reviews", p.minReviews)
       .lte("reviews", p.maxReviews)
       .gte("rating", p.minRating);
+
+    q = applyWebPresenceFilter(q, p.webPresence);
 
     if (p.contactMin !== undefined) {
       q = q.gte("contact_count", p.contactMin);
@@ -173,11 +207,15 @@ export async function fetchCrmBusinessRows(
     const to = from + p.pageSize - 1;
 
     const { data, error, count } = await q
-      .order("reviews", { ascending: false })
+      .order("id", { ascending: false })
       .range(from, to);
 
     if (error) {
-      return { rows: [], total: 0, error: error.message };
+      const hint =
+        /crm_contact_surface|listing_website|schema cache/i.test(error.message)
+          ? " Run scrape/sql/add-listing-website-crm-contact-surface.sql in Supabase, then refresh."
+          : "";
+      return { rows: [], total: 0, error: error.message + hint };
     }
     return {
       rows: (data ?? []) as BusinessLead[],
@@ -214,11 +252,11 @@ export async function fetchAllDemoCohortPlaceIds(): Promise<string[]> {
     let q = supabase
       .from("businesses_nowebsite")
       .select("place_id")
-      .eq("has_website", c.hasWebsite)
       .neq("contact_count", -1)
       .gte("reviews", c.minReviews)
       .lte("reviews", c.maxReviews)
       .gte("rating", c.minRating);
+    q = applyWebPresenceFilter(q, c.webPresence);
     q = applyReviewExcerptsExtractedFilter(q);
     const { data, error } = await q
       .order("place_id", { ascending: true })
@@ -246,12 +284,12 @@ export async function fetchDemoBusinessByPlaceId(
   let q = supabase
     .from("businesses_nowebsite")
     .select(DEMO_DETAIL_COLUMNS)
-    .eq("has_website", c.hasWebsite)
     .neq("contact_count", -1)
     .gte("reviews", c.minReviews)
     .lte("reviews", c.maxReviews)
     .gte("rating", c.minRating)
     .eq("place_id", placeId);
+  q = applyWebPresenceFilter(q, c.webPresence);
   q = applyReviewExcerptsExtractedFilter(q);
   const { data, error } = await q.maybeSingle();
 
@@ -279,11 +317,11 @@ export async function fetchDemoCohortPage(
   let q = supabase
     .from("businesses_nowebsite")
     .select(DEMO_INDEX_COLUMNS, { count: "exact" })
-    .eq("has_website", c.hasWebsite)
     .neq("contact_count", -1)
     .gte("reviews", c.minReviews)
     .lte("reviews", c.maxReviews)
     .gte("rating", c.minRating);
+  q = applyWebPresenceFilter(q, c.webPresence);
   q = applyReviewExcerptsExtractedFilter(q);
   const { data, error, count } = await q
     .order("reviews", { ascending: false })

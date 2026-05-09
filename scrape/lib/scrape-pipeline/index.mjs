@@ -303,6 +303,36 @@ export function normalizeFacebookUrl(href) {
 }
 
 /**
+ * True when the Maps "website" field is only a Facebook-family URL (facebook.com, fb.com, fb.me).
+ * Those listings should be treated as having no standalone website for lead filtering.
+ * @param {string|null|undefined} href
+ * @returns {boolean}
+ */
+export function isFacebookWebsiteField(href) {
+  return normalizeFacebookUrl(href != null ? String(href) : "") != null;
+}
+
+/**
+ * True when the website field is only a WhatsApp link (`wa.me`, `*.whatsapp.com`), e.g.
+ * `https://wa.me/c/12404682667` — treat as no standalone website for lead filtering.
+ * @param {string|null|undefined} href
+ * @returns {boolean}
+ */
+export function isWhatsAppWebsiteField(href) {
+  if (!href || typeof href !== "string") return false;
+  const s = href.trim();
+  if (!s) return false;
+  try {
+    const u = new URL(s.startsWith("http") ? s : `https://${s}`);
+    const h = u.hostname.toLowerCase();
+    if (h === "wa.me" || h.endsWith(".wa.me")) return true;
+    return /(^|\.)whatsapp\.com$/i.test(h);
+  } catch {
+    return /\bwa\.me\b|whatsapp\.com/i.test(s);
+  }
+}
+
+/**
  * Google Maps scraper exposes FACEBOOK when website social enrichment runs (enable_emails_social).
  */
 export function pickFacebookUrl(row) {
@@ -333,10 +363,10 @@ export function pickFacebookUrl(row) {
   return null;
 }
 
-/** Rating 4+ and reviews in [75, 200] by default. */
+/** Rating 4+ and reviews in [10, 200] by default. */
 export function passesSweetSpotFilters(rating, reviews) {
   const minR = Number(process.env.SWEET_SPOT_MIN_RATING ?? 4);
-  const minRev = Number(process.env.SWEET_SPOT_MIN_REVIEWS ?? 75);
+  const minRev = Number(process.env.SWEET_SPOT_MIN_REVIEWS ?? 10);
   const maxRev = Number(process.env.SWEET_SPOT_MAX_REVIEWS ?? 200);
   const r = toNum(rating);
   const n = toInt(reviews);
@@ -345,10 +375,206 @@ export function passesSweetSpotFilters(rating, reviews) {
   return n >= minRev && n <= maxRev;
 }
 
+/**
+ * Review list shapes from google_maps_scraper / extractor NDJSON.
+ * @param {Record<string, unknown>} row
+ * @returns {unknown[]}
+ */
+export function pickReviewContainers(row) {
+  const candidates = [
+    pick(row, "featured_reviews", "FEATURED_REVIEWS"),
+    pick(row, "reviews_data", "REVIEWS_DATA"),
+    pick(row, "reviews", "REVIEWS"),
+  ];
+  for (const c of candidates) {
+    if (Array.isArray(c)) return c;
+  }
+  return [];
+}
+
+function envFlagScrape(name, def = false) {
+  const v = process.env[name];
+  if (v == null) return def;
+  const s = String(v).trim().toLowerCase();
+  if (s === "1" || s === "true" || s === "yes") return true;
+  if (s === "0" || s === "false" || s === "no") return false;
+  return def;
+}
+
+/**
+ * Best-effort ms since epoch for a single review object. Unknown → null (not counted toward a year).
+ * @param {unknown} rev
+ * @param {number} [nowMs]
+ * @returns {number|null}
+ */
+function relativeAgoToMs(quantity, unitRaw, nowMs) {
+  const unit = unitRaw.toLowerCase();
+  const n =
+    quantity === "a" || quantity === "an" || quantity === "one" ? 1 : Number.parseInt(quantity, 10);
+  if (!Number.isFinite(n) || n < 0) return null;
+  const sec =
+    unit.startsWith("sec")
+      ? n
+      : unit.startsWith("min")
+        ? n * 60
+        : unit.startsWith("hour")
+          ? n * 3600
+          : unit.startsWith("day")
+            ? n * 86400
+            : unit.startsWith("week")
+              ? n * 7 * 86400
+              : unit.startsWith("month")
+                ? n * 30 * 86400
+                : unit.startsWith("year")
+                  ? n * 365.25 * 86400
+                  : 0;
+  return nowMs - sec * 1000;
+}
+
+export function parseReviewDateMs(rev, nowMs = Date.now()) {
+  if (!rev || typeof rev !== "object") return null;
+  const r = /** @type {Record<string, unknown>} */ (rev);
+  const raw = pick(
+    r,
+    "review_time",
+    "REVIEW_TIME",
+    "reviewTime",
+    "time",
+    "TIME",
+    "relative_time",
+    "RELATIVE_TIME",
+    "relativeTime",
+    "relative_description",
+    "date",
+    "DATE",
+    "timestamp",
+    "TIMESTAMP",
+    "created_at",
+    "createdAt",
+    "published_at",
+    "publishedAt",
+    "iso_date",
+    "review_date",
+  );
+
+  const secTop = toNum(pick(r, "seconds", "SECONDS"));
+  if (secTop != null && secTop > 1e9) return secTop * 1000;
+
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    if (raw > 1e12) return raw;
+    if (raw > 1e9) return raw * 1000;
+    return null;
+  }
+
+  if (raw != null && typeof raw === "object") {
+    const nested = pick(/** @type {Record<string, unknown>} */ (raw), "seconds", "nanos");
+    if (typeof nested === "number" && Number.isFinite(nested) && nested > 1e9) {
+      return nested * 1000;
+    }
+    const alt = pick(/** @type {Record<string, unknown>} */ (raw), "text", "label", "description");
+    if (alt != null && typeof alt !== "object") {
+      const inner = String(alt).trim();
+      const ms = parseReviewDateMs({ ...r, review_time: inner }, nowMs);
+      if (ms != null) return ms;
+    }
+  }
+
+  let s = raw != null ? String(raw).trim() : "";
+  if (!s) return null;
+
+  s = s.replace(/^\s*edited\s*:?\s*/i, "").trim();
+
+  let parsed = Date.parse(s);
+  if (!Number.isNaN(parsed)) return parsed;
+
+  const lower = s.toLowerCase();
+  if (/^yesterday\b/i.test(lower)) return relativeAgoToMs("1", "day", nowMs);
+  if (/^(last|past)\s+week\b/i.test(lower)) return relativeAgoToMs("1", "week", nowMs);
+
+  let rel = /^(\d+)\s*(second|minute|hour|day|week|month|year)s?\s*ago\b/i.exec(s);
+  if (rel) {
+    const ms = relativeAgoToMs(rel[1], rel[2], nowMs);
+    return ms != null ? ms : null;
+  }
+
+  rel = /^(a|an|one)\s+(second|minute|hour|day|week|month|year)s?\s*ago\b/i.exec(s);
+  if (rel) {
+    const ms = relativeAgoToMs(rel[1], rel[2], nowMs);
+    return ms != null ? ms : null;
+  }
+
+  return null;
+}
+
+/**
+ * Count reviews whose date falls in `calendarYear` (local timezone).
+ * @param {Record<string, unknown>} row
+ * @param {number} calendarYear e.g. 2026
+ * @param {number} [nowMs]
+ */
+export function countReviewsInCalendarYear(row, calendarYear, nowMs = Date.now()) {
+  const reviews = pickReviewContainers(row);
+  let n = 0;
+  for (const rev of reviews) {
+    const ms = parseReviewDateMs(rev, nowMs);
+    if (ms == null) continue;
+    if (new Date(ms).getFullYear() === calendarYear) n += 1;
+  }
+  return n;
+}
+
+/**
+ * Require at least N reviews dated in the filter year (default: current calendar year, min 2).
+ * Set SCRAPE_SKIP_MIN_REVIEWS_IN_CALENDAR_YEAR_FILTER=1 to disable.
+ * Override year: SCRAPE_REVIEWS_YEAR_FILTER=2026
+ * Override min: SCRAPE_MIN_REVIEWS_IN_CALENDAR_YEAR (default 2; use 4 for stricter gate)
+ *
+ * @param {Record<string, unknown>} rawRow — full extractor row (with review arrays)
+ * @param {{ nowMs?: number }} [opts]
+ */
+export function passesMinReviewsInCalendarYear(rawRow, opts = {}) {
+  if (envFlagScrape("SCRAPE_SKIP_MIN_REVIEWS_IN_CALENDAR_YEAR_FILTER", false)) {
+    return true;
+  }
+  const nowMs = opts.nowMs ?? Date.now();
+  const yRaw = process.env.SCRAPE_REVIEWS_YEAR_FILTER;
+  const year = yRaw != null && String(yRaw).trim() !== ""
+    ? Number.parseInt(String(yRaw), 10)
+    : new Date(nowMs).getFullYear();
+  if (!Number.isFinite(year)) {
+    return false;
+  }
+  const min = Number.parseInt(
+    String(process.env.SCRAPE_MIN_REVIEWS_IN_CALENDAR_YEAR ?? "2"),
+    10,
+  );
+  const need = Number.isFinite(min) && min >= 0 ? min : 2;
+  return countReviewsInCalendarYear(rawRow, year, nowMs) >= need;
+}
+
+export function getMinReviewsInCalendarYearFilterConfig(nowMs = Date.now()) {
+  const disabled = envFlagScrape("SCRAPE_SKIP_MIN_REVIEWS_IN_CALENDAR_YEAR_FILTER", false);
+  const yRaw = process.env.SCRAPE_REVIEWS_YEAR_FILTER;
+  const year =
+    yRaw != null && String(yRaw).trim() !== ""
+      ? Number.parseInt(String(yRaw), 10)
+      : new Date(nowMs).getFullYear();
+  const min = Number.parseInt(
+    String(process.env.SCRAPE_MIN_REVIEWS_IN_CALENDAR_YEAR ?? "2"),
+    10,
+  );
+  return {
+    disabled,
+    year: Number.isFinite(year) ? year : new Date(nowMs).getFullYear(),
+    min: Number.isFinite(min) && min >= 0 ? min : 2,
+  };
+}
+
 export function rowToBusiness(row, businessTypeArg) {
   const da = pickDetailedAddress(row);
   const { latitude, longitude } = pickLatLng(row);
   const website = pick(row, "website", "WEBSITE");
+  const websiteTrim = website != null ? String(website).trim() : "";
   const street = da.street ?? pick(row, "address", "ADDRESS");
   return {
     place_id: pick(row, "place_id", "PLACE_ID"),
@@ -364,10 +590,15 @@ export function rowToBusiness(row, businessTypeArg) {
     rating: toNum(pick(row, "rating", "RATING")),
     reviews: toInt(pick(row, "reviews", "REVIEWS")),
     is_spending_on_ads: Boolean(pick(row, "is_spending_on_ads", "IS_SPENDING_ON_ADS")),
-    has_website: Boolean(website && String(website).trim()),
+    has_website:
+      Boolean(websiteTrim) &&
+      !isFacebookWebsiteField(websiteTrim) &&
+      !isWhatsAppWebsiteField(websiteTrim),
     phone: pick(row, "phone", "PHONE"),
     google_maps_link: pick(row, "link", "LINK"),
     facebook_url: pickFacebookUrl(row),
+    /** Raw Maps website URL (Facebook / WhatsApp / etc.); stored for CRM contact-surface filters. */
+    listing_website: websiteTrim ? websiteTrim : null,
   };
 }
 
