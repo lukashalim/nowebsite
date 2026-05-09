@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import {
   ExternalLink,
   Mail,
@@ -11,7 +11,11 @@ import {
   Star,
   Clock3,
 } from "lucide-react";
-import { fetchDemoBusinessByPlaceId } from "@/lib/crm-cohort";
+import {
+  fetchDemoBusinessByUrlSegment,
+  type DemoBusiness,
+} from "@/lib/crm-cohort";
+import { demoPublicPath, isLikelyGooglePlaceId } from "@/lib/demo-slug";
 import { DemoReviewCarousel } from "@/components/demo-review-carousel";
 import { buildLocalBusinessJsonLd } from "@/lib/demo-local-business-jsonld";
 import {
@@ -44,7 +48,7 @@ function serviceLabel(b: {
   return b.main_category?.trim() || "Local services";
 }
 
-function formatTitle(b: Awaited<ReturnType<typeof fetchDemoBusinessByPlaceId>>) {
+function formatTitle(b: DemoBusiness | null) {
   if (!b) return "Demo not found";
   const name = b.name?.trim() || "Local business";
   const service = serviceLabel(b);
@@ -54,9 +58,7 @@ function formatTitle(b: Awaited<ReturnType<typeof fetchDemoBusinessByPlaceId>>) 
   return loc ? `${name} | ${service} in ${loc}` : `${name} | ${service}`;
 }
 
-function formatDescription(b: NonNullable<
-  Awaited<ReturnType<typeof fetchDemoBusinessByPlaceId>>
->): string {
+function formatDescription(b: NonNullable<DemoBusiness>): string {
   const summary = b.enrichment?.sales_summary?.trim();
   if (summary) {
     return truncateForMeta(summary.replace(/\s+/g, " "));
@@ -80,11 +82,11 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { placeId } = await params;
-  const b = await fetchDemoBusinessByPlaceId(placeId);
+  const b = await fetchDemoBusinessByUrlSegment(placeId);
   if (!b) {
     return { title: "Demo not found" };
   }
-  const path = `/demo/${encodeURIComponent(b.place_id)}`;
+  const path = demoPublicPath(b);
   return {
     title: formatTitle(b),
     description: formatDescription(b),
@@ -141,9 +143,24 @@ function formatBusinessDisplayName(name: string | null, service: string): string
 
 export default async function DemoBusinessPage({ params }: PageProps) {
   const { placeId } = await params;
-  const b = await fetchDemoBusinessByPlaceId(placeId);
+  const b = await fetchDemoBusinessByUrlSegment(placeId);
   if (!b) {
     notFound();
+  }
+
+  const decodedSegment = (() => {
+    try {
+      return decodeURIComponent(placeId.trim());
+    } catch {
+      return placeId.trim();
+    }
+  })();
+  if (
+    b.demo_slug &&
+    isLikelyGooglePlaceId(decodedSegment) &&
+    decodedSegment === b.place_id
+  ) {
+    redirect(demoPublicPath(b));
   }
 
   const service = serviceLabel(b);

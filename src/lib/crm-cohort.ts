@@ -9,20 +9,33 @@ import {
   type CrmSearchParams,
   type CrmWebPresence,
 } from "@/lib/crm-params";
+import type { DemoReviewHighlight } from "@/lib/demo-review-types";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
+import { demoPublicPath, isLikelyGooglePlaceId } from "@/lib/demo-slug";
+
+export type { DemoReviewHighlight } from "@/lib/demo-review-types";
 
 export const CRM_BUSINESS_LIST_COLUMNS =
-  "place_id, name, address, city, state, postal_code, business_type, main_category, rating, reviews, phone, google_maps_link, facebook_url, listing_website, crm_contact_surface, contact_count" as const;
+  "place_id, demo_slug, name, address, city, state, postal_code, business_type, main_category, rating, reviews, phone, google_maps_link, facebook_url, listing_website, crm_contact_surface, contact_count" as const;
 
 const DEMO_CORE_COLUMNS =
-  "place_id, name, address, city, state, postal_code, business_type, main_category, rating, reviews, phone, google_maps_link, facebook_url, listing_website, crm_contact_surface, contact_enrichment" as const;
+  "place_id, demo_slug, name, address, city, state, postal_code, business_type, main_category, rating, reviews, phone, google_maps_link, facebook_url, listing_website, crm_contact_surface, contact_enrichment" as const;
 
 export const DEMO_INDEX_COLUMNS = DEMO_CORE_COLUMNS;
 
 export const DEMO_DETAIL_COLUMNS =
-  "place_id, name, address, city, state, postal_code, business_type, main_category, rating, reviews, phone, google_maps_link, facebook_url, contact_enrichment, latitude, longitude, is_spending_on_ads, competitive_weakness, review_highlights, services_offered, hours, open_now" as const;
+  "place_id, demo_slug, name, address, city, state, postal_code, business_type, main_category, rating, reviews, phone, google_maps_link, facebook_url, contact_enrichment, latitude, longitude, is_spending_on_ads, competitive_weakness, review_highlights, services_offered, hours, open_now" as const;
 
 const BATCH = 1000;
+
+function normalizeDemoUrlSegment(segment: string): string {
+  const t = segment.trim();
+  try {
+    return decodeURIComponent(t);
+  } catch {
+    return t;
+  }
+}
 
 function applyWebPresenceFilter<
   T extends { eq: (column: string, value: unknown) => T },
@@ -54,13 +67,6 @@ function applyReviewExcerptsExtractedFilter<
   return q
     .not("review_highlights->0", "is", null)
     .not("review_highlights->0->excerpt", "is", null) as T;
-}
-
-export interface DemoReviewHighlight {
-  rating?: number;
-  excerpt: string;
-  relative_time?: string;
-  reviewer_name?: string;
 }
 
 export interface DemoBusinessHour {
@@ -97,12 +103,24 @@ function parseReviewHighlights(value: unknown): DemoReviewHighlight[] | null {
   return out.length > 0 ? out : null;
 }
 
+/** Synthetic scrape placeholder for business_type — not a customer-facing service. */
+function isPlaceholderServicesOfferedLabel(label: string): boolean {
+  const t = label
+    .trim()
+    .toLowerCase()
+    .replace(/_+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return t === "local cache";
+}
+
 function parseServicesOffered(value: unknown): string[] | null {
   if (!Array.isArray(value)) return null;
   const out = value
     .filter((x): x is string => typeof x === "string")
     .map((x) => x.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter((x) => !isPlaceholderServicesOfferedLabel(x));
   return out.length > 0 ? out : null;
 }
 
@@ -142,8 +160,14 @@ function mapRowToDemoBusiness(
   detail: boolean,
 ): DemoBusiness {
   const enrichment = parseContactEnrichment(data.contact_enrichment);
+  const slugRaw = data.demo_slug;
+  const demo_slug =
+    typeof slugRaw === "string" && slugRaw.trim()
+      ? slugRaw.trim().toLowerCase()
+      : null;
   const b: DemoBusiness = {
     place_id: String(data.place_id ?? ""),
+    demo_slug,
     name: (data.name as string | null) ?? null,
     address: (data.address as string | null) ?? null,
     city: (data.city as string | null) ?? null,
@@ -241,17 +265,17 @@ export interface DemoBusiness extends Omit<BusinessLead, "contact_count"> {
   enrichment?: ContactEnrichment | null;
 }
 
-/** All `place_id` values in the default CRM demo cohort (for sitemaps). */
-export async function fetchAllDemoCohortPlaceIds(): Promise<string[]> {
+/** Public `/demo/...` paths for the default demo cohort (for sitemaps). */
+export async function fetchAllDemoCohortPublicDemoPaths(): Promise<string[]> {
   const c = defaultCrmDemoCohortFilters();
   const supabase = createSupabaseAdmin();
-  const ids: string[] = [];
+  const paths: string[] = [];
   let offset = 0;
 
   for (;;) {
     let q = supabase
       .from("businesses_nowebsite")
-      .select("place_id")
+      .select("place_id, demo_slug")
       .neq("contact_count", -1)
       .gte("reviews", c.minReviews)
       .lte("reviews", c.maxReviews)
@@ -267,39 +291,51 @@ export async function fetchAllDemoCohortPlaceIds(): Promise<string[]> {
     }
     const rows = data ?? [];
     for (const row of rows) {
-      if (row.place_id) ids.push(row.place_id);
+      const placeId = row.place_id as string | undefined;
+      if (!placeId) continue;
+      paths.push(
+        demoPublicPath({
+          place_id: placeId,
+          demo_slug: (row.demo_slug as string | null | undefined) ?? null,
+        }),
+      );
     }
     if (rows.length < BATCH) break;
     offset += BATCH;
   }
 
-  return ids;
+  return paths;
 }
 
-export async function fetchDemoBusinessByPlaceId(
-  placeId: string,
+/**
+ * Load a demo detail row by URL segment: Google `place_id` (legacy) or `demo_slug`.
+ * Intentionally avoids demo-cohort filters so shared links keep working.
+ */
+export async function fetchDemoBusinessByUrlSegment(
+  segment: string,
 ): Promise<DemoBusiness | null> {
-  const c = defaultCrmDemoCohortFilters();
+  const raw = normalizeDemoUrlSegment(segment);
+  if (!raw) return null;
+
   const supabase = createSupabaseAdmin();
   let q = supabase
     .from("businesses_nowebsite")
     .select(DEMO_DETAIL_COLUMNS)
-    .neq("contact_count", -1)
-    .gte("reviews", c.minReviews)
-    .lte("reviews", c.maxReviews)
-    .gte("rating", c.minRating)
-    .eq("place_id", placeId);
-  q = applyWebPresenceFilter(q, c.webPresence);
-  q = applyReviewExcerptsExtractedFilter(q);
+    .neq("contact_count", -1);
+
+  if (isLikelyGooglePlaceId(raw)) {
+    q = q.eq("place_id", raw);
+  } else {
+    q = q.eq("demo_slug", raw.toLowerCase());
+  }
+
   const { data, error } = await q.maybeSingle();
 
   if (error) {
     throw new Error(error.message);
   }
   if (!data) return null;
-  const b = mapRowToDemoBusiness(data as Record<string, unknown>, true);
-  if (!b.review_highlights?.length) return null;
-  return b;
+  return mapRowToDemoBusiness(data as Record<string, unknown>, true);
 }
 
 /** Paginated list for `/demo` index (default cohort). */

@@ -1,5 +1,6 @@
 import type { DemoBusiness } from "@/lib/crm-cohort";
 import { collectSameAsUrls } from "@/lib/demo-enrichment";
+import { demoPublicPath } from "@/lib/demo-slug";
 import { absoluteUrl } from "@/lib/site-url";
 
 export function buildLocalBusinessJsonLd(
@@ -31,7 +32,7 @@ export function buildLocalBusinessJsonLd(
     "@type": "LocalBusiness",
     name,
     description,
-    url: absoluteUrl(`/demo/${encodeURIComponent(b.place_id)}`),
+    url: absoluteUrl(demoPublicPath(b)),
   };
 
   const areaServed = [city, region, postal].filter(Boolean);

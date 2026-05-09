@@ -54,6 +54,10 @@ import {
   buildBusinessUpsertPayload,
   reverseGeocodeZipCensus,
 } from "./lib/business-payload-from-raw.mjs";
+import {
+  createDemoSlugAllocator,
+  assignDemoSlugToPayload,
+} from "./lib/demo-slug.mjs";
 
 const DEFAULT_WIN_EXTRACTOR_DIR = "googlemapsextractor";
 
@@ -312,6 +316,8 @@ async function main() {
   const supabase = getSupabase();
   /** @type {object[]} */
   const payloadBuffer = [];
+  /** @type {Promise<{ slugToPlace: Map<string, string>, placeToSlug: Map<string, string> }>|null} */
+  let slugStatePromise = null;
 
   const cacheDir = path.join(root, "task_results", "cache");
   const tasksDir = path.join(root, "task_results", "tasks");
@@ -364,6 +370,13 @@ async function main() {
       }
       const n = Math.min(BUSINESSES_UPSERT_BATCH_SIZE, payloadBuffer.length);
       const chunk = payloadBuffer.splice(0, n);
+      if (!slugStatePromise) {
+        slugStatePromise = createDemoSlugAllocator(supabase, BUSINESSES_TABLE);
+      }
+      const slugState = await slugStatePromise;
+      for (const row of chunk) {
+        assignDemoSlugToPayload(slugState, row);
+      }
       const { error: upErr } = await supabase
         .from(BUSINESSES_TABLE)
         .upsert(chunk, { onConflict: "place_id" });

@@ -90,6 +90,11 @@ function normalizeServiceLabel(s) {
     .toLowerCase();
 }
 
+/** `business_type` fallback from extract-local; must never appear as a service bullet. */
+function isPlaceholderServiceNormalized(n) {
+  return n.replace(/_+/g, " ").trim() === "local cache";
+}
+
 function titleCase(s) {
   return String(s ?? "")
     .split(" ")
@@ -203,6 +208,7 @@ export function extractServicesOffered(raw, base) {
   for (const c of candidates) {
     const n = normalizeServiceLabel(c);
     if (!n || n.length < 3) continue;
+    if (isPlaceholderServiceNormalized(n)) continue;
     if (seen.has(n)) continue;
     seen.add(n);
     uniq.push(titleCase(n));

@@ -14,6 +14,7 @@ import { OutreachSpintaxButton } from "@/components/outreach-spintax-button";
 import { isEligibleForFacebookListingOutreach } from "@/lib/outreach-spintax";
 import type { BusinessLead } from "@/lib/business";
 import { fetchCrmBusinessRows } from "@/lib/crm-cohort";
+import { demoPublicPath } from "@/lib/demo-slug";
 import { tryParseCrmSearchParams } from "@/lib/crm-params";
 
 export const dynamic = "force-dynamic";
@@ -299,7 +300,7 @@ export default async function Home({ searchParams }: PageProps) {
                       </td>
                       <td className="px-3 py-3">
                         <a
-                          href={`/demo/${encodeURIComponent(b.place_id)}`}
+                          href={demoPublicPath(b)}
                           className="text-blue-600 hover:underline dark:text-blue-400"
                           target="_blank"
                           rel="noopener noreferrer"

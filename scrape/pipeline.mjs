@@ -9,6 +9,7 @@ import {
   sleep,
   passesSweetSpotFilters,
 } from "./lib/scrape-pipeline/index.mjs";
+import { attachDemoSlugsToPayloads } from "./lib/demo-slug.mjs";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const BUSINESSES_UPSERT_BATCH_SIZE = Math.max(
@@ -477,6 +478,11 @@ function normalizeServiceLabel(s) {
     .toLowerCase();
 }
 
+/** `business_type` fallback from extract-local; must never appear as a service bullet. */
+function isPlaceholderServiceNormalized(n) {
+  return n.replace(/_+/g, " ").trim() === "local cache";
+}
+
 function titleCase(s) {
   return String(s ?? "")
     .split(" ")
@@ -582,6 +588,7 @@ function extractServicesOffered(raw, base) {
   for (const c of candidates) {
     const n = normalizeServiceLabel(c);
     if (!n || n.length < 3) continue;
+    if (isPlaceholderServiceNormalized(n)) continue;
     if (seen.has(n)) continue;
     seen.add(n);
     uniq.push(titleCase(n));
@@ -762,6 +769,13 @@ async function main() {
           console.error("Row error:", rowErr.message ?? rowErr);
           rowErrors += 1;
         }
+      }
+
+      try {
+        await attachDemoSlugsToPayloads(supabase, BUSINESSES_TABLE, payloads);
+      } catch (slugErr) {
+        console.error("demo_slug assignment failed:", slugErr.message ?? slugErr);
+        throw slugErr;
       }
 
       for (let i = 0; i < payloads.length; i += BUSINESSES_UPSERT_BATCH_SIZE) {

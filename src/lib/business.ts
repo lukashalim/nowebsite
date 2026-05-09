@@ -1,5 +1,7 @@
 export interface BusinessLead {
   place_id: string;
+  /** Pretty `/demo/{slug}` segment when set (see scrape `demo_slug`). */
+  demo_slug?: string | null;
   name: string | null;
   address: string | null;
   city: string | null;

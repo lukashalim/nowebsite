@@ -34,27 +34,44 @@ export function isEligibleForFacebookListingOutreach(row: FacebookOutreachRow): 
   return Boolean(fb);
 }
 
-const SYSTEM_PROMPT = `You write concise outreach spintax for cold DMs. Output rules:
-- Return ONE line only: complete flat spintax — no curly braces, no markdown, no **bold**.
-- Format exactly: Hey ACTUAL_NAME - group1optA|group1optB. group2optA|group2optB. group3optA|group3optB
-  - Use the real business name once after "Hey " (plain text, not a placeholder).
-  - Separate spin groups with ". " (period + space). Inside each group, separate alternatives with "|" only (no "|." — put the period inside each alternative where the sentence needs it, or end the group with a single period after the last alternative if the whole group is one sentence).
-  - Typically 3 groups: (1) warning about Facebook as website on Google / GMB hurting ranking, (2) you fix it with a simple site, (3) permission to share a demo (questions can end with ?).
-- Meaning: warn that using Facebook as the website on their Google Business Profile hurts local ranking; you fix it with a simple site; ask permission to share a demo.
+const SYSTEM_PROMPT = `You write one concise cold-DM line for a local business. Output rules:
+- Return exactly ONE version — a single message. No spintax: do not use the "|" character anywhere. No curly braces, no markdown, no **bold**.
+- Structure: greeting with their name, then 2–3 short sentences separated by ". " (period + space).
+  - Start with "Hey " plus the short name they gave you (plain text).
+  - (1) Note that using Facebook as the website on their Google Business Profile / Google listing hurts local ranking (one clear wording).
+  - (2) You fix that with a simple site (one clear wording).
+  - (3) Ask permission to share a demo (one question).
 - Stay professional, short, and non-spammy. No emojis.
 - Do not wrap in code fences. No explanation before or after the line.
 
 Good shape (example — use their real name, not this business):
-Hey Arcade Resurrection - having Facebook as your website on Google hurts your local ranking|using Facebook as your site on Google Business Profile drops your ranking. I fix that with a simple site|I can fix that with a straightforward website. Mind if I share a demo?|Can I send you a short demo?`;
+Hey Arcade Resurrection - having Facebook as your website on Google hurts your local ranking. I fix that with a simple site. Mind if I share a demo?`;
 
 function userPrompt(shortName: string, fullName: string): string {
-  return `Address them using this short name in the line (plain text after "Hey "): ${shortName}
+  return `Address them using this short name after "Hey ": ${shortName}
 Full business name (context only): ${fullName || shortName}
 
-Base idea (paraphrase into flat pipe spintax with 2–3 alternatives per group):
+Paraphrase this idea into one polished line (remember: no "|" character, single version only):
 "Hey ${shortName} - Having Facebook as your website on your Google listing hurts your ranking. I fix that with a simple site. Mind if I share a demo?"
 
-Output one line in the flat format from the system rules.`;
+Output that one line only.`;
+}
+
+/**
+ * If the model still emits pipe-separated variants, keep the first option per sentence chunk.
+ */
+function collapsePipeVariants(line: string): string {
+  const stripped = line
+    .replace(/^```[\w]*\n?|\n?```$/g, "")
+    .trim()
+    .replace(/\s+/g, " ");
+  if (!stripped.includes("|")) return stripped;
+  const chunks = stripped.split(/\.\s+/).map((chunk) => {
+    const c = chunk.trim();
+    if (!c.includes("|")) return c;
+    return c.split("|")[0].trim();
+  });
+  return chunks.filter(Boolean).join(". ").trim();
 }
 
 export async function generateFacebookListingSpintax(
@@ -75,7 +92,7 @@ export async function generateFacebookListingSpintax(
     },
     body: JSON.stringify({
       model,
-      temperature: 0.75,
+      temperature: 0.45,
       max_tokens: 500,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
@@ -96,5 +113,5 @@ export async function generateFacebookListingSpintax(
   if (!raw) {
     throw new Error("Empty response from DeepSeek");
   }
-  return raw.replace(/^```[\w]*\n?|\n?```$/g, "").trim();
+  return collapsePipeVariants(raw);
 }

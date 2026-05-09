@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { BadgeCheck, ChevronLeft, ChevronRight, Star } from "lucide-react";
-import type { DemoReviewHighlight } from "@/lib/crm-cohort";
+import type { DemoReviewHighlight } from "@/lib/demo-review-types";
 
 interface DemoReviewCarouselProps {
   reviews: DemoReviewHighlight[];

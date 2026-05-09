@@ -5,6 +5,7 @@ import {
   demoCohortTotalPages,
   fetchDemoCohortPage,
 } from "@/lib/crm-cohort";
+import { demoPublicPath } from "@/lib/demo-slug";
 import { salesSummaryOneLine } from "@/lib/demo-enrichment";
 
 export const revalidate = 3600;
@@ -73,7 +74,7 @@ export default async function DemoIndex({ searchParams }: DemoIndexProps) {
           </li>
         ) : (
           rows.map((b) => {
-            const href = `/demo/${encodeURIComponent(b.place_id)}`;
+            const href = demoPublicPath(b);
             const loc =
               [b.city, b.state, b.postal_code].filter(Boolean).join(", ") ||
               b.address ||
