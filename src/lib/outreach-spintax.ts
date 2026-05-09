@@ -35,20 +35,26 @@ export function isEligibleForFacebookListingOutreach(row: FacebookOutreachRow): 
 }
 
 const SYSTEM_PROMPT = `You write concise outreach spintax for cold DMs. Output rules:
-- Return ONE line only: valid spintax using curly braces with pipe separators, e.g. {Hi|Hey|Hello} **Name** — {rest A|rest B}.
-- Use markdown bold around the business name exactly as shown: **SHORT_NAME** (we will replace SHORT_NAME — keep the double asterisks around it in every branch where the name appears).
+- Return ONE line only: complete flat spintax — no curly braces, no markdown, no **bold**.
+- Format exactly: Hey ACTUAL_NAME - group1optA|group1optB. group2optA|group2optB. group3optA|group3optB
+  - Use the real business name once after "Hey " (plain text, not a placeholder).
+  - Separate spin groups with ". " (period + space). Inside each group, separate alternatives with "|" only (no "|." — put the period inside each alternative where the sentence needs it, or end the group with a single period after the last alternative if the whole group is one sentence).
+  - Typically 3 groups: (1) warning about Facebook as website on Google / GMB hurting ranking, (2) you fix it with a simple site, (3) permission to share a demo (questions can end with ?).
 - Meaning: warn that using Facebook as the website on their Google Business Profile hurts local ranking; you fix it with a simple site; ask permission to share a demo.
-- Stay professional, short, and non-spammy. No emojis unless inside a spintax option.
-- Do not wrap in code fences. No explanation before or after the spintax line.`;
+- Stay professional, short, and non-spammy. No emojis.
+- Do not wrap in code fences. No explanation before or after the line.
+
+Good shape (example — use their real name, not this business):
+Hey Arcade Resurrection - having Facebook as your website on Google hurts your local ranking|using Facebook as your site on Google Business Profile drops your ranking. I fix that with a simple site|I can fix that with a straightforward website. Mind if I share a demo?|Can I send you a short demo?`;
 
 function userPrompt(shortName: string, fullName: string): string {
-  return `SHORT_NAME (use in message, bolded): **${shortName}**
+  return `Address them using this short name in the line (plain text after "Hey "): ${shortName}
 Full business name (context only): ${fullName || shortName}
 
-Base idea (paraphrase into spintax with multiple synonym branches):
-"Hey **${shortName}** - Having your facebook as your website on your google listing hurts your ranking. I fix that with a simple site. Mind if I share a demo?"
+Base idea (paraphrase into flat pipe spintax with 2–3 alternatives per group):
+"Hey ${shortName} - Having Facebook as your website on your Google listing hurts your ranking. I fix that with a simple site. Mind if I share a demo?"
 
-Produce spintax that varies the greeting, the middle sentence, and the closing question, while always using **${shortName}** for the name when you address them.`;
+Output one line in the flat format from the system rules.`;
 }
 
 export async function generateFacebookListingSpintax(
