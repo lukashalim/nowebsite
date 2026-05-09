@@ -36,15 +36,25 @@ function isWhatsAppListingUrl(href: string | null | undefined): boolean {
   return /wa\.me|whatsapp\.com/i.test(href);
 }
 
-/** Google query: name + location + facebook (to surface their page). */
+/** Digits-only length check — enough to be a real phone for search disambiguation. */
+function phoneForGoogleQuery(phone: string | null | undefined): string | null {
+  const raw = phone?.trim();
+  if (!raw) return null;
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length < 7) return null;
+  return raw;
+}
+
+/** Google query: name + phone (preferred over ZIP) + city/state + facebook. */
 function googleLookupUrl(b: BusinessLead): string | null {
   const name = b.name?.trim() || b.business_type?.trim();
+  const phoneQ = phoneForGoogleQuery(b.phone);
   const loc =
-    [b.city, b.state, b.postal_code].filter(Boolean).join(" ").trim() ||
+    [b.city, b.state].filter(Boolean).join(" ").trim() ||
     b.address?.trim() ||
     "";
-  if (!name && !loc) return null;
-  const q = [name, loc, "facebook"]
+  if (!name && !phoneQ && !loc) return null;
+  const q = [name, phoneQ, loc, "facebook"]
     .filter((s): s is string => typeof s === "string" && s.length > 0)
     .join(" ");
   return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
