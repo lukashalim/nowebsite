@@ -45,7 +45,7 @@ export const crmSearchParamsSchema = z
     maxReviews: intInRange(199, 0, 1_000_000),
     minRating: floatInRange(4, 0, 5),
     /** No = no standalone website (broad); Facebook / WhatsApp narrow by Maps listing; Yes = has a real site. */
-    webPresence: z.enum(crmWebPresenceValues),
+    webPresence: z.enum(crmWebPresenceValues).default("no"),
     page: intInRange(1, 1, 1_000_000),
     pageSize: intInRange(50, 1, 100),
     contactMin: optionalInt,
