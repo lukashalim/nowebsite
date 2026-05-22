@@ -16,10 +16,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteOrigin()),
   title: {
-    default: "No-website leads CRM",
-    template: "%s",
+    default: "No Website Business Leads | Directory for Web Designers",
+    template: "%s | No Website Business Leads",
   },
-  description: "Mini CRM for local businesses without websites.",
+  description:
+    "Public directory of local businesses without websites, plus a Pro CRM for web designers and agencies.",
 };
 
 export default function RootLayout({

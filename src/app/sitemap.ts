@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { fetchAllDemoCohortPublicDemoPaths } from "@/lib/crm-cohort";
+import { fetchSitemapPaths } from "@/lib/directory/data";
 import { getSiteOrigin } from "@/lib/site-url";
 
 export const revalidate = 3600;
@@ -7,33 +7,18 @@ export const revalidate = 3600;
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const origin = getSiteOrigin();
   const now = new Date();
-  let paths: string[] = [];
+  let paths: string[] = ["/", "/pro"];
+
   try {
-    paths = await fetchAllDemoCohortPublicDemoPaths();
+    paths = await fetchSitemapPaths();
   } catch {
-    paths = [];
+    // keep minimal fallback
   }
 
-  const demoUrls: MetadataRoute.Sitemap = paths.map((path) => ({
+  return paths.map((path) => ({
     url: `${origin}${path}`,
     lastModified: now,
-    changeFrequency: "weekly",
-    priority: 0.6,
+    changeFrequency: path === "/" ? "daily" : "weekly",
+    priority: path === "/" ? 1 : path === "/pro" ? 0.8 : 0.7,
   }));
-
-  return [
-    {
-      url: `${origin}/`,
-      lastModified: now,
-      changeFrequency: "daily",
-      priority: 0.5,
-    },
-    {
-      url: `${origin}/demo`,
-      lastModified: now,
-      changeFrequency: "daily",
-      priority: 0.7,
-    },
-    ...demoUrls,
-  ];
 }

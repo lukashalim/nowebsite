@@ -4,6 +4,7 @@ import {
   buildCrmQueryString,
   type CrmSearchParams,
 } from "@/lib/crm-params";
+import { CRM_BASE_PATH } from "@/lib/crm-path";
 
 interface CrmFiltersProps {
   params: CrmSearchParams;
@@ -106,7 +107,7 @@ export function CrmFilters({ params }: CrmFiltersProps) {
             Apply filters
           </button>
           <Link
-            href="/"
+            href={CRM_BASE_PATH}
             className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
           >
             Reset defaults
@@ -131,7 +132,7 @@ export function CrmPagination({ params, total }: CrmPaginationProps) {
   const base = (pageNum: number): string => {
     const q: CrmSearchParams = { ...params, page: pageNum };
     const qs = buildCrmQueryString(q);
-    return qs ? `/${qs}` : "/";
+    return qs ? `${CRM_BASE_PATH}${qs}` : CRM_BASE_PATH;
   };
 
   return (
