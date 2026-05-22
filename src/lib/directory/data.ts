@@ -225,16 +225,6 @@ export async function fetchAllValidCityCategorySlugs(): Promise<
   }));
 }
 
-export async function fetchSitemapPaths(): Promise<string[]> {
-  const { cities, cityCategories } = await fetchDirectoryIndex();
-  const paths = new Set<string>(["/", "/pro"]);
-  for (const c of cities) paths.add(`/${c.citySlug}`);
-  for (const cc of cityCategories) {
-    paths.add(`/${cc.citySlug}/${cc.categorySlug}`);
-  }
-  return [...paths];
-}
-
 /** Best city hub URL per category for homepage grid links. */
 export async function fetchFeaturedCategoryLinks(): Promise<
   { categoryLabel: string; categorySlug: string; href: string; count: number }[]

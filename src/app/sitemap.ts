@@ -1,24 +1,50 @@
 import type { MetadataRoute } from "next";
-import { fetchSitemapPaths } from "@/lib/directory/data";
-import { getSiteOrigin } from "@/lib/site-url";
+import { fetchSitemapData } from "@/lib/directory/sitemap-data";
+
+const SITE_ORIGIN = "https://nowebsitebusinessleads.com";
 
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const origin = getSiteOrigin();
-  const now = new Date();
-  let paths: string[] = ["/", "/pro"];
+  let data: Awaited<ReturnType<typeof fetchSitemapData>> | null = null;
 
   try {
-    paths = await fetchSitemapPaths();
+    data = await fetchSitemapData();
   } catch {
-    // keep minimal fallback
+    data = null;
   }
 
-  return paths.map((path) => ({
-    url: `${origin}${path}`,
-    lastModified: now,
-    changeFrequency: path === "/" ? "daily" : "weekly",
-    priority: path === "/" ? 1 : path === "/pro" ? 0.8 : 0.7,
-  }));
+  if (!data) {
+    return [
+      {
+        url: `${SITE_ORIGIN}/`,
+        lastModified: new Date(),
+        changeFrequency: "weekly",
+        priority: 1.0,
+      },
+    ];
+  }
+
+  const entries: MetadataRoute.Sitemap = [
+    {
+      url: `${SITE_ORIGIN}/`,
+      lastModified: data.homepageLastModified,
+      changeFrequency: "weekly",
+      priority: 1.0,
+    },
+    ...data.cityHubs.map((hub) => ({
+      url: `${SITE_ORIGIN}/${hub.citySlug}`,
+      lastModified: hub.lastModified,
+      changeFrequency: "weekly" as const,
+      priority: 0.8,
+    })),
+    ...data.cityCategories.map((group) => ({
+      url: `${SITE_ORIGIN}/${group.citySlug}/${group.categorySlug}`,
+      lastModified: group.lastModified,
+      changeFrequency: "weekly" as const,
+      priority: 0.7,
+    })),
+  ];
+
+  return entries;
 }

@@ -102,14 +102,11 @@ export function parseCitySlug(
 
 const CATEGORY_SLUG_SUFFIX = "-without-a-website";
 
+/** e.g. "Painting" → "painting-without-a-website" */
 export function categoryLabelToSlug(label: string): string {
   const base = slugifySegment(label);
-  if (!base) return `businesses${CATEGORY_SLUG_SUFFIX}`;
-  const plural =
-    base.endsWith("s") || base.endsWith("x") || base.endsWith("z")
-      ? base
-      : `${base}s`;
-  return `${plural}${CATEGORY_SLUG_SUFFIX}`;
+  if (!base) return `business${CATEGORY_SLUG_SUFFIX}`;
+  return `${base}${CATEGORY_SLUG_SUFFIX}`;
 }
 
 export function parseCategorySlug(
@@ -133,15 +130,15 @@ export function isPlaceholderBusinessType(value: string | null | undefined): boo
   return t === "local cache" || t === "local_cache";
 }
 
-/** Primary category label for directory grouping and display. */
+/** Primary category label for directory grouping (business_type first, then main_category). */
 export function directoryCategoryLabel(
   mainCategory: string | null | undefined,
   businessType: string | null | undefined,
 ): string | null {
-  const main = mainCategory?.trim();
-  if (main) return main;
   const type = businessType?.trim();
   if (type && !isPlaceholderBusinessType(type)) return type;
+  const main = mainCategory?.trim();
+  if (main) return main;
   return null;
 }
 
