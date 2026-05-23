@@ -1,3 +1,4 @@
+import { cache } from "react";
 import {
   categoryLabelToSlug,
   cityStateToSlug,
@@ -68,7 +69,7 @@ async function fetchMaxLastScrapedAtForCityCategory(
   return maxFreshnessIso((data ?? []) as RawDirectoryRow[]);
 }
 
-async function fetchAllNoWebsiteRows(): Promise<RawDirectoryRow[]> {
+const fetchAllNoWebsiteRows = cache(async (): Promise<RawDirectoryRow[]> => {
   const supabase = createSupabaseAdmin();
   const rows: RawDirectoryRow[] = [];
   let from = 0;
@@ -81,6 +82,7 @@ async function fetchAllNoWebsiteRows(): Promise<RawDirectoryRow[]> {
       .not("city", "is", null)
       .not("state", "is", null)
       .order("reviews", { ascending: false })
+      .order("place_id", { ascending: true })
       .range(from, from + BATCH - 1);
 
     if (error) throw new Error(error.message);
@@ -91,7 +93,7 @@ async function fetchAllNoWebsiteRows(): Promise<RawDirectoryRow[]> {
   }
 
   return rows;
-}
+});
 
 function sortByReviewsDesc(a: DirectoryBusiness, b: DirectoryBusiness): number {
   return (b.reviews ?? 0) - (a.reviews ?? 0);
@@ -107,10 +109,11 @@ function bumpFreshnessIso(
   return current;
 }
 
-export async function fetchDirectoryIndex(): Promise<{
+export const fetchDirectoryIndex = cache(async (): Promise<{
   cities: DirectoryCityRef[];
   categories: { categoryLabel: string; categorySlug: string; totalCount: number }[];
   cityCategories: DirectoryCityCategoryRef[];
+  cityCategoriesAll: DirectoryCityCategoryRef[];
   homepageLastModified: Date | null;
 }> {
   const rows = await fetchAllNoWebsiteRows();
@@ -184,7 +187,7 @@ export async function fetchDirectoryIndex(): Promise<{
     (a, b) => b.totalCount - a.totalCount,
   );
 
-  const cityCategories = [...cityCategoryCounts.values()].filter(
+  const cityCategoriesPublished = [...cityCategoryCounts.values()].filter(
     (c) => c.listingCount >= DIRECTORY_MIN_LISTINGS,
   );
 
@@ -192,7 +195,36 @@ export async function fetchDirectoryIndex(): Promise<{
     ? new Date(homepageLastModifiedIso)
     : null;
 
-  return { cities, categories, cityCategories, homepageLastModified };
+  return {
+    cities,
+    categories,
+    cityCategories: cityCategoriesPublished,
+    cityCategoriesAll: [...cityCategoryCounts.values()],
+    homepageLastModified,
+  };
+});
+
+export interface DirectorySummary {
+  /** Businesses with city, state, and a directory category label. */
+  totalListings: number;
+  /** Cities with at least DIRECTORY_MIN_LISTINGS businesses. */
+  cityHubCount: number;
+  /** City + category pages (each has DIRECTORY_MIN_LISTINGS+ listings). */
+  categoryPageCount: number;
+}
+
+export async function fetchDirectorySummary(): Promise<DirectorySummary> {
+  const { cities, cityCategories } = await fetchDirectoryIndex();
+  return {
+    totalListings: cities.reduce((sum, c) => sum + c.listingCount, 0),
+    cityHubCount: cities.length,
+    categoryPageCount: cityCategories.length,
+  };
+}
+
+export async function fetchAllDirectoryCities(): Promise<DirectoryCityRef[]> {
+  const { cities } = await fetchDirectoryIndex();
+  return cities;
 }
 
 export async function fetchTopCities(limit = 5): Promise<DirectoryCityRef[]> {
@@ -200,21 +232,48 @@ export async function fetchTopCities(limit = 5): Promise<DirectoryCityRef[]> {
   return cities.slice(0, limit);
 }
 
+export async function fetchCityListings(
+  citySlug: string,
+): Promise<DirectoryBusiness[] | null> {
+  const parsed = parseCitySlug(citySlug);
+  if (!parsed) return null;
+
+  const { cities } = await fetchDirectoryIndex();
+  if (!cities.some((c) => c.citySlug === citySlug.toLowerCase())) {
+    return null;
+  }
+
+  const rows = await fetchAllNoWebsiteRows();
+  return rows
+    .filter(
+      (row) =>
+        cityStateToSlug(row.city ?? "", row.state ?? "") ===
+          citySlug.toLowerCase() && directoryCategoryLabel(row.main_category, row.business_type),
+    )
+    .sort(sortByReviewsDesc);
+}
+
 export async function fetchCityHub(citySlug: string): Promise<{
   city: string;
   state: string;
   listingCount: number;
+  /** Every category in this city (any listing count). */
   categories: DirectoryCategoryRef[];
+  /** Categories with a public directory page (DIRECTORY_MIN_LISTINGS+). */
+  publishedCategories: DirectoryCategoryRef[];
 } | null> {
   const parsed = parseCitySlug(citySlug);
   if (!parsed) return null;
 
-  const { cities, cityCategories } = await fetchDirectoryIndex();
-  const cityRef = cities.find((c) => c.citySlug === citySlug.toLowerCase());
+  const index = await fetchDirectoryIndex();
+  const cityRef = index.cities.find((c) => c.citySlug === citySlug.toLowerCase());
   if (!cityRef) return null;
 
-  const categories: DirectoryCategoryRef[] = cityCategories
-    .filter((c) => c.citySlug === citySlug.toLowerCase())
+  const allCityCategories = index.cityCategoriesAll.filter(
+    (c) => c.citySlug === citySlug.toLowerCase(),
+  );
+
+  const categories: DirectoryCategoryRef[] = allCityCategories
     .map((m) => ({
       categorySlug: m.categorySlug,
       categoryLabel: m.categoryLabel,
@@ -222,11 +281,16 @@ export async function fetchCityHub(citySlug: string): Promise<{
     }))
     .sort((a, b) => b.listingCount - a.listingCount);
 
+  const publishedCategories = categories.filter(
+    (c) => c.listingCount >= DIRECTORY_MIN_LISTINGS,
+  );
+
   return {
     city: cityRef.city,
     state: cityRef.state,
     listingCount: cityRef.listingCount,
     categories,
+    publishedCategories,
   };
 }
 
@@ -334,7 +398,7 @@ export async function fetchFeaturedCategoryLinks(): Promise<
         categoryLabel: c.categoryLabel,
         categorySlug: c.categorySlug,
         href: `/${top.citySlug}/${top.categorySlug}`,
-        count: top.listingCount,
+        count: c.totalCount,
       };
     });
 }

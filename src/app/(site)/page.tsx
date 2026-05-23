@@ -11,9 +11,11 @@ import {
 import { ProCta } from "@/components/pro-cta";
 import { cityPath } from "@/lib/directory/labels";
 import {
+  fetchAllDirectoryCities,
+  fetchDirectorySummary,
   fetchFeaturedCategoryLinks,
-  fetchTopCities,
 } from "@/lib/directory/data";
+import { DIRECTORY_MIN_LISTINGS } from "@/lib/directory/types";
 import { absoluteUrl } from "@/lib/site-url";
 
 export const revalidate = 3600;
@@ -46,14 +48,16 @@ function iconForCategory(label: string) {
 }
 
 export default async function HomePage() {
-  let topCities: Awaited<ReturnType<typeof fetchTopCities>> = [];
+  let cities: Awaited<ReturnType<typeof fetchAllDirectoryCities>> = [];
+  let summary: Awaited<ReturnType<typeof fetchDirectorySummary>> | null = null;
   let featuredCategories: Awaited<ReturnType<typeof fetchFeaturedCategoryLinks>> =
     [];
   let loadError: string | null = null;
 
   try {
-    [topCities, featuredCategories] = await Promise.all([
-      fetchTopCities(5),
+    [cities, summary, featuredCategories] = await Promise.all([
+      fetchAllDirectoryCities(),
+      fetchDirectorySummary(),
       fetchFeaturedCategoryLinks(),
     ]);
   } catch (e) {
@@ -71,6 +75,23 @@ export default async function HomePage() {
           review counts, phone numbers, and Google Maps links for businesses that do
           not have their own website.
         </p>
+        {summary ? (
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            <span className="font-medium text-zinc-800 dark:text-zinc-200">
+              {summary.totalListings.toLocaleString()} businesses
+            </span>{" "}
+            across {summary.cityHubCount.toLocaleString()} cities
+            {summary.categoryPageCount > 0 ? (
+              <>
+                {" "}
+                · {summary.categoryPageCount.toLocaleString()} category pages (
+                {DIRECTORY_MIN_LISTINGS}+ listings each)
+              </>
+            ) : null}
+            . Open a city to see every listing there — category pages only appear
+            when a city has {DIRECTORY_MIN_LISTINGS}+ businesses in the same trade.
+          </p>
+        ) : null}
       </section>
 
       {loadError ? (
@@ -80,14 +101,26 @@ export default async function HomePage() {
       ) : (
         <>
           <section className="space-y-4">
-            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-              Top cities
-            </h2>
-            {topCities.length === 0 ? (
-              <p className="text-sm text-zinc-500">No city hubs yet (need 5+ listings per city).</p>
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                Cities
+              </h2>
+              {cities.length > 0 ? (
+                <Link
+                  href="/cities"
+                  className="text-sm font-medium text-zinc-600 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                >
+                  View all {cities.length} cities
+                </Link>
+              ) : null}
+            </div>
+            {cities.length === 0 ? (
+              <p className="text-sm text-zinc-500">
+                No city hubs yet (need {DIRECTORY_MIN_LISTINGS}+ listings per city).
+              </p>
             ) : (
-              <ul className="grid gap-2 sm:grid-cols-2">
-                {topCities.map((c) => (
+              <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {cities.map((c) => (
                   <li key={c.citySlug}>
                     <Link
                       href={cityPath(c.citySlug)}
@@ -131,7 +164,7 @@ export default async function HomePage() {
                             {cat.categoryLabel}
                           </span>
                           <span className="text-xs text-zinc-500">
-                            {cat.count} listings · sample city
+                            {cat.count.toLocaleString()} nationwide · sample city
                           </span>
                         </span>
                       </Link>

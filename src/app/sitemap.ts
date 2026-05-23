@@ -24,6 +24,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         changeFrequency: "weekly",
         priority: 1.0,
       },
+      {
+        url: `${SITE_ORIGIN}/cities`,
+        lastModified: homepageLastModified ?? new Date(),
+        changeFrequency: "weekly",
+        priority: 0.85,
+      },
       ...cities.map((hub) => ({
         url: `${SITE_ORIGIN}/${hub.citySlug}`,
         lastModified: toLastModified(hub.lastModifiedAt),
