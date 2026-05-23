@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { CategoryIcon } from "@/components/category-icon";
 import { DirectoryCategoryPage } from "@/components/directory-category-page";
 import { DirectoryBusinessList } from "@/components/directory-business-list";
+import { DirectoryStatePage } from "@/components/directory-state-page";
 import { ProCta } from "@/components/pro-cta";
 import {
   categoryLinkLabel,
@@ -11,16 +12,24 @@ import {
   cityHubMetaDescription,
   cityHubTitle,
   nationwideCategoryMetaDescription,
-  nationwideCategoryPageTitle,
+  nationwideCategoryMetaTitle,
+  stateHubMetaDescription,
+  stateHubMetaTitle,
 } from "@/lib/directory/labels";
 import {
   fetchAllValidSlugParams,
   fetchCityHub,
   fetchCityListings,
   fetchNationwideCategoryListings,
+  fetchStateListings,
 } from "@/lib/directory/data";
-import { parseCategorySlug, parseCitySlug } from "@/lib/directory/slugs";
-import { DIRECTORY_MIN_LISTINGS } from "@/lib/directory/types";
+import {
+  isCanonicalCategorySlug,
+  legacyCategorySlugToCanonical,
+  parseCitySlug,
+  parseStateSlug,
+} from "@/lib/directory/slugs";
+import { DIRECTORY_MIN_CATEGORY_LISTINGS } from "@/lib/directory/types";
 import { absoluteUrl } from "@/lib/site-url";
 
 export const revalidate = 3600;
@@ -39,25 +48,32 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
+  const lower = slug.trim().toLowerCase();
 
-  if (parseCategorySlug(slug)) {
-    const data = await fetchNationwideCategoryListings(slug);
+  const legacyCanonical = legacyCategorySlugToCanonical(lower);
+  if (legacyCanonical) {
+    return { title: "Redirecting…" };
+  }
+
+  if (isCanonicalCategorySlug(lower)) {
+    const data = await fetchNationwideCategoryListings(lower);
     if (!data) return { title: "Not found" };
-    const title = nationwideCategoryPageTitle(data.categoryLabel);
+    const title = nationwideCategoryMetaTitle(data.categoryLabel);
     const description = nationwideCategoryMetaDescription(
       data.categoryLabel,
       data.businesses.length,
+      data.cityCount,
+      data.lastUpdatedLabel,
     );
-    const path = `/${slug}`;
     return {
       title: { absolute: title },
       description,
-      alternates: { canonical: absoluteUrl(path) },
+      alternates: { canonical: absoluteUrl(`/${lower}`) },
     };
   }
 
-  if (parseCitySlug(slug)) {
-    const hub = await fetchCityHub(slug);
+  if (parseCitySlug(lower)) {
+    const hub = await fetchCityHub(lower);
     if (!hub) return { title: "City not found" };
     const title = cityHubTitle(hub.city, hub.state);
     const description = cityHubMetaDescription(
@@ -65,11 +81,26 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       hub.state,
       hub.listingCount,
     );
-    const path = `/${slug}`;
     return {
       title: { absolute: title },
       description,
-      alternates: { canonical: absoluteUrl(path) },
+      alternates: { canonical: absoluteUrl(`/${lower}`) },
+    };
+  }
+
+  if (parseStateSlug(lower)) {
+    const data = await fetchStateListings(lower);
+    if (!data) return { title: "Not found" };
+    const title = stateHubMetaTitle(data.state);
+    const description = stateHubMetaDescription(
+      data.state,
+      data.listingCount,
+      data.cityCount,
+    );
+    return {
+      title: { absolute: title },
+      description,
+      alternates: { canonical: absoluteUrl(`/${lower}`) },
     };
   }
 
@@ -78,25 +109,51 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function SlugDirectoryPage({ params }: PageProps) {
   const { slug } = await params;
+  const lower = slug.trim().toLowerCase();
 
-  if (parseCategorySlug(slug)) {
-    const data = await fetchNationwideCategoryListings(slug);
+  const legacyCanonical = legacyCategorySlugToCanonical(lower);
+  if (legacyCanonical) {
+    permanentRedirect(`/${legacyCanonical}`);
+  }
+
+  if (isCanonicalCategorySlug(lower)) {
+    const data = await fetchNationwideCategoryListings(lower);
     if (!data) notFound();
     return (
       <DirectoryCategoryPage
-        categorySlug={slug}
+        categorySlug={lower}
         categoryLabel={data.categoryLabel}
         businesses={data.businesses}
+        cityGroups={data.cityGroups}
+        cityCount={data.cityCount}
         lastUpdatedLabel={data.lastUpdatedLabel}
+        publishedCitySlugs={data.publishedCitySlugs}
       />
     );
   }
 
-  if (!parseCitySlug(slug)) notFound();
+  if (!parseCitySlug(lower)) {
+    if (parseStateSlug(lower)) {
+      const data = await fetchStateListings(lower);
+      if (!data) notFound();
+      return (
+        <DirectoryStatePage
+          stateSlug={lower}
+          state={data.state}
+          businesses={data.businesses}
+          cityGroups={data.cityGroups}
+          cityCount={data.cityCount}
+          lastUpdatedLabel={data.lastUpdatedLabel}
+          publishedCitySlugs={data.publishedCitySlugs}
+        />
+      );
+    }
+    notFound();
+  }
 
   const [hub, businesses] = await Promise.all([
-    fetchCityHub(slug),
-    fetchCityListings(slug),
+    fetchCityHub(lower),
+    fetchCityListings(lower),
   ]);
   if (!hub || !businesses) notFound();
 
@@ -131,8 +188,9 @@ export default async function SlugDirectoryPage({ params }: PageProps) {
         </h2>
         {hub.categories.length === 0 ? (
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Listings are grouped below. No category has {DIRECTORY_MIN_LISTINGS} or
-            more listings yet for a dedicated category page.
+            Listings are grouped below. No category has{" "}
+            {DIRECTORY_MIN_CATEGORY_LISTINGS} or more listings nationwide yet for a
+            dedicated category page.
           </p>
         ) : (
           <ul className="grid gap-2 sm:grid-cols-2">
@@ -157,7 +215,7 @@ export default async function SlugDirectoryPage({ params }: PageProps) {
                 <li key={cat.categorySlug}>
                   {hasPage ? (
                     <Link
-                      href={categoryPath(cat.categoryLabel)}
+                      href={categoryPath(cat.categorySlug)}
                       className="flex items-center gap-3 rounded-lg border border-zinc-200 px-4 py-3 text-sm hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/50"
                     >
                       <CategoryIcon

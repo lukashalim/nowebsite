@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CategoryIcon } from "@/components/category-icon";
 import { fetchAllPublishedCategoryLinks } from "@/lib/directory/data";
 import { categoryGridLabel } from "@/lib/directory/labels";
+import { DIRECTORY_MIN_CATEGORY_LISTINGS } from "@/lib/directory/types";
 import { absoluteUrl } from "@/lib/site-url";
 
 export const revalidate = 3600;
@@ -38,7 +39,8 @@ export default async function CategoriesIndexPage() {
         </h1>
         <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
           Each category page lists no-website businesses nationwide in that trade,
-          with ratings, phones, and Google Maps links.
+          grouped by city, with ratings, phones, and Google Maps links. Pages require
+          at least {DIRECTORY_MIN_CATEGORY_LISTINGS} listings.
         </p>
       </header>
 

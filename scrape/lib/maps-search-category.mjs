@@ -18,6 +18,16 @@ export const MAPS_SEARCH_CATEGORY_MAP = {
   handyman: "handyman",
   contractors: "contractor",
   contractor: "contractor",
+  "event+services": "event_services",
+  "event services": "event_services",
+  "event-services": "event_services",
+  event_services: "event_services",
+  laundromat: "laundromat",
+  laundromats: "laundromat",
+  "auto+repair": "auto_repair",
+  "auto repair": "auto_repair",
+  "auto-repair": "auto_repair",
+  auto_repair: "auto_repair",
 };
 
 /**

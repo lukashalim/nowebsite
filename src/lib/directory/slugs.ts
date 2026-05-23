@@ -1,3 +1,10 @@
+import {
+  canonicalCategoryFromBusinessType,
+  canonicalCategoryFromSlug,
+  type CanonicalCategory,
+} from "@/lib/directory/categories";
+import { mapSearchKeywordToBusinessType } from "@/lib/directory/search-category-map";
+
 const STATE_NAME_TO_ABBR: Record<string, string> = {
   alabama: "al",
   alaska: "ak",
@@ -56,6 +63,15 @@ const STATE_ABBR_TO_NAME: Record<string, string> = Object.fromEntries(
   Object.entries(STATE_NAME_TO_ABBR).map(([name, abbr]) => [abbr, name]),
 );
 
+const STATE_SLUG_TO_ABBR: Record<string, string> = Object.fromEntries(
+  Object.entries(STATE_NAME_TO_ABBR).map(([name, abbr]) => [
+    slugifySegment(name),
+    abbr,
+  ]),
+);
+
+const LEGACY_CATEGORY_SLUG_SUFFIX = "-without-a-website";
+
 function slugifySegment(value: string): string {
   return value
     .trim()
@@ -81,6 +97,25 @@ export function stateAbbrToDisplayName(abbr: string): string {
     .join(" ");
 }
 
+export function stateNameToSlug(state: string): string | null {
+  const abbr = stateToAbbr(state);
+  if (!abbr) return null;
+  const name = STATE_ABBR_TO_NAME[abbr];
+  if (!name) return null;
+  return slugifySegment(name);
+}
+
+export function parseStateSlug(
+  stateSlug: string,
+): { stateAbbr: string; stateName: string } | null {
+  const slug = stateSlug.trim().toLowerCase();
+  const abbr = STATE_SLUG_TO_ABBR[slug];
+  if (!abbr) return null;
+  const stateName = STATE_ABBR_TO_NAME[abbr];
+  if (!stateName) return null;
+  return { stateAbbr: abbr, stateName };
+}
+
 /** Matches rows where `lower(regexp_replace(city, '\\s+', '-', 'g')) || '-' || state_abbr` equals slug. */
 export function cityStateToSlug(city: string, state: string): string | null {
   const cityPart = slugifySegment(city);
@@ -100,26 +135,59 @@ export function parseCitySlug(
   return { cityPattern, stateAbbr };
 }
 
-const CATEGORY_SLUG_SUFFIX = "-without-a-website";
-
-/** e.g. "Painting" → "painting-without-a-website" */
-export function categoryLabelToSlug(label: string): string {
-  const base = slugifySegment(label);
-  if (!base) return `business${CATEGORY_SLUG_SUFFIX}`;
-  return `${base}${CATEGORY_SLUG_SUFFIX}`;
+export function isCanonicalCategorySlug(slug: string): boolean {
+  return canonicalCategoryFromSlug(slug) !== null;
 }
 
-export function parseCategorySlug(
+/** Legacy `painting-without-a-website` → canonical slug e.g. `painter`. */
+export function legacyCategorySlugToCanonical(slug: string): string | null {
+  const lower = slug.trim().toLowerCase();
+  if (!lower.endsWith(LEGACY_CATEGORY_SLUG_SUFFIX)) return null;
+  const base = lower
+    .slice(0, -LEGACY_CATEGORY_SLUG_SUFFIX.length)
+    .replace(/-/g, " ");
+  if (!base.trim()) return null;
+
+  const fromMap = mapSearchKeywordToBusinessType(base);
+  if (fromMap) {
+    const cat = canonicalCategoryFromBusinessType(fromMap);
+    if (cat) return cat.slug;
+  }
+
+  const normalized = base.replace(/\s+/g, "_");
+  const cat = canonicalCategoryFromBusinessType(normalized);
+  return cat?.slug ?? null;
+}
+
+export function parseLegacyCategorySlug(
   categorySlug: string,
 ): { searchTerm: string } | null {
   const lower = categorySlug.trim().toLowerCase();
-  if (!lower.endsWith(CATEGORY_SLUG_SUFFIX)) return null;
-  const base = lower.slice(0, -CATEGORY_SLUG_SUFFIX.length).replace(/-/g, " ");
+  if (!lower.endsWith(LEGACY_CATEGORY_SLUG_SUFFIX)) return null;
+  const base = lower
+    .slice(0, -LEGACY_CATEGORY_SLUG_SUFFIX.length)
+    .replace(/-/g, " ");
   if (!base.trim()) return null;
   return { searchTerm: base.trim() };
 }
 
-export function isPlaceholderBusinessType(value: string | null | undefined): boolean {
+/** @deprecated Legacy suffix URLs; use canonical slugs. */
+export function categoryLabelToSlug(label: string): string {
+  const base = slugifySegment(label);
+  if (!base) return `business${LEGACY_CATEGORY_SLUG_SUFFIX}`;
+  return `${base}${LEGACY_CATEGORY_SLUG_SUFFIX}`;
+}
+
+/** @deprecated Use isCanonicalCategorySlug or legacyCategorySlugToCanonical. */
+export function parseCategorySlug(
+  categorySlug: string,
+): { searchTerm: string } | null {
+  return parseLegacyCategorySlug(categorySlug);
+}
+
+export function isPlaceholderBusinessType(
+  value: string | null | undefined,
+): boolean {
   if (!value) return true;
   const t = value
     .trim()
@@ -130,11 +198,48 @@ export function isPlaceholderBusinessType(value: string | null | undefined): boo
   return t === "local cache" || t === "local_cache";
 }
 
+function normalizeBusinessTypeValue(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
+}
+
+/** Resolve row to canonical category, if any. */
+export function resolveCanonicalCategoryForRow(
+  mainCategory: string | null | undefined,
+  businessType: string | null | undefined,
+): CanonicalCategory | null {
+  const type = businessType?.trim();
+  if (type && !isPlaceholderBusinessType(type)) {
+    const cat = canonicalCategoryFromBusinessType(normalizeBusinessTypeValue(type));
+    if (cat) return cat;
+  }
+
+  const main = mainCategory?.trim();
+  if (main) {
+    const fromMap = mapSearchKeywordToBusinessType(main);
+    if (fromMap) {
+      const cat = canonicalCategoryFromBusinessType(fromMap);
+      if (cat) return cat;
+    }
+    const normalized = normalizeBusinessTypeValue(main);
+    const cat = canonicalCategoryFromBusinessType(normalized);
+    if (cat) return cat;
+  }
+
+  return null;
+}
+
 /** Primary category label for directory grouping (business_type first, then main_category). */
 export function directoryCategoryLabel(
   mainCategory: string | null | undefined,
   businessType: string | null | undefined,
 ): string | null {
+  const canonical = resolveCanonicalCategoryForRow(mainCategory, businessType);
+  if (canonical) return canonical.label;
+
   const type = businessType?.trim();
   if (type && !isPlaceholderBusinessType(type)) return type;
   const main = mainCategory?.trim();
@@ -151,12 +256,12 @@ export function cityMatchesSlug(
   return cityStateToSlug(city, state) === citySlug.trim().toLowerCase();
 }
 
-export function categoryMatchesSlug(
+export function categoryMatchesCanonicalSlug(
   mainCategory: string | null | undefined,
   businessType: string | null | undefined,
   categorySlug: string,
 ): boolean {
-  const label = directoryCategoryLabel(mainCategory, businessType);
-  if (!label) return false;
-  return categoryLabelToSlug(label) === categorySlug.trim().toLowerCase();
+  const canonical = resolveCanonicalCategoryForRow(mainCategory, businessType);
+  if (!canonical) return false;
+  return canonical.slug === categorySlug.trim().toLowerCase();
 }

@@ -1,3 +1,5 @@
+import { canonicalCategoryFromSlug } from "@/lib/directory/categories";
+
 /** Keep in sync with scrape/lib/maps-search-category.mjs */
 const MAPS_SEARCH_CATEGORY_MAP: Record<string, string> = {
   restaurants: "restaurant",
@@ -18,6 +20,16 @@ const MAPS_SEARCH_CATEGORY_MAP: Record<string, string> = {
   handyman: "handyman",
   contractors: "contractor",
   contractor: "contractor",
+  "event+services": "event_services",
+  "event services": "event_services",
+  "event-services": "event_services",
+  event_services: "event_services",
+  laundromat: "laundromat",
+  laundromats: "laundromat",
+  "auto+repair": "auto_repair",
+  "auto repair": "auto_repair",
+  "auto-repair": "auto_repair",
+  auto_repair: "auto_repair",
 };
 
 export function mapSearchKeywordToBusinessType(
@@ -43,11 +55,16 @@ export function mapSearchKeywordToBusinessType(
   return null;
 }
 
-/** Resolve `business_type` filter for last_scraped_at query from category URL slug. */
+/** Resolve `business_type` filter from a canonical or legacy category URL slug. */
 export function businessTypeFromCategorySlug(categorySlug: string): string | null {
   const lower = categorySlug.trim().toLowerCase();
+  const canonical = canonicalCategoryFromSlug(lower);
+  if (canonical) return canonical.businessType;
+
   const suffix = "-without-a-website";
-  if (!lower.endsWith(suffix)) return null;
+  if (!lower.endsWith(suffix)) {
+    return mapSearchKeywordToBusinessType(lower.replace(/-/g, " "));
+  }
   const term = lower.slice(0, -suffix.length).replace(/-/g, " ");
   return mapSearchKeywordToBusinessType(term);
 }

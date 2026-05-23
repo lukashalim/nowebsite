@@ -1,6 +1,10 @@
 import type { MetadataRoute } from "next";
 import { fetchDirectoryIndex } from "@/lib/directory/data";
-import { DIRECTORY_MIN_LISTINGS } from "@/lib/directory/types";
+import {
+  DIRECTORY_MIN_CATEGORY_LISTINGS,
+  DIRECTORY_MIN_CITY_LISTINGS,
+  DIRECTORY_MIN_STATE_LISTINGS,
+} from "@/lib/directory/types";
 
 const SITE_ORIGIN = "https://nowebsitebusinessleads.com";
 
@@ -15,7 +19,7 @@ function toLastModified(iso: string | null | undefined): Date {
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
-    const { cities, categories, homepageLastModified } =
+    const { cities, categories, states, homepageLastModified } =
       await fetchDirectoryIndex();
 
     const entries: MetadataRoute.Sitemap = [
@@ -37,19 +41,29 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         changeFrequency: "weekly",
         priority: 0.85,
       },
-      ...cities.map((hub) => ({
-        url: `${SITE_ORIGIN}/${hub.citySlug}`,
-        lastModified: toLastModified(hub.lastModifiedAt),
-        changeFrequency: "weekly" as const,
-        priority: 0.8,
-      })),
+      ...cities
+        .filter((hub) => hub.listingCount >= DIRECTORY_MIN_CITY_LISTINGS)
+        .map((hub) => ({
+          url: `${SITE_ORIGIN}/${hub.citySlug}`,
+          lastModified: toLastModified(hub.lastModifiedAt),
+          changeFrequency: "weekly" as const,
+          priority: 0.8,
+        })),
       ...categories
-        .filter((c) => c.totalCount >= DIRECTORY_MIN_LISTINGS)
+        .filter((c) => c.totalCount >= DIRECTORY_MIN_CATEGORY_LISTINGS)
         .map((cat) => ({
           url: `${SITE_ORIGIN}/${cat.categorySlug}`,
           lastModified: homepageLastModified ?? new Date(),
           changeFrequency: "weekly" as const,
           priority: 0.7,
+        })),
+      ...states
+        .filter((s) => s.listingCount >= DIRECTORY_MIN_STATE_LISTINGS)
+        .map((state) => ({
+          url: `${SITE_ORIGIN}/${state.stateSlug}`,
+          lastModified: toLastModified(state.lastModifiedAt),
+          changeFrequency: "weekly" as const,
+          priority: 0.75,
         })),
     ];
 

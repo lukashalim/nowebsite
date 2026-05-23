@@ -2,17 +2,15 @@ import Link from "next/link";
 import { DirectoryGroupedByCity } from "@/components/directory-grouped-by-city";
 import { DownloadCsvButton } from "@/components/download-csv-button";
 import { ProCta } from "@/components/pro-cta";
-import {
-  nationwideCategoryPageTitle,
-  pluralCategoryForTitle,
-} from "@/lib/directory/labels";
+import { stateHubTitle } from "@/lib/directory/labels";
+import { stateAbbrToDisplayName, stateToAbbr } from "@/lib/directory/slugs";
 import { buildDirectoryListJsonLd } from "@/lib/directory/jsonld";
 import type { DirectoryCityGroup } from "@/lib/directory/types";
 import type { DirectoryBusiness } from "@/lib/directory/types";
 
-interface DirectoryCategoryPageProps {
-  categorySlug: string;
-  categoryLabel: string;
+interface DirectoryStatePageProps {
+  stateSlug: string;
+  state: string;
   businesses: DirectoryBusiness[];
   cityGroups: DirectoryCityGroup[];
   cityCount: number;
@@ -20,19 +18,19 @@ interface DirectoryCategoryPageProps {
   publishedCitySlugs?: Set<string>;
 }
 
-export function DirectoryCategoryPage({
-  categorySlug,
-  categoryLabel,
+export function DirectoryStatePage({
+  stateSlug,
+  state,
   businesses,
   cityGroups,
   cityCount,
   lastUpdatedLabel,
   publishedCitySlugs,
-}: DirectoryCategoryPageProps) {
-  const title = nationwideCategoryPageTitle(categoryLabel);
-  const path = `/${categorySlug}`;
+}: DirectoryStatePageProps) {
+  const title = stateHubTitle(state);
+  const path = `/${stateSlug}`;
+  const displayState = stateAbbrToDisplayName(stateToAbbr(state) ?? state);
   const jsonLd = buildDirectoryListJsonLd(businesses, path, title);
-  const pluralLower = pluralCategoryForTitle(categoryLabel).toLowerCase();
 
   return (
     <div className="space-y-8">
@@ -51,10 +49,10 @@ export function DirectoryCategoryPage({
           {title}
         </h1>
         <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
-          Browse {businesses.length.toLocaleString()} {pluralLower} across{" "}
-          {cityCount.toLocaleString()} US cities that do not have their own website.
-          Each listing includes ratings, review counts, phone numbers, and Google Maps
-          links for outreach.
+          Browse {businesses.length.toLocaleString()} businesses across{" "}
+          {cityCount.toLocaleString()} cities in {displayState} that do not have their
+          own website. Each listing includes ratings, review counts, phone numbers, and
+          Google Maps links for outreach.
         </p>
       </header>
 

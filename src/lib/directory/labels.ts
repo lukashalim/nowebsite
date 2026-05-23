@@ -1,8 +1,4 @@
-import {
-  categoryLabelToSlug,
-  stateAbbrToDisplayName,
-  stateToAbbr,
-} from "@/lib/directory/slugs";
+import { stateAbbrToDisplayName, stateToAbbr } from "@/lib/directory/slugs";
 
 export function formatCityState(city: string, state: string): string {
   const abbr = stateToAbbr(state);
@@ -52,9 +48,41 @@ export function nationwideCategoryPageTitle(categoryLabel: string): string {
 export function nationwideCategoryMetaDescription(
   categoryLabel: string,
   count: number,
+  cityCount: number,
+  lastUpdatedLabel: string | null,
 ): string {
   const plural = pluralCategoryForTitle(categoryLabel).toLowerCase();
-  return `Browse ${count} ${plural} with no website — phone numbers, ratings, and Google Maps links for web designers and agencies.`;
+  const updated = lastUpdatedLabel ? ` Updated ${lastUpdatedLabel}.` : "";
+  return `Browse ${count.toLocaleString()} ${plural} across ${cityCount.toLocaleString()} cities with no website.${updated}`;
+}
+
+const SITE_BRAND = "No Website Business Leads";
+
+export function nationwideCategoryMetaTitle(categoryLabel: string): string {
+  return `${nationwideCategoryPageTitle(categoryLabel)} | ${SITE_BRAND}`;
+}
+
+export function stateHubTitle(state: string): string {
+  const display = stateAbbrToDisplayName(stateToAbbr(state) ?? state);
+  return `Businesses Without a Website in ${display}`;
+}
+
+export function stateHubMetaTitle(state: string): string {
+  const display = stateAbbrToDisplayName(stateToAbbr(state) ?? state);
+  return `${display} Businesses Without a Website | ${SITE_BRAND}`;
+}
+
+export function stateHubMetaDescription(
+  state: string,
+  count: number,
+  cityCount: number,
+): string {
+  const display = stateAbbrToDisplayName(stateToAbbr(state) ?? state);
+  return `Browse ${count.toLocaleString()} businesses across ${cityCount.toLocaleString()} cities in ${display} with no website. Updated regularly.`;
+}
+
+export function statePath(stateSlug: string): string {
+  return `/${stateSlug}`;
 }
 
 export function cityHubTitle(city: string, state: string): string {
@@ -79,8 +107,8 @@ export function categoryGridLabel(categoryLabel: string): string {
   return formatCategoryDisplayName(categoryLabel);
 }
 
-export function categoryPath(categoryLabel: string): string {
-  return `/${categoryLabelToSlug(categoryLabel)}`;
+export function categoryPath(categorySlug: string): string {
+  return `/${categorySlug}`;
 }
 
 export function cityPath(citySlug: string): string {
