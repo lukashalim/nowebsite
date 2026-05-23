@@ -23,7 +23,8 @@ export function formatCategoryDisplayName(raw: string): string {
     .split(" ")
     .map((word) => {
       if (!word) return word;
-      if (word.length <= 3 && /^[a-z]+$/i.test(word)) {
+      // Only force uppercase for 1–2 letter tokens (e.g. "IT"); keep words like "spa" → "Spa".
+      if (word.length <= 2 && /^[a-z]+$/i.test(word)) {
         return word.toUpperCase();
       }
       return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
