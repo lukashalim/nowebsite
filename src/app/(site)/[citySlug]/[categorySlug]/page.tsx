@@ -8,6 +8,7 @@ import {
   categoryMetaDescription,
   categoryPageTitle,
   cityPath,
+  formatCategoryDisplayName,
   formatCityState,
 } from "@/lib/directory/labels";
 import {
@@ -84,7 +85,7 @@ export default async function CategoryDirectoryPage({ params }: PageProps) {
         </h1>
         <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
           This page lists {data.businesses.length} local{" "}
-          {data.categoryLabel.toLowerCase()} businesses in {place} that do not have
+          {formatCategoryDisplayName(data.categoryLabel).toLowerCase()} businesses in {place} that do not have
           their own website. Use the table for quick outreach — call, open Maps, or
           upgrade to Pro for contact tracking and demo tools.
         </p>

@@ -12,8 +12,27 @@ export function formatCityState(city: string, state: string): string {
   return `${city.trim()}, ${state.trim()}`;
 }
 
+/** Turn DB/scraper values like `event_services` or `painter` into "Event Services", "Painter". */
+export function formatCategoryDisplayName(raw: string): string {
+  const t = raw
+    .trim()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+  if (!t) return "Business";
+  return t
+    .split(" ")
+    .map((word) => {
+      if (!word) return word;
+      if (word.length <= 3 && /^[a-z]+$/i.test(word)) {
+        return word.toUpperCase();
+      }
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(" ");
+}
+
 export function pluralCategoryForTitle(label: string): string {
-  const t = label.trim();
+  const t = formatCategoryDisplayName(label);
   if (!t) return "Businesses";
   const lower = t.toLowerCase();
   if (lower.endsWith("s")) return t;
@@ -51,7 +70,12 @@ export function cityHubMetaDescription(city: string, state: string, categoryCoun
 }
 
 export function categoryLinkLabel(categoryLabel: string): string {
-  return pluralCategoryForTitle(categoryLabel);
+  return pluralCategoryForTitle(formatCategoryDisplayName(categoryLabel));
+}
+
+/** Short singular-style label for grids (e.g. "Painter", "Event Services"). */
+export function categoryGridLabel(categoryLabel: string): string {
+  return formatCategoryDisplayName(categoryLabel);
 }
 
 export function categoryPath(citySlug: string, categoryLabel: string): string {

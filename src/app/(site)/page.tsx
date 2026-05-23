@@ -1,15 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  Building2,
-  ChefHat,
-  Droplets,
-  Hammer,
-  Scissors,
-  Sparkles,
-} from "lucide-react";
+import { CategoryIcon } from "@/components/category-icon";
 import { ProCta } from "@/components/pro-cta";
-import { cityPath } from "@/lib/directory/labels";
+import { categoryGridLabel, cityPath } from "@/lib/directory/labels";
 import {
   fetchAllDirectoryCities,
   fetchDirectorySummary,
@@ -29,23 +22,6 @@ export const metadata: Metadata = {
     "Browse city and category directories of local businesses with no website — ratings, phone numbers, and Google Maps links for web designers and agencies.",
   alternates: { canonical: absoluteUrl("/") },
 };
-
-const CATEGORY_ICONS: Record<string, typeof Building2> = {
-  restaurant: ChefHat,
-  painting: Hammer,
-  painter: Hammer,
-  plumber: Droplets,
-  salon: Scissors,
-  party: Sparkles,
-};
-
-function iconForCategory(label: string) {
-  const key = label.toLowerCase();
-  for (const [needle, Icon] of Object.entries(CATEGORY_ICONS)) {
-    if (key.includes(needle)) return Icon;
-  }
-  return Building2;
-}
 
 export default async function HomePage() {
   let cities: Awaited<ReturnType<typeof fetchAllDirectoryCities>> = [];
@@ -75,23 +51,6 @@ export default async function HomePage() {
           review counts, phone numbers, and Google Maps links for businesses that do
           not have their own website.
         </p>
-        {summary ? (
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            <span className="font-medium text-zinc-800 dark:text-zinc-200">
-              {summary.totalListings.toLocaleString()} businesses
-            </span>{" "}
-            across {summary.cityHubCount.toLocaleString()} cities
-            {summary.categoryPageCount > 0 ? (
-              <>
-                {" "}
-                · {summary.categoryPageCount.toLocaleString()} category pages (
-                {DIRECTORY_MIN_LISTINGS}+ listings each)
-              </>
-            ) : null}
-            . Open a city to see every listing there — category pages only appear
-            when a city has {DIRECTORY_MIN_LISTINGS}+ businesses in the same trade.
-          </p>
-        ) : null}
       </section>
 
       {loadError ? (
@@ -147,33 +106,45 @@ export default async function HomePage() {
               <p className="text-sm text-zinc-500">No category pages yet.</p>
             ) : (
               <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {featuredCategories.map((cat) => {
-                  const Icon = iconForCategory(cat.categoryLabel);
-                  return (
-                    <li key={cat.categorySlug}>
-                      <Link
-                        href={cat.href}
-                        className="flex items-start gap-3 rounded-lg border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/50"
-                      >
-                        <Icon
-                          className="mt-0.5 size-5 shrink-0 text-zinc-500"
-                          aria-hidden
-                        />
-                        <span>
-                          <span className="block font-medium text-zinc-900 dark:text-zinc-100">
-                            {cat.categoryLabel}
-                          </span>
-                          <span className="text-xs text-zinc-500">
-                            {cat.count.toLocaleString()} nationwide · sample city
-                          </span>
+                {featuredCategories.map((cat) => (
+                  <li key={cat.categorySlug}>
+                    <Link
+                      href={cat.href}
+                      className="flex items-start gap-3 rounded-lg border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/50"
+                    >
+                      <CategoryIcon
+                        categoryLabel={cat.categoryLabel}
+                        className="mt-0.5 size-5 shrink-0 text-zinc-500"
+                      />
+                      <span>
+                        <span className="block font-medium text-zinc-900 dark:text-zinc-100">
+                          {categoryGridLabel(cat.categoryLabel)}
                         </span>
-                      </Link>
-                    </li>
-                  );
-                })}
+                        <span className="text-xs text-zinc-500">
+                          {cat.count.toLocaleString()} nationwide · sample city
+                        </span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
               </ul>
             )}
           </section>
+
+          {summary ? (
+            <section
+              className="rounded-xl border border-zinc-200 bg-zinc-50 px-6 py-10 text-center dark:border-zinc-800 dark:bg-zinc-900/40"
+              aria-label="Directory coverage"
+            >
+              <p className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-4xl">
+                {summary.totalListings.toLocaleString()} businesses listed
+              </p>
+              <p className="mt-2 text-base text-zinc-600 dark:text-zinc-400">
+                across {summary.cityHubCount.toLocaleString()} cities — no website,
+                ready for outreach
+              </p>
+            </section>
+          ) : null}
         </>
       )}
 

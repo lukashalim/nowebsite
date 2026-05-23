@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CategoryIcon } from "@/components/category-icon";
 import { DirectoryBusinessList } from "@/components/directory-business-list";
 import { ProCta } from "@/components/pro-cta";
 import {
@@ -117,13 +118,25 @@ export default async function CityHubPage({ params }: PageProps) {
                   {hasPage ? (
                     <Link
                       href={categoryPath(citySlug, cat.categoryLabel)}
-                      className="flex items-center justify-between rounded-lg border border-zinc-200 px-4 py-3 text-sm hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/50"
+                      className="flex items-center gap-3 rounded-lg border border-zinc-200 px-4 py-3 text-sm hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/50"
                     >
-                      {inner}
+                      <CategoryIcon
+                        categoryLabel={cat.categoryLabel}
+                        className="size-4 shrink-0 text-zinc-500"
+                      />
+                      <span className="flex flex-1 items-center justify-between gap-2">
+                        {inner}
+                      </span>
                     </Link>
                   ) : (
-                    <div className="flex items-center justify-between rounded-lg border border-dashed border-zinc-200 px-4 py-3 text-sm dark:border-zinc-800">
-                      {inner}
+                    <div className="flex items-center gap-3 rounded-lg border border-dashed border-zinc-200 px-4 py-3 text-sm dark:border-zinc-800">
+                      <CategoryIcon
+                        categoryLabel={cat.categoryLabel}
+                        className="size-4 shrink-0 text-zinc-400"
+                      />
+                      <span className="flex flex-1 items-center justify-between gap-2">
+                        {inner}
+                      </span>
                     </div>
                   )}
                 </li>

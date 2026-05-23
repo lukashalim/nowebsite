@@ -115,7 +115,7 @@ export const fetchDirectoryIndex = cache(async (): Promise<{
   cityCategories: DirectoryCityCategoryRef[];
   cityCategoriesAll: DirectoryCityCategoryRef[];
   homepageLastModified: Date | null;
-}> {
+}> => {
   const rows = await fetchAllNoWebsiteRows();
   const cityCounts = new Map<string, DirectoryCityRef>();
   const categoryCounts = new Map<string, { categoryLabel: string; categorySlug: string; totalCount: number }>();
