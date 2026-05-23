@@ -11,13 +11,33 @@ export function PublicNav() {
         >
           No Website Business Leads
         </Link>
-        <Link
-          href="/pro"
-          className="inline-flex items-center gap-1 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-        >
-          For Web Designers
-          <ArrowRight className="size-4" aria-hidden />
-        </Link>
+        <nav className="flex flex-wrap items-center justify-end gap-3 sm:gap-5">
+          <Link
+            href="/about"
+            className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            About
+          </Link>
+          <Link
+            href="/how-it-works"
+            className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            How It Works
+          </Link>
+          <Link
+            href="/contact"
+            className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            Contact
+          </Link>
+          <Link
+            href="/pro"
+            className="inline-flex items-center gap-1 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+          >
+            For Web Designers
+            <ArrowRight className="size-4" aria-hidden />
+          </Link>
+        </nav>
       </div>
     </header>
   );
