@@ -1,14 +1,14 @@
 /**
  * Read google_maps_scraper NDJSON from the Google Maps Extractor desktop app
  * (%AppData%/Roaming/googlemapsextractor/task_results/cache) and emit businesses
- * that match the same core filters as pipeline.mjs (no website, sweet spot).
+ * that match core filters (no website by default, min rating; no review count band).
  *
  * Usage (from scrape/):
  *   node extract-local-extractor-cache.mjs --business-type "Appliance repair"
  *
  * Env:
  *   GOOGLE_MAPS_EXTRACTOR_DIR — app root or .../task_results/cache (default: %APPDATA%/googlemapsextractor on Windows)
- *   SWEET_SPOT_* — same as pipeline
+ *   SWEET_SPOT_MIN_RATING — default 4 (review min/max band is not applied here; see pipeline.mjs)
  *   SCRAPE_MIN_REVIEWS_IN_CALENDAR_YEAR — default 1 (need this many reviews dated in the filter year; set 2+ to tighten)
  *   SCRAPE_REVIEWS_YEAR_FILTER — calendar year (default: current year, e.g. 2026)
  *   SCRAPE_SKIP_MIN_REVIEWS_IN_CALENDAR_YEAR_FILTER=1 — disable the year review count gate
@@ -19,7 +19,7 @@
  *   --business-type <text>     — stored on rows as business_type (metadata only here)
  *   --include-tasks            — also scan task_results/tasks/*.ndjson (dedupe by place_id)
  *   --allow-website            — do not skip rows with a website
- *   --no-sweet-spot            — skip rating/review band filter
+ *   --no-sweet-spot            — skip min-rating filter
  *   --format jsonl|csv         — with --dry-run, print matches (default jsonl)
  *   --max-files N              — only read the first N cache files (sorted by name), for testing
  *   --keep-files               — do not delete .ndjson after a file is fully read (default: delete to save disk)
@@ -45,7 +45,7 @@ import {
   loadEnvLocal,
   getSupabase,
   rowToBusiness,
-  passesSweetSpotFilters,
+  passesSweetSpotRatingFilter,
   passesMinReviewsInCalendarYear,
   getMinReviewsInCalendarYearFilterConfig,
   omitUndefined,
@@ -259,8 +259,6 @@ async function persistExtractRunLog(p) {
         ? null
         : {
             minRating: Number(process.env.SWEET_SPOT_MIN_RATING ?? 4),
-            minReviews: Number(process.env.SWEET_SPOT_MIN_REVIEWS ?? 10),
-            maxReviews: Number(process.env.SWEET_SPOT_MAX_REVIEWS ?? 200),
           },
       minReviewsInCalendarYear: {
         ...yf,
@@ -429,7 +427,7 @@ async function main() {
           stats.hasWebsite += 1;
           continue;
         }
-        if (!noSweetSpot && !passesSweetSpotFilters(base.rating, base.reviews)) {
+        if (!noSweetSpot && !passesSweetSpotRatingFilter(base.rating)) {
           stats.sweetSpotFail += 1;
           continue;
         }
@@ -506,8 +504,6 @@ async function main() {
         ? null
         : {
             minRating: Number(process.env.SWEET_SPOT_MIN_RATING ?? 4),
-            minReviews: Number(process.env.SWEET_SPOT_MIN_REVIEWS ?? 10),
-            maxReviews: Number(process.env.SWEET_SPOT_MAX_REVIEWS ?? 200),
           },
       minReviewsInCalendarYear: {
         ...getMinReviewsInCalendarYearFilterConfig(),

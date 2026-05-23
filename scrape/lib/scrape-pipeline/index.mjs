@@ -375,6 +375,14 @@ export function passesSweetSpotFilters(rating, reviews) {
   return n >= minRev && n <= maxRev;
 }
 
+/** NDJSON ingest: min rating only (no review count band). */
+export function passesSweetSpotRatingFilter(rating) {
+  const minR = Number(process.env.SWEET_SPOT_MIN_RATING ?? 4);
+  const r = toNum(rating);
+  if (r == null) return false;
+  return r >= minR;
+}
+
 /**
  * Review list shapes from google_maps_scraper / extractor NDJSON.
  * @param {Record<string, unknown>} row
