@@ -16,10 +16,10 @@ export const revalidate = 3600;
 export const metadata: Metadata = {
   title: {
     absolute:
-      "Find Local Businesses Without a Website | Leads for Web Designers",
+      "Local Businesses Without a Website | Free Directory for Web Designers",
   },
   description:
-    "Browse city and category directories of local businesses with no website — ratings, phone numbers, and Google Maps links for web designers and agencies.",
+    "Browse our free list of local businesses without websites — restaurants, plumbers, painters and more across the US. Updated regularly. Free for web designers and agencies.",
   alternates: { canonical: absoluteUrl("/") },
 };
 
@@ -44,12 +44,14 @@ export default async function HomePage() {
     <div className="space-y-12">
       <section className="space-y-4">
         <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-4xl">
-          Find local businesses without a website — the leads list for web designers
+          Local Businesses Without a Website
         </h1>
         <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
-          Public directories by city and category. Each listing includes ratings,
-          review counts, phone numbers, and Google Maps links for businesses that do
-          not have their own website.
+          A free directory of small businesses without websites across the US — Google
+          businesses without a website, sourced directly from Google Maps. Browse by city
+          and category; each listing includes ratings, review counts, phone numbers, and
+          Google Maps links. Every listing is a real Google business profile verified to
+          have no website. Updated regularly.
         </p>
       </section>
 
@@ -142,6 +144,10 @@ export default async function HomePage() {
               <p className="mt-2 text-base text-zinc-600 dark:text-zinc-400">
                 across {summary.cityHubCount.toLocaleString()} cities — no website,
                 ready for outreach
+              </p>
+              <p className="mt-4 text-base text-zinc-600 dark:text-zinc-400">
+                Looking for local businesses without websites near you? Browse by city
+                below.
               </p>
             </section>
           ) : null}
