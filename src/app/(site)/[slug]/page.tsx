@@ -63,7 +63,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     const description = cityHubMetaDescription(
       hub.city,
       hub.state,
-      hub.categories.length,
+      hub.listingCount,
     );
     const path = `/${slug}`;
     return {
@@ -119,9 +119,9 @@ export default async function SlugDirectoryPage({ params }: PageProps) {
           {title}
         </h1>
         <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
-          These local businesses in {hub.city} do not have a standalone website.
-          Browse by category below — each page lists phone numbers, ratings, and
-          Google Maps links you can use for outreach.
+          {hub.listingCount.toLocaleString()} local businesses in {hub.city} without
+          a standalone website — phone numbers, ratings, and Google Maps links for
+          outreach. Browse by category when available, or see every listing below.
         </p>
       </header>
 

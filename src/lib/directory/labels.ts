@@ -61,9 +61,13 @@ export function cityHubTitle(city: string, state: string): string {
   return `Businesses Without a Website in ${formatCityState(city, state)}`;
 }
 
-export function cityHubMetaDescription(city: string, state: string, categoryCount: number): string {
+export function cityHubMetaDescription(
+  city: string,
+  state: string,
+  listingCount: number,
+): string {
   const place = formatCityState(city, state);
-  return `Directory of local businesses in ${place} that do not have a website. Explore ${categoryCount} categories with verified listings for designers and agencies.`;
+  return `Directory of ${listingCount} local businesses in ${place} that do not have a website — phone numbers, ratings, and Google Maps links for designers and agencies.`;
 }
 
 export function categoryLinkLabel(categoryLabel: string): string {

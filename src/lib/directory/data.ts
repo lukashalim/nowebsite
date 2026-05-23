@@ -103,14 +103,12 @@ export const fetchDirectoryIndex = cache(async (): Promise<{
   for (const row of rows) {
     const city = row.city?.trim();
     const state = row.state?.trim();
-    const label = directoryCategoryLabel(row.main_category, row.business_type);
-    if (!city || !state || !label) continue;
+    if (!city || !state) continue;
 
     homepageLastModifiedIso = bumpFreshnessIso(homepageLastModifiedIso, row);
 
     const citySlug = cityStateToSlug(city, state);
     if (!citySlug) continue;
-    const categorySlug = categoryLabelToSlug(label);
 
     const cityKey = citySlug;
     const existingCity = cityCounts.get(cityKey);
@@ -126,6 +124,11 @@ export const fetchDirectoryIndex = cache(async (): Promise<{
         lastModifiedAt: bumpFreshnessIso(null, row),
       });
     }
+
+    const label = directoryCategoryLabel(row.main_category, row.business_type);
+    if (!label) continue;
+
+    const categorySlug = categoryLabelToSlug(label);
 
     const catKey = categorySlug;
     const existingCat = categoryCounts.get(catKey);
@@ -183,7 +186,7 @@ export const fetchDirectoryIndex = cache(async (): Promise<{
 });
 
 export interface DirectorySummary {
-  /** Businesses with city, state, and a directory category label. */
+  /** Businesses in published city hubs (city + state; category not required). */
   totalListings: number;
   /** Cities with at least DIRECTORY_MIN_LISTINGS businesses. */
   cityHubCount: number;
@@ -227,8 +230,7 @@ export async function fetchCityListings(
   return rows
     .filter(
       (row) =>
-        cityStateToSlug(row.city ?? "", row.state ?? "") ===
-          citySlug.toLowerCase() && directoryCategoryLabel(row.main_category, row.business_type),
+        cityStateToSlug(row.city ?? "", row.state ?? "") === citySlug.toLowerCase(),
     )
     .sort(sortByReviewsDesc);
 }
@@ -352,19 +354,30 @@ export async function fetchAllValidCityCategorySlugs(): Promise<
   }));
 }
 
-/** Nationwide category pages for homepage grid links. */
-export async function fetchFeaturedCategoryLinks(): Promise<
-  { categoryLabel: string; categorySlug: string; href: string; count: number }[]
+export interface PublishedCategoryLink {
+  categoryLabel: string;
+  categorySlug: string;
+  href: string;
+  count: number;
+}
+
+/** Nationwide category pages with DIRECTORY_MIN_LISTINGS+ listings. */
+export async function fetchAllPublishedCategoryLinks(): Promise<
+  PublishedCategoryLink[]
 > {
   const { categories } = await fetchDirectoryIndex();
 
   return categories
     .filter((c) => c.totalCount >= DIRECTORY_MIN_LISTINGS)
-    .slice(0, 12)
     .map((c) => ({
       categoryLabel: c.categoryLabel,
       categorySlug: c.categorySlug,
       href: `/${c.categorySlug}`,
       count: c.totalCount,
     }));
+}
+
+/** @deprecated Use fetchAllPublishedCategoryLinks */
+export async function fetchFeaturedCategoryLinks(): Promise<PublishedCategoryLink[]> {
+  return fetchAllPublishedCategoryLinks();
 }

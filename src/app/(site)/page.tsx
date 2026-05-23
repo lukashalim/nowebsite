@@ -5,8 +5,8 @@ import { ProCta } from "@/components/pro-cta";
 import { categoryGridLabel, cityPath } from "@/lib/directory/labels";
 import {
   fetchAllDirectoryCities,
+  fetchAllPublishedCategoryLinks,
   fetchDirectorySummary,
-  fetchFeaturedCategoryLinks,
 } from "@/lib/directory/data";
 import { DIRECTORY_MIN_LISTINGS } from "@/lib/directory/types";
 import { absoluteUrl } from "@/lib/site-url";
@@ -26,15 +26,16 @@ export const metadata: Metadata = {
 export default async function HomePage() {
   let cities: Awaited<ReturnType<typeof fetchAllDirectoryCities>> = [];
   let summary: Awaited<ReturnType<typeof fetchDirectorySummary>> | null = null;
-  let featuredCategories: Awaited<ReturnType<typeof fetchFeaturedCategoryLinks>> =
-    [];
+  let publishedCategories: Awaited<
+    ReturnType<typeof fetchAllPublishedCategoryLinks>
+  > = [];
   let loadError: string | null = null;
 
   try {
-    [cities, summary, featuredCategories] = await Promise.all([
+    [cities, summary, publishedCategories] = await Promise.all([
       fetchAllDirectoryCities(),
       fetchDirectorySummary(),
-      fetchFeaturedCategoryLinks(),
+      fetchAllPublishedCategoryLinks(),
     ]);
   } catch (e) {
     loadError = e instanceof Error ? e.message : "Could not load directory data.";
@@ -101,14 +102,27 @@ export default async function HomePage() {
           </section>
 
           <section className="space-y-4">
-            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-              Browse by category
-            </h2>
-            {featuredCategories.length === 0 ? (
-              <p className="text-sm text-zinc-500">No category pages yet.</p>
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                Categories
+              </h2>
+              {publishedCategories.length > 0 ? (
+                <Link
+                  href="/categories"
+                  className="text-sm font-medium text-zinc-600 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                >
+                  View all {publishedCategories.length} categories
+                </Link>
+              ) : null}
+            </div>
+            {publishedCategories.length === 0 ? (
+              <p className="text-sm text-zinc-500">
+                No category pages yet (need {DIRECTORY_MIN_LISTINGS}+ listings per
+                category).
+              </p>
             ) : (
               <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {featuredCategories.map((cat) => (
+                {publishedCategories.map((cat) => (
                   <li key={cat.categorySlug}>
                     <Link
                       href={cat.href}
@@ -142,7 +156,8 @@ export default async function HomePage() {
                 {summary.totalListings.toLocaleString()} businesses listed
               </p>
               <p className="mt-2 text-base text-zinc-600 dark:text-zinc-400">
-                across {summary.cityHubCount.toLocaleString()} cities — no website,
+                across {summary.cityHubCount.toLocaleString()} cities and{" "}
+                {summary.categoryPageCount.toLocaleString()} categories — no website,
                 ready for outreach
               </p>
               <p className="mt-4 text-base text-zinc-600 dark:text-zinc-400">
