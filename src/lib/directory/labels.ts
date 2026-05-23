@@ -43,21 +43,17 @@ export function pluralCategoryForTitle(label: string): string {
   return `${t}s`;
 }
 
-export function categoryPageTitle(city: string, state: string, categoryLabel: string): string {
-  const place = formatCityState(city, state);
+export function nationwideCategoryPageTitle(categoryLabel: string): string {
   const plural = pluralCategoryForTitle(categoryLabel);
-  return `${plural} in ${place} Without a Website`;
+  return `${plural} Without a Website`;
 }
 
-export function categoryMetaDescription(
-  city: string,
-  state: string,
+export function nationwideCategoryMetaDescription(
   categoryLabel: string,
   count: number,
 ): string {
-  const place = formatCityState(city, state);
   const plural = pluralCategoryForTitle(categoryLabel).toLowerCase();
-  return `Browse ${count} ${plural} in ${place} with no website — phone numbers, ratings, and Google Maps links for web designers and agencies.`;
+  return `Browse ${count} ${plural} with no website — phone numbers, ratings, and Google Maps links for web designers and agencies.`;
 }
 
 export function cityHubTitle(city: string, state: string): string {
@@ -78,8 +74,8 @@ export function categoryGridLabel(categoryLabel: string): string {
   return formatCategoryDisplayName(categoryLabel);
 }
 
-export function categoryPath(citySlug: string, categoryLabel: string): string {
-  return `/${citySlug}/${categoryLabelToSlug(categoryLabel)}`;
+export function categoryPath(categoryLabel: string): string {
+  return `/${categoryLabelToSlug(categoryLabel)}`;
 }
 
 export function cityPath(citySlug: string): string {

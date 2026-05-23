@@ -1,12 +1,20 @@
 import { ExternalLink, MapPin, Phone, Star } from "lucide-react";
 import type { DirectoryBusiness } from "@/lib/directory/types";
-import { formatNeighborhoodOrArea } from "@/lib/directory/labels";
+import {
+  formatCityState,
+  formatNeighborhoodOrArea,
+} from "@/lib/directory/labels";
 
 interface DirectoryBusinessListProps {
   businesses: DirectoryBusiness[];
+  /** On nationwide category pages, show city/state instead of neighborhood-only area. */
+  showCityState?: boolean;
 }
 
-export function DirectoryBusinessList({ businesses }: DirectoryBusinessListProps) {
+export function DirectoryBusinessList({
+  businesses,
+  showCityState = false,
+}: DirectoryBusinessListProps) {
   return (
     <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
       <table className="w-full min-w-[640px] border-collapse text-left text-sm">
@@ -22,7 +30,10 @@ export function DirectoryBusinessList({ businesses }: DirectoryBusinessListProps
         </thead>
         <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
           {businesses.map((b, i) => {
-            const area = formatNeighborhoodOrArea(b.address, b.city);
+            const area = showCityState
+              ? formatCityState(b.city ?? "", b.state ?? "") ||
+                formatNeighborhoodOrArea(b.address, b.city)
+              : formatNeighborhoodOrArea(b.address, b.city);
             const phone = b.phone?.trim();
             return (
               <tr

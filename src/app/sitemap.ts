@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { fetchDirectoryIndex } from "@/lib/directory/data";
+import { DIRECTORY_MIN_LISTINGS } from "@/lib/directory/types";
 
 const SITE_ORIGIN = "https://nowebsitebusinessleads.com";
 
@@ -14,7 +15,7 @@ function toLastModified(iso: string | null | undefined): Date {
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
-    const { cities, cityCategories, homepageLastModified } =
+    const { cities, categories, homepageLastModified } =
       await fetchDirectoryIndex();
 
     const entries: MetadataRoute.Sitemap = [
@@ -36,12 +37,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         changeFrequency: "weekly" as const,
         priority: 0.8,
       })),
-      ...cityCategories.map((group) => ({
-        url: `${SITE_ORIGIN}/${group.citySlug}/${group.categorySlug}`,
-        lastModified: toLastModified(group.lastModifiedAt),
-        changeFrequency: "weekly" as const,
-        priority: 0.7,
-      })),
+      ...categories
+        .filter((c) => c.totalCount >= DIRECTORY_MIN_LISTINGS)
+        .map((cat) => ({
+          url: `${SITE_ORIGIN}/${cat.categorySlug}`,
+          lastModified: homepageLastModified ?? new Date(),
+          changeFrequency: "weekly" as const,
+          priority: 0.7,
+        })),
     ];
 
     return entries;

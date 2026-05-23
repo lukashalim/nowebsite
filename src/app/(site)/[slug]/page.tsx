@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CategoryIcon } from "@/components/category-icon";
+import { DirectoryCategoryPage } from "@/components/directory-category-page";
 import { DirectoryBusinessList } from "@/components/directory-business-list";
 import { ProCta } from "@/components/pro-cta";
 import {
@@ -9,54 +10,93 @@ import {
   categoryPath,
   cityHubMetaDescription,
   cityHubTitle,
+  nationwideCategoryMetaDescription,
+  nationwideCategoryPageTitle,
 } from "@/lib/directory/labels";
 import {
-  fetchAllValidCitySlugs,
+  fetchAllValidSlugParams,
   fetchCityHub,
   fetchCityListings,
+  fetchNationwideCategoryListings,
 } from "@/lib/directory/data";
+import { parseCategorySlug, parseCitySlug } from "@/lib/directory/slugs";
 import { DIRECTORY_MIN_LISTINGS } from "@/lib/directory/types";
 import { absoluteUrl } from "@/lib/site-url";
 
 export const revalidate = 3600;
 
 interface PageProps {
-  params: Promise<{ citySlug: string }>;
+  params: Promise<{ slug: string }>;
 }
 
 export async function generateStaticParams() {
   try {
-    return await fetchAllValidCitySlugs();
+    return await fetchAllValidSlugParams();
   } catch {
     return [];
   }
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { citySlug } = await params;
-  const hub = await fetchCityHub(citySlug);
-  if (!hub) {
-    return { title: "City not found" };
+  const { slug } = await params;
+
+  if (parseCategorySlug(slug)) {
+    const data = await fetchNationwideCategoryListings(slug);
+    if (!data) return { title: "Not found" };
+    const title = nationwideCategoryPageTitle(data.categoryLabel);
+    const description = nationwideCategoryMetaDescription(
+      data.categoryLabel,
+      data.businesses.length,
+    );
+    const path = `/${slug}`;
+    return {
+      title: { absolute: title },
+      description,
+      alternates: { canonical: absoluteUrl(path) },
+    };
   }
-  const title = cityHubTitle(hub.city, hub.state);
-  const description = cityHubMetaDescription(
-    hub.city,
-    hub.state,
-    hub.categories.length,
-  );
-  const path = `/${citySlug}`;
-  return {
-    title: { absolute: title },
-    description,
-    alternates: { canonical: absoluteUrl(path) },
-  };
+
+  if (parseCitySlug(slug)) {
+    const hub = await fetchCityHub(slug);
+    if (!hub) return { title: "City not found" };
+    const title = cityHubTitle(hub.city, hub.state);
+    const description = cityHubMetaDescription(
+      hub.city,
+      hub.state,
+      hub.categories.length,
+    );
+    const path = `/${slug}`;
+    return {
+      title: { absolute: title },
+      description,
+      alternates: { canonical: absoluteUrl(path) },
+    };
+  }
+
+  return { title: "Not found" };
 }
 
-export default async function CityHubPage({ params }: PageProps) {
-  const { citySlug } = await params;
+export default async function SlugDirectoryPage({ params }: PageProps) {
+  const { slug } = await params;
+
+  if (parseCategorySlug(slug)) {
+    const data = await fetchNationwideCategoryListings(slug);
+    if (!data) notFound();
+    return (
+      <DirectoryCategoryPage
+        categorySlug={slug}
+        categoryLabel={data.categoryLabel}
+        businesses={data.businesses}
+        lastUpdatedLabel={data.lastUpdatedLabel}
+      />
+    );
+  }
+
+  if (!parseCitySlug(slug)) notFound();
+
   const [hub, businesses] = await Promise.all([
-    fetchCityHub(citySlug),
-    fetchCityListings(citySlug),
+    fetchCityHub(slug),
+    fetchCityListings(slug),
   ]);
   if (!hub || !businesses) notFound();
 
@@ -117,7 +157,7 @@ export default async function CityHubPage({ params }: PageProps) {
                 <li key={cat.categorySlug}>
                   {hasPage ? (
                     <Link
-                      href={categoryPath(citySlug, cat.categoryLabel)}
+                      href={categoryPath(cat.categoryLabel)}
                       className="flex items-center gap-3 rounded-lg border border-zinc-200 px-4 py-3 text-sm hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/50"
                     >
                       <CategoryIcon

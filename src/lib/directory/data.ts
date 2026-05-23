@@ -3,12 +3,10 @@ import {
   categoryLabelToSlug,
   cityStateToSlug,
   directoryCategoryLabel,
-  isPlaceholderBusinessType,
   parseCategorySlug,
   parseCitySlug,
   stateAbbrToDisplayName,
 } from "@/lib/directory/slugs";
-import { businessTypeFromCategorySlug } from "@/lib/directory/search-category-map";
 import { formatLastUpdatedMonthYear } from "@/lib/directory/labels";
 import type {
   DirectoryBusiness,
@@ -47,26 +45,6 @@ function maxFreshnessIso(
     if (!max || t > max) max = t;
   }
   return max;
-}
-
-async function fetchMaxLastScrapedAtForCityCategory(
-  city: string,
-  state: string,
-  businessType: string,
-): Promise<string | null> {
-  const supabase = createSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("businesses_nowebsite")
-    .select("last_scraped_at, scraped_at")
-    .eq("has_website", false)
-    .eq("city", city)
-    .eq("state", state)
-    .eq("business_type", businessType);
-
-  if (error) {
-    return null;
-  }
-  return maxFreshnessIso((data ?? []) as RawDirectoryRow[]);
 }
 
 const fetchAllNoWebsiteRows = cache(async (): Promise<RawDirectoryRow[]> => {
@@ -214,11 +192,13 @@ export interface DirectorySummary {
 }
 
 export async function fetchDirectorySummary(): Promise<DirectorySummary> {
-  const { cities, cityCategories } = await fetchDirectoryIndex();
+  const { cities, categories } = await fetchDirectoryIndex();
   return {
     totalListings: cities.reduce((sum, c) => sum + c.listingCount, 0),
     cityHubCount: cities.length,
-    categoryPageCount: cityCategories.length,
+    categoryPageCount: categories.filter(
+      (c) => c.totalCount >= DIRECTORY_MIN_LISTINGS,
+    ).length,
   };
 }
 
@@ -281,8 +261,13 @@ export async function fetchCityHub(citySlug: string): Promise<{
     }))
     .sort((a, b) => b.listingCount - a.listingCount);
 
-  const publishedCategories = categories.filter(
-    (c) => c.listingCount >= DIRECTORY_MIN_LISTINGS,
+  const publishedCategorySlugs = new Set(
+    index.categories
+      .filter((c) => c.totalCount >= DIRECTORY_MIN_LISTINGS)
+      .map((c) => c.categorySlug),
+  );
+  const publishedCategories = categories.filter((c) =>
+    publishedCategorySlugs.has(c.categorySlug),
   );
 
   return {
@@ -294,63 +279,40 @@ export async function fetchCityHub(citySlug: string): Promise<{
   };
 }
 
-export async function fetchCategoryListings(
-  citySlug: string,
+export async function fetchNationwideCategoryListings(
   categorySlug: string,
 ): Promise<{
-  city: string;
-  state: string;
   categoryLabel: string;
   businesses: DirectoryBusiness[];
   lastUpdatedLabel: string | null;
 } | null> {
-  const cityParsed = parseCitySlug(citySlug);
   const categoryParsed = parseCategorySlug(categorySlug);
-  if (!cityParsed || !categoryParsed) return null;
+  if (!categoryParsed) return null;
+
+  const index = await fetchDirectoryIndex();
+  const categoryRef = index.categories.find(
+    (c) => c.categorySlug === categorySlug.trim().toLowerCase(),
+  );
+  if (!categoryRef || categoryRef.totalCount < DIRECTORY_MIN_LISTINGS) {
+    return null;
+  }
 
   const rows = await fetchAllNoWebsiteRows();
-  const matched = rows.filter(
-    (row) =>
-      cityStateToSlug(row.city ?? "", row.state ?? "") ===
-        citySlug.toLowerCase() && categoryMatchesRow(row, categorySlug),
-  );
+  const matched = rows.filter((row) => categoryMatchesRow(row, categorySlug));
   const businesses = matched.sort(sortByReviewsDesc);
 
   if (businesses.length < DIRECTORY_MIN_LISTINGS) return null;
 
-  const city = businesses[0].city ?? cityParsed.cityPattern;
-  const state =
-    businesses[0].state ?? stateAbbrToDisplayName(cityParsed.stateAbbr);
   const label =
     directoryCategoryLabel(
       businesses[0]?.main_category,
       businesses[0]?.business_type,
-    ) ?? categoryParsed.searchTerm;
-
-  const queryBusinessType =
-    businessTypeFromCategorySlug(categorySlug) ??
-    (!isPlaceholderBusinessType(businesses[0]?.business_type)
-      ? businesses[0].business_type?.trim() ?? null
-      : null);
-
-  let lastScrapedIso: string | null = null;
-  if (queryBusinessType && city && state) {
-    lastScrapedIso = await fetchMaxLastScrapedAtForCityCategory(
-      city,
-      state,
-      queryBusinessType,
-    );
-  }
-  if (!lastScrapedIso) {
-    lastScrapedIso = maxFreshnessIso(matched);
-  }
+    ) ?? categoryRef.categoryLabel;
 
   return {
-    city,
-    state,
     categoryLabel: label,
     businesses,
-    lastUpdatedLabel: formatLastUpdatedMonthYear(lastScrapedIso),
+    lastUpdatedLabel: formatLastUpdatedMonthYear(maxFreshnessIso(matched)),
   };
 }
 
@@ -360,45 +322,49 @@ function categoryMatchesRow(row: RawDirectoryRow, categorySlug: string): boolean
   return categoryLabelToSlug(label) === categorySlug.trim().toLowerCase();
 }
 
-export async function fetchAllValidCitySlugs(): Promise<{ citySlug: string }[]> {
+export async function fetchAllValidCitySlugs(): Promise<{ slug: string }[]> {
   const { cities } = await fetchDirectoryIndex();
-  return cities.map((c) => ({ citySlug: c.citySlug }));
+  return cities.map((c) => ({ slug: c.citySlug }));
+}
+
+export async function fetchAllValidCategorySlugs(): Promise<{ slug: string }[]> {
+  const { categories } = await fetchDirectoryIndex();
+  return categories
+    .filter((c) => c.totalCount >= DIRECTORY_MIN_LISTINGS)
+    .map((c) => ({ slug: c.categorySlug }));
+}
+
+export async function fetchAllValidSlugParams(): Promise<{ slug: string }[]> {
+  const [cities, categories] = await Promise.all([
+    fetchAllValidCitySlugs(),
+    fetchAllValidCategorySlugs(),
+  ]);
+  return [...cities, ...categories];
 }
 
 export async function fetchAllValidCityCategorySlugs(): Promise<
-  { citySlug: string; categorySlug: string }[]
+  { slug: string; categorySlug: string }[]
 > {
   const { cityCategories } = await fetchDirectoryIndex();
   return cityCategories.map((c) => ({
-    citySlug: c.citySlug,
+    slug: c.citySlug,
     categorySlug: c.categorySlug,
   }));
 }
 
-/** Best city hub URL per category for homepage grid links. */
+/** Nationwide category pages for homepage grid links. */
 export async function fetchFeaturedCategoryLinks(): Promise<
   { categoryLabel: string; categorySlug: string; href: string; count: number }[]
 > {
-  const { categories, cityCategories } = await fetchDirectoryIndex();
-  const topCityByCategory = new Map<string, DirectoryCityCategoryRef>();
-
-  for (const cc of cityCategories) {
-    const prev = topCityByCategory.get(cc.categorySlug);
-    if (!prev || cc.listingCount > prev.listingCount) {
-      topCityByCategory.set(cc.categorySlug, cc);
-    }
-  }
+  const { categories } = await fetchDirectoryIndex();
 
   return categories
-    .filter((c) => topCityByCategory.has(c.categorySlug))
+    .filter((c) => c.totalCount >= DIRECTORY_MIN_LISTINGS)
     .slice(0, 12)
-    .map((c) => {
-      const top = topCityByCategory.get(c.categorySlug)!;
-      return {
-        categoryLabel: c.categoryLabel,
-        categorySlug: c.categorySlug,
-        href: `/${top.citySlug}/${top.categorySlug}`,
-        count: c.totalCount,
-      };
-    });
+    .map((c) => ({
+      categoryLabel: c.categoryLabel,
+      categorySlug: c.categorySlug,
+      href: `/${c.categorySlug}`,
+      count: c.totalCount,
+    }));
 }

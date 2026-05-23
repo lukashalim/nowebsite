@@ -121,7 +121,7 @@ export default async function HomePage() {
                           {categoryGridLabel(cat.categoryLabel)}
                         </span>
                         <span className="text-xs text-zinc-500">
-                          {cat.count.toLocaleString()} nationwide · sample city
+                          {cat.count.toLocaleString()} nationwide
                         </span>
                       </span>
                     </Link>
