@@ -1,5 +1,3 @@
-import { canonicalCategoryFromSlug } from "@/lib/directory/categories";
-
 /** Keep in sync with scrape/lib/maps-search-category.mjs */
 const MAPS_SEARCH_CATEGORY_MAP: Record<string, string> = {
   restaurants: "restaurant",
@@ -58,13 +56,12 @@ export function mapSearchKeywordToBusinessType(
 /** Resolve `business_type` filter from a canonical or legacy category URL slug. */
 export function businessTypeFromCategorySlug(categorySlug: string): string | null {
   const lower = categorySlug.trim().toLowerCase();
-  const canonical = canonicalCategoryFromSlug(lower);
-  if (canonical) return canonical.businessType;
-
   const suffix = "-without-a-website";
-  if (!lower.endsWith(suffix)) {
-    return mapSearchKeywordToBusinessType(lower.replace(/-/g, " "));
-  }
-  const term = lower.slice(0, -suffix.length).replace(/-/g, " ");
-  return mapSearchKeywordToBusinessType(term);
+  const term = lower.endsWith(suffix)
+    ? lower.slice(0, -suffix.length).replace(/-/g, " ")
+    : lower.replace(/-/g, " ");
+  const fromMap = mapSearchKeywordToBusinessType(term);
+  if (fromMap) return fromMap;
+  const normalized = term.replace(/\s+/g, "_").replace(/-+/g, "_");
+  return normalized || null;
 }

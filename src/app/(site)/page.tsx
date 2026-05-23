@@ -6,6 +6,7 @@ import { categoryGridLabel, cityPath, statePath } from "@/lib/directory/labels";
 import { stateAbbrToDisplayName, stateToAbbr } from "@/lib/directory/slugs";
 import {
   fetchAllDirectoryCities,
+  fetchAllDirectoryStates,
   fetchAllPublishedCategoryLinks,
   fetchDirectorySummary,
   fetchTopStates,
@@ -35,14 +36,16 @@ export default async function HomePage() {
   let publishedCategories: Awaited<
     ReturnType<typeof fetchAllPublishedCategoryLinks>
   > = [];
+  let states: Awaited<ReturnType<typeof fetchAllDirectoryStates>> = [];
   let topStates: Awaited<ReturnType<typeof fetchTopStates>> = [];
   let loadError: string | null = null;
 
   try {
-    [cities, summary, publishedCategories, topStates] = await Promise.all([
+    [cities, summary, publishedCategories, states, topStates] = await Promise.all([
       fetchAllDirectoryCities(),
       fetchDirectorySummary(),
       fetchAllPublishedCategoryLinks(),
+      fetchAllDirectoryStates(),
       fetchTopStates(8),
     ]);
   } catch (e) {
@@ -121,6 +124,14 @@ export default async function HomePage() {
               <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
                 Browse by state
               </h2>
+              {states.length > 0 ? (
+                <Link
+                  href="/states"
+                  className="text-sm font-medium text-zinc-600 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                >
+                  View all {states.length} states
+                </Link>
+              ) : null}
             </div>
             {topStates.length === 0 ? (
               <p className="text-sm text-zinc-500">

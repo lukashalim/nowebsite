@@ -1,17 +1,14 @@
 import { cache } from "react";
-import {
-  CANONICAL_CATEGORIES,
-  canonicalCategoryFromSlug,
-} from "@/lib/directory/categories";
 import { formatLastUpdatedMonthYear } from "@/lib/directory/labels";
 import {
   cityStateToSlug,
   directoryCategoryLabel,
   parseCitySlug,
   parseStateSlug,
-  resolveCanonicalCategoryForRow,
+  resolveCategoryForRow,
   stateNameToSlug,
   stateToAbbr,
+  categoryMatchesSlug,
 } from "@/lib/directory/slugs";
 import type {
   DirectoryBusiness,
@@ -162,14 +159,6 @@ export const fetchDirectoryIndex = cache(async (): Promise<{
   const cityCategoryCounts = new Map<string, DirectoryCityCategoryRef>();
   let homepageLastModifiedIso: string | null = null;
 
-  for (const canonical of CANONICAL_CATEGORIES) {
-    categoryCounts.set(canonical.slug, {
-      categoryLabel: canonical.label,
-      categorySlug: canonical.slug,
-      totalCount: 0,
-    });
-  }
-
   for (const row of rows) {
     const city = row.city?.trim();
     const state = row.state?.trim();
@@ -219,16 +208,25 @@ export const fetchDirectoryIndex = cache(async (): Promise<{
       }
     }
 
-    const canonical = resolveCanonicalCategoryForRow(
+    const resolved = resolveCategoryForRow(
       row.main_category,
       row.business_type,
     );
-    if (canonical) {
-      const cat = categoryCounts.get(canonical.slug);
-      if (cat) cat.totalCount += 1;
-
+    if (resolved) {
+      const catKey = resolved.slug;
       const label = directoryCategoryLabel(row.main_category, row.business_type);
-      const ccKey = `${citySlug}::${canonical.slug}`;
+      const existingCat = categoryCounts.get(catKey);
+      if (existingCat) {
+        existingCat.totalCount += 1;
+      } else {
+        categoryCounts.set(catKey, {
+          categoryLabel: label ?? resolved.label,
+          categorySlug: resolved.slug,
+          totalCount: 1,
+        });
+      }
+
+      const ccKey = `${citySlug}::${resolved.slug}`;
       const existingCc = cityCategoryCounts.get(ccKey);
       if (existingCc) {
         existingCc.listingCount += 1;
@@ -239,10 +237,10 @@ export const fetchDirectoryIndex = cache(async (): Promise<{
       } else {
         cityCategoryCounts.set(ccKey, {
           citySlug,
-          categorySlug: canonical.slug,
+          categorySlug: resolved.slug,
           city,
           state,
-          categoryLabel: label ?? canonical.label,
+          categoryLabel: label ?? resolved.label,
           listingCount: 1,
           lastModifiedAt: bumpFreshnessIso(null, row),
         });
@@ -300,6 +298,11 @@ export async function fetchDirectorySummary(): Promise<DirectorySummary> {
 export async function fetchAllDirectoryCities(): Promise<DirectoryCityRef[]> {
   const { cities } = await fetchDirectoryIndex();
   return cities;
+}
+
+export async function fetchAllDirectoryStates(): Promise<DirectoryStateRef[]> {
+  const { states } = await fetchDirectoryIndex();
+  return states;
 }
 
 export async function fetchTopStates(
@@ -385,13 +388,10 @@ export async function fetchNationwideCategoryListings(
   lastUpdatedLabel: string | null;
   publishedCitySlugs: Set<string>;
 } | null> {
-  const canonical = canonicalCategoryFromSlug(categorySlug);
-  if (!canonical) return null;
+  const slug = categorySlug.trim().toLowerCase();
 
   const index = await fetchDirectoryIndex();
-  const categoryRef = index.categories.find(
-    (c) => c.categorySlug === canonical.slug,
-  );
+  const categoryRef = index.categories.find((c) => c.categorySlug === slug);
   if (
     !categoryRef ||
     categoryRef.totalCount < DIRECTORY_MIN_CATEGORY_LISTINGS
@@ -401,8 +401,7 @@ export async function fetchNationwideCategoryListings(
 
   const rows = await fetchAllNoWebsiteRows();
   const matched = rows.filter((row) =>
-    resolveCanonicalCategoryForRow(row.main_category, row.business_type)?.slug ===
-    canonical.slug,
+    categoryMatchesSlug(row.main_category, row.business_type, slug),
   );
   const businesses = matched.map(rowToBusiness).sort(sortByReviewsDesc);
 
@@ -411,7 +410,7 @@ export async function fetchNationwideCategoryListings(
   const cityGroups = groupBusinessesByCity(businesses);
 
   return {
-    categoryLabel: canonical.label,
+    categoryLabel: categoryRef.categoryLabel,
     businesses,
     cityGroups,
     cityCount: cityGroups.length,

@@ -24,7 +24,6 @@ import {
   fetchStateListings,
 } from "@/lib/directory/data";
 import {
-  isCanonicalCategorySlug,
   legacyCategorySlugToCanonical,
   parseCitySlug,
   parseStateSlug,
@@ -53,23 +52,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const legacyCanonical = legacyCategorySlugToCanonical(lower);
   if (legacyCanonical) {
     return { title: "Redirecting…" };
-  }
-
-  if (isCanonicalCategorySlug(lower)) {
-    const data = await fetchNationwideCategoryListings(lower);
-    if (!data) return { title: "Not found" };
-    const title = nationwideCategoryMetaTitle(data.categoryLabel);
-    const description = nationwideCategoryMetaDescription(
-      data.categoryLabel,
-      data.businesses.length,
-      data.cityCount,
-      data.lastUpdatedLabel,
-    );
-    return {
-      title: { absolute: title },
-      description,
-      alternates: { canonical: absoluteUrl(`/${lower}`) },
-    };
   }
 
   if (parseCitySlug(lower)) {
@@ -104,6 +86,22 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   }
 
+  const categoryData = await fetchNationwideCategoryListings(lower);
+  if (categoryData) {
+    const title = nationwideCategoryMetaTitle(categoryData.categoryLabel);
+    const description = nationwideCategoryMetaDescription(
+      categoryData.categoryLabel,
+      categoryData.businesses.length,
+      categoryData.cityCount,
+      categoryData.lastUpdatedLabel,
+    );
+    return {
+      title: { absolute: title },
+      description,
+      alternates: { canonical: absoluteUrl(`/${lower}`) },
+    };
+  }
+
   return { title: "Not found" };
 }
 
@@ -114,22 +112,6 @@ export default async function SlugDirectoryPage({ params }: PageProps) {
   const legacyCanonical = legacyCategorySlugToCanonical(lower);
   if (legacyCanonical) {
     permanentRedirect(`/${legacyCanonical}`);
-  }
-
-  if (isCanonicalCategorySlug(lower)) {
-    const data = await fetchNationwideCategoryListings(lower);
-    if (!data) notFound();
-    return (
-      <DirectoryCategoryPage
-        categorySlug={lower}
-        categoryLabel={data.categoryLabel}
-        businesses={data.businesses}
-        cityGroups={data.cityGroups}
-        cityCount={data.cityCount}
-        lastUpdatedLabel={data.lastUpdatedLabel}
-        publishedCitySlugs={data.publishedCitySlugs}
-      />
-    );
   }
 
   if (!parseCitySlug(lower)) {
@@ -148,6 +130,22 @@ export default async function SlugDirectoryPage({ params }: PageProps) {
         />
       );
     }
+
+    const categoryData = await fetchNationwideCategoryListings(lower);
+    if (categoryData) {
+      return (
+        <DirectoryCategoryPage
+          categorySlug={lower}
+          categoryLabel={categoryData.categoryLabel}
+          businesses={categoryData.businesses}
+          cityGroups={categoryData.cityGroups}
+          cityCount={categoryData.cityCount}
+          lastUpdatedLabel={categoryData.lastUpdatedLabel}
+          publishedCitySlugs={categoryData.publishedCitySlugs}
+        />
+      );
+    }
+
     notFound();
   }
 
