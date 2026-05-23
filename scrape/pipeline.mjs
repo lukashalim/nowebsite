@@ -8,8 +8,10 @@ import {
   toNum,
   sleep,
   passesSweetSpotFilters,
+  mapsSearchLinkForZip,
 } from "./lib/scrape-pipeline/index.mjs";
 import { attachDemoSlugsToPayloads } from "./lib/demo-slug.mjs";
+import { resolveBusinessTypeFromMapsSearch } from "./lib/maps-search-category.mjs";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const BUSINESSES_UPSERT_BATCH_SIZE = Math.max(
@@ -677,6 +679,7 @@ async function main() {
     try {
       const rows = await fetchAllTaskResults(job.task_id);
       rowsSeen += rows.length;
+      const jobSearchUrl = mapsSearchLinkForZip(job.business_type, job.zip_code);
       console.log(
         `Processing ${job.business_type} in ${job.zip_code} — ${rows.length} businesses found`,
       );
@@ -684,7 +687,11 @@ async function main() {
       const payloads = [];
       for (const raw of rows) {
         try {
-          const base = rowToBusiness(raw, job.business_type);
+          const mainCategory = pick(raw, "main_category", "MAIN_CATEGORY");
+          const businessType =
+            resolveBusinessTypeFromMapsSearch(jobSearchUrl, mainCategory) ??
+            job.business_type;
+          const base = rowToBusiness(raw, businessType);
           if (!base.place_id) {
             console.error("Skipping row without place_id");
             skippedNoPlaceId += 1;
@@ -761,6 +768,7 @@ async function main() {
             services_offered: extractServicesOffered(raw, base),
             ...extractHoursData(raw),
             review_highlights_updated_at: new Date().toISOString(),
+            last_scraped_at: new Date().toISOString(),
           });
 
           payloads.push(payload);

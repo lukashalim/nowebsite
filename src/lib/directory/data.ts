@@ -2,10 +2,13 @@ import {
   categoryLabelToSlug,
   cityStateToSlug,
   directoryCategoryLabel,
+  isPlaceholderBusinessType,
   parseCategorySlug,
   parseCitySlug,
   stateAbbrToDisplayName,
 } from "@/lib/directory/slugs";
+import { businessTypeFromCategorySlug } from "@/lib/directory/search-category-map";
+import { formatLastUpdatedMonthYear } from "@/lib/directory/labels";
 import type {
   DirectoryBusiness,
   DirectoryCategoryRef,
@@ -29,6 +32,40 @@ interface RawDirectoryRow {
   phone: string | null;
   google_maps_link: string | null;
   demo_slug: string | null;
+  last_scraped_at: string | null;
+  scraped_at: string | null;
+}
+
+function maxFreshnessIso(
+  rows: { last_scraped_at?: string | null; scraped_at?: string | null }[],
+): string | null {
+  let max: string | null = null;
+  for (const row of rows) {
+    const t = row.last_scraped_at ?? row.scraped_at;
+    if (!t) continue;
+    if (!max || t > max) max = t;
+  }
+  return max;
+}
+
+async function fetchMaxLastScrapedAtForCityCategory(
+  city: string,
+  state: string,
+  businessType: string,
+): Promise<string | null> {
+  const supabase = createSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("businesses_nowebsite")
+    .select("last_scraped_at, scraped_at")
+    .eq("has_website", false)
+    .eq("city", city)
+    .eq("state", state)
+    .eq("business_type", businessType);
+
+  if (error) {
+    return null;
+  }
+  return maxFreshnessIso((data ?? []) as RawDirectoryRow[]);
 }
 
 async function fetchAllNoWebsiteRows(): Promise<RawDirectoryRow[]> {
@@ -60,21 +97,35 @@ function sortByReviewsDesc(a: DirectoryBusiness, b: DirectoryBusiness): number {
   return (b.reviews ?? 0) - (a.reviews ?? 0);
 }
 
+function bumpFreshnessIso(
+  current: string | null,
+  row: Pick<RawDirectoryRow, "last_scraped_at" | "scraped_at">,
+): string | null {
+  const t = row.last_scraped_at ?? row.scraped_at;
+  if (!t) return current;
+  if (!current || t > current) return t;
+  return current;
+}
+
 export async function fetchDirectoryIndex(): Promise<{
   cities: DirectoryCityRef[];
   categories: { categoryLabel: string; categorySlug: string; totalCount: number }[];
   cityCategories: DirectoryCityCategoryRef[];
+  homepageLastModified: Date | null;
 }> {
   const rows = await fetchAllNoWebsiteRows();
   const cityCounts = new Map<string, DirectoryCityRef>();
   const categoryCounts = new Map<string, { categoryLabel: string; categorySlug: string; totalCount: number }>();
   const cityCategoryCounts = new Map<string, DirectoryCityCategoryRef>();
+  let homepageLastModifiedIso: string | null = null;
 
   for (const row of rows) {
     const city = row.city?.trim();
     const state = row.state?.trim();
     const label = directoryCategoryLabel(row.main_category, row.business_type);
     if (!city || !state || !label) continue;
+
+    homepageLastModifiedIso = bumpFreshnessIso(homepageLastModifiedIso, row);
 
     const citySlug = cityStateToSlug(city, state);
     if (!citySlug) continue;
@@ -84,12 +135,14 @@ export async function fetchDirectoryIndex(): Promise<{
     const existingCity = cityCounts.get(cityKey);
     if (existingCity) {
       existingCity.listingCount += 1;
+      existingCity.lastModifiedAt = bumpFreshnessIso(existingCity.lastModifiedAt, row);
     } else {
       cityCounts.set(cityKey, {
         citySlug,
         city,
         state,
         listingCount: 1,
+        lastModifiedAt: bumpFreshnessIso(null, row),
       });
     }
 
@@ -109,6 +162,7 @@ export async function fetchDirectoryIndex(): Promise<{
     const existingCc = cityCategoryCounts.get(ccKey);
     if (existingCc) {
       existingCc.listingCount += 1;
+      existingCc.lastModifiedAt = bumpFreshnessIso(existingCc.lastModifiedAt, row);
     } else {
       cityCategoryCounts.set(ccKey, {
         citySlug,
@@ -117,6 +171,7 @@ export async function fetchDirectoryIndex(): Promise<{
         state,
         categoryLabel: label,
         listingCount: 1,
+        lastModifiedAt: bumpFreshnessIso(null, row),
       });
     }
   }
@@ -133,7 +188,11 @@ export async function fetchDirectoryIndex(): Promise<{
     (c) => c.listingCount >= DIRECTORY_MIN_LISTINGS,
   );
 
-  return { cities, categories, cityCategories };
+  const homepageLastModified = homepageLastModifiedIso
+    ? new Date(homepageLastModifiedIso)
+    : null;
+
+  return { cities, categories, cityCategories, homepageLastModified };
 }
 
 export async function fetchTopCities(limit = 5): Promise<DirectoryCityRef[]> {
@@ -144,17 +203,18 @@ export async function fetchTopCities(limit = 5): Promise<DirectoryCityRef[]> {
 export async function fetchCityHub(citySlug: string): Promise<{
   city: string;
   state: string;
+  listingCount: number;
   categories: DirectoryCategoryRef[];
 } | null> {
   const parsed = parseCitySlug(citySlug);
   if (!parsed) return null;
 
-  const { cityCategories } = await fetchDirectoryIndex();
-  const matches = cityCategories.filter((c) => c.citySlug === citySlug.toLowerCase());
-  if (matches.length === 0) return null;
+  const { cities, cityCategories } = await fetchDirectoryIndex();
+  const cityRef = cities.find((c) => c.citySlug === citySlug.toLowerCase());
+  if (!cityRef) return null;
 
-  const { city, state } = matches[0];
-  const categories: DirectoryCategoryRef[] = matches
+  const categories: DirectoryCategoryRef[] = cityCategories
+    .filter((c) => c.citySlug === citySlug.toLowerCase())
     .map((m) => ({
       categorySlug: m.categorySlug,
       categoryLabel: m.categoryLabel,
@@ -162,7 +222,12 @@ export async function fetchCityHub(citySlug: string): Promise<{
     }))
     .sort((a, b) => b.listingCount - a.listingCount);
 
-  return { city, state, categories };
+  return {
+    city: cityRef.city,
+    state: cityRef.state,
+    listingCount: cityRef.listingCount,
+    categories,
+  };
 }
 
 export async function fetchCategoryListings(
@@ -173,34 +238,55 @@ export async function fetchCategoryListings(
   state: string;
   categoryLabel: string;
   businesses: DirectoryBusiness[];
+  lastUpdatedLabel: string | null;
 } | null> {
   const cityParsed = parseCitySlug(citySlug);
   const categoryParsed = parseCategorySlug(categorySlug);
   if (!cityParsed || !categoryParsed) return null;
 
   const rows = await fetchAllNoWebsiteRows();
-  const businesses = rows
-    .filter(
-      (row) =>
-        cityStateToSlug(row.city ?? "", row.state ?? "") ===
-          citySlug.toLowerCase() &&
-        categoryMatchesRow(row, categorySlug),
-    )
-    .sort(sortByReviewsDesc);
+  const matched = rows.filter(
+    (row) =>
+      cityStateToSlug(row.city ?? "", row.state ?? "") ===
+        citySlug.toLowerCase() && categoryMatchesRow(row, categorySlug),
+  );
+  const businesses = matched.sort(sortByReviewsDesc);
 
   if (businesses.length < DIRECTORY_MIN_LISTINGS) return null;
 
+  const city = businesses[0].city ?? cityParsed.cityPattern;
+  const state =
+    businesses[0].state ?? stateAbbrToDisplayName(cityParsed.stateAbbr);
   const label =
     directoryCategoryLabel(
       businesses[0]?.main_category,
       businesses[0]?.business_type,
     ) ?? categoryParsed.searchTerm;
 
+  const queryBusinessType =
+    businessTypeFromCategorySlug(categorySlug) ??
+    (!isPlaceholderBusinessType(businesses[0]?.business_type)
+      ? businesses[0].business_type?.trim() ?? null
+      : null);
+
+  let lastScrapedIso: string | null = null;
+  if (queryBusinessType && city && state) {
+    lastScrapedIso = await fetchMaxLastScrapedAtForCityCategory(
+      city,
+      state,
+      queryBusinessType,
+    );
+  }
+  if (!lastScrapedIso) {
+    lastScrapedIso = maxFreshnessIso(matched);
+  }
+
   return {
-    city: businesses[0].city ?? cityParsed.cityPattern,
-    state: businesses[0].state ?? stateAbbrToDisplayName(cityParsed.stateAbbr),
+    city,
+    state,
     categoryLabel: label,
     businesses,
+    lastUpdatedLabel: formatLastUpdatedMonthYear(lastScrapedIso),
   };
 }
 

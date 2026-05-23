@@ -1,0 +1,51 @@
+import { NextResponse } from "next/server";
+import type { ExtractStartOptions } from "@/lib/extract-local-runner-types";
+import {
+  getExtractRunnerSnapshot,
+  startExtractLocal,
+} from "@/lib/extract-local-runner";
+import { isLocalAdminEnabled } from "@/lib/local-admin";
+
+function notFound() {
+  return new NextResponse(null, { status: 404 });
+}
+
+export async function GET() {
+  if (!isLocalAdminEnabled()) return notFound();
+  return NextResponse.json(getExtractRunnerSnapshot());
+}
+
+export async function POST(request: Request) {
+  if (!isLocalAdminEnabled()) return notFound();
+
+  let body: Record<string, unknown> = {};
+  try {
+    body = (await request.json()) as Record<string, unknown>;
+  } catch {
+    body = {};
+  }
+
+  const options: ExtractStartOptions = {
+    businessType:
+      typeof body.businessType === "string" ? body.businessType : undefined,
+    dryRun: body.dryRun === true,
+    keepFiles: body.keepFiles === true,
+    includeTasks: body.includeTasks === true,
+    maxFiles:
+      typeof body.maxFiles === "number" && Number.isFinite(body.maxFiles)
+        ? body.maxFiles
+        : typeof body.maxFiles === "string" && body.maxFiles.trim() !== ""
+          ? Number.parseInt(body.maxFiles, 10)
+          : undefined,
+  };
+
+  const result = startExtractLocal(options);
+  if (!result.ok) {
+    return NextResponse.json(result, { status: 409 });
+  }
+
+  return NextResponse.json({
+    ok: true,
+    ...getExtractRunnerSnapshot(),
+  });
+}

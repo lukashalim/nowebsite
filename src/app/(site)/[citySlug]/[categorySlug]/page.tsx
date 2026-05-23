@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DirectoryBusinessList } from "@/components/directory-business-list";
+import { DownloadCsvButton } from "@/components/download-csv-button";
 import { ProCta } from "@/components/pro-cta";
 import {
   categoryMetaDescription,
@@ -89,7 +90,15 @@ export default async function CategoryDirectoryPage({ params }: PageProps) {
         </p>
       </header>
 
+      {data.lastUpdatedLabel ? (
+        <p className="text-right text-sm text-gray-400 dark:text-zinc-500">
+          Last updated: {data.lastUpdatedLabel}
+        </p>
+      ) : null}
+
       <DirectoryBusinessList businesses={data.businesses} />
+
+      <DownloadCsvButton businesses={data.businesses} pagePath={path} />
 
       <ProCta />
     </div>

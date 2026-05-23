@@ -62,6 +62,16 @@ export function cityPath(citySlug: string): string {
   return `/${citySlug}`;
 }
 
+/** e.g. "May 2026" for directory freshness line. */
+export function formatLastUpdatedMonthYear(
+  iso: string | null | undefined,
+): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
 export function formatNeighborhoodOrArea(
   address: string | null | undefined,
   city: string | null | undefined,

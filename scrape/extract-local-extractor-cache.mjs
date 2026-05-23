@@ -9,7 +9,7 @@
  * Env:
  *   GOOGLE_MAPS_EXTRACTOR_DIR — app root or .../task_results/cache (default: %APPDATA%/googlemapsextractor on Windows)
  *   SWEET_SPOT_* — same as pipeline
- *   SCRAPE_MIN_REVIEWS_IN_CALENDAR_YEAR — default 2 (need this many reviews dated in the filter year; set 4 to tighten)
+ *   SCRAPE_MIN_REVIEWS_IN_CALENDAR_YEAR — default 1 (need this many reviews dated in the filter year; set 2+ to tighten)
  *   SCRAPE_REVIEWS_YEAR_FILTER — calendar year (default: current year, e.g. 2026)
  *   SCRAPE_SKIP_MIN_REVIEWS_IN_CALENDAR_YEAR_FILTER=1 — disable the year review count gate
  *

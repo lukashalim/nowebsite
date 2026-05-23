@@ -17,6 +17,8 @@ export interface DirectoryCityRef {
   city: string;
   state: string;
   listingCount: number;
+  /** Latest `last_scraped_at` or `scraped_at` in this city. */
+  lastModifiedAt: string | null;
 }
 
 export interface DirectoryCategoryRef {
@@ -32,9 +34,10 @@ export interface DirectoryCityCategoryRef {
   state: string;
   categoryLabel: string;
   listingCount: number;
+  lastModifiedAt: string | null;
 }
 
 export const DIRECTORY_MIN_LISTINGS = 5;
 
 export const DIRECTORY_LIST_COLUMNS =
-  "name, address, city, state, business_type, main_category, rating, reviews, phone, google_maps_link, demo_slug" as const;
+  "name, address, city, state, business_type, main_category, rating, reviews, phone, google_maps_link, demo_slug, last_scraped_at, scraped_at" as const;

@@ -524,10 +524,10 @@ export function countReviewsInCalendarYear(row, calendarYear, nowMs = Date.now()
 }
 
 /**
- * Require at least N reviews dated in the filter year (default: current calendar year, min 2).
+ * Require at least N reviews dated in the filter year (default: current calendar year, min 1).
  * Set SCRAPE_SKIP_MIN_REVIEWS_IN_CALENDAR_YEAR_FILTER=1 to disable.
  * Override year: SCRAPE_REVIEWS_YEAR_FILTER=2026
- * Override min: SCRAPE_MIN_REVIEWS_IN_CALENDAR_YEAR (default 2; use 4 for stricter gate)
+ * Override min: SCRAPE_MIN_REVIEWS_IN_CALENDAR_YEAR (default 1; use 2+ for stricter gate)
  *
  * @param {Record<string, unknown>} rawRow — full extractor row (with review arrays)
  * @param {{ nowMs?: number }} [opts]
@@ -545,10 +545,10 @@ export function passesMinReviewsInCalendarYear(rawRow, opts = {}) {
     return false;
   }
   const min = Number.parseInt(
-    String(process.env.SCRAPE_MIN_REVIEWS_IN_CALENDAR_YEAR ?? "2"),
+    String(process.env.SCRAPE_MIN_REVIEWS_IN_CALENDAR_YEAR ?? "1"),
     10,
   );
-  const need = Number.isFinite(min) && min >= 0 ? min : 2;
+  const need = Number.isFinite(min) && min >= 0 ? min : 1;
   return countReviewsInCalendarYear(rawRow, year, nowMs) >= need;
 }
 
@@ -560,13 +560,13 @@ export function getMinReviewsInCalendarYearFilterConfig(nowMs = Date.now()) {
       ? Number.parseInt(String(yRaw), 10)
       : new Date(nowMs).getFullYear();
   const min = Number.parseInt(
-    String(process.env.SCRAPE_MIN_REVIEWS_IN_CALENDAR_YEAR ?? "2"),
+    String(process.env.SCRAPE_MIN_REVIEWS_IN_CALENDAR_YEAR ?? "1"),
     10,
   );
   return {
     disabled,
     year: Number.isFinite(year) ? year : new Date(nowMs).getFullYear(),
-    min: Number.isFinite(min) && min >= 0 ? min : 2,
+    min: Number.isFinite(min) && min >= 0 ? min : 1,
   };
 }
 

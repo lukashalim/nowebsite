@@ -270,5 +270,6 @@ export function buildBusinessUpsertPayload(raw, base) {
     services_offered: extractServicesOffered(raw, base),
     ...extractHoursData(raw),
     review_highlights_updated_at: new Date().toISOString(),
+    last_scraped_at: new Date().toISOString(),
   });
 }

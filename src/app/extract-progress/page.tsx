@@ -4,6 +4,7 @@ import {
   fetchExtractLocalCacheRuns,
   type ExtractLocalCacheRunRow,
 } from "@/lib/extract-cache-runs";
+import { isLocalAdminEnabled } from "@/lib/local-admin";
 
 export const metadata: Metadata = {
   title: "Extractor progress",
@@ -93,6 +94,7 @@ function RunRow({ r }: { r: ExtractLocalCacheRunRow }) {
 }
 
 export default async function ExtractProgressPage() {
+  const showLocalAdmin = isLocalAdminEnabled();
   const { rows, error } = await fetchExtractLocalCacheRuns(120);
 
   return (
@@ -100,11 +102,22 @@ export default async function ExtractProgressPage() {
       <header className="mb-6 space-y-1">
         <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
           <Link
-            href="/"
+            href="/crm"
             className="text-zinc-700 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
           >
-            ← CRM home
+            ← CRM
           </Link>
+          {showLocalAdmin ? (
+            <>
+              {" · "}
+              <Link
+                href="/admin/scrape"
+                className="text-zinc-700 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+              >
+                Run NDJSON ingest (local)
+              </Link>
+            </>
+          ) : null}
         </p>
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
           Local extractor progress

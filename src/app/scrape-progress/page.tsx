@@ -18,6 +18,7 @@ import {
   fetchScrapeJobsSummary,
   type ScrapeJobRow,
 } from "@/lib/scrape-jobs";
+import { isLocalAdminEnabled } from "@/lib/local-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -215,17 +216,29 @@ export default async function ScrapeProgressPage({ searchParams }: PageProps) {
   const latestNdjsonRun = ndjsonRuns[0] ?? null;
 
   const querySuffix = limit !== 100 ? `?limit=${limit}` : "";
+  const showLocalAdmin = isLocalAdminEnabled();
 
   return (
     <div className="mx-auto max-w-[1400px] flex-1 p-4 sm:p-6">
       <header className="mb-6 space-y-1">
         <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
           <Link
-            href="/"
+            href="/crm"
             className="text-zinc-700 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
           >
-            ← CRM home
+            ← CRM
           </Link>
+          {showLocalAdmin ? (
+            <>
+              {" · "}
+              <Link
+                href="/admin/scrape"
+                className="text-zinc-700 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+              >
+                Run NDJSON ingest (local)
+              </Link>
+            </>
+          ) : null}
           {" · "}
           <Link
             href="/extract-progress"
