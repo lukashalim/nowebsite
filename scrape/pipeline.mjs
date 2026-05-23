@@ -12,6 +12,10 @@ import {
 } from "./lib/scrape-pipeline/index.mjs";
 import { attachDemoSlugsToPayloads } from "./lib/demo-slug.mjs";
 import { resolveBusinessTypeFromMapsSearch } from "./lib/maps-search-category.mjs";
+import {
+  applyLocationFallbacks,
+  enrichLocationAsync,
+} from "./lib/location-fallbacks.mjs";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const BUSINESSES_UPSERT_BATCH_SIZE = Math.max(
@@ -32,77 +36,6 @@ function envFlag(name, def = false) {
 
 const ENABLE_CATEGORY_VALIDATION = envFlag("ENABLE_CATEGORY_VALIDATION", true);
 const ENABLE_WEAKNESS_SUMMARY = envFlag("ENABLE_WEAKNESS_SUMMARY", true);
-
-/** US Census Geocoder — coordinates → ZCTA (used as ZIP when Maps has no postal_code). */
-const CENSUS_COORD_GEOGRAPHIES_URL =
-  "https://geocoding.geo.census.gov/geocoder/geographies/coordinates";
-
-/**
- * @param {number|string} longitude
- * @param {number|string} latitude
- * @returns {Promise<string|null>} 5-digit ZIP/ZCTA or null
- */
-async function reverseGeocodeZipCensus(longitude, latitude) {
-  const lon = Number(longitude);
-  const lat = Number(latitude);
-  if (!Number.isFinite(lon) || !Number.isFinite(lat)) {
-    return null;
-  }
-
-  const params = new URLSearchParams({
-    x: String(lon),
-    y: String(lat),
-    benchmark: "Public_AR_Current",
-    vintage: "Current_Current",
-    format: "json",
-  });
-
-  const res = await fetch(`${CENSUS_COORD_GEOGRAPHIES_URL}?${params}`, {
-    headers: {
-      Accept: "application/json",
-      "User-Agent": "sweatydata-pipeline/1.0",
-    },
-  });
-  if (!res.ok) {
-    console.error(`Census geocoder HTTP ${res.status}`);
-    return null;
-  }
-
-  const data = await res.json();
-  const geos = data?.result?.geographies;
-  if (!geos || typeof geos !== "object") {
-    return null;
-  }
-
-  for (const layerName of Object.keys(geos)) {
-    if (!/ZCTA|ZIP Code Tabulation/i.test(layerName)) {
-      continue;
-    }
-    const arr = geos[layerName];
-    if (!Array.isArray(arr) || arr.length === 0) {
-      continue;
-    }
-    const row = arr[0];
-    const raw =
-      row.ZCTA5CE20 ??
-      row.ZCTA5CE10 ??
-      row.GEOID ??
-      row.BASENAME ??
-      row.NAME ??
-      null;
-    if (raw == null) {
-      continue;
-    }
-    const digits = String(raw).replace(/\D/g, "");
-    if (digits.length >= 5) {
-      return digits.slice(0, 5);
-    }
-    if (digits.length >= 3) {
-      return digits.padStart(5, "0");
-    }
-  }
-  return null;
-}
 
 function getOpenRouterModel() {
   return (
@@ -692,6 +625,7 @@ async function main() {
             resolveBusinessTypeFromMapsSearch(jobSearchUrl, mainCategory) ??
             job.business_type;
           const base = rowToBusiness(raw, businessType);
+          applyLocationFallbacks(base, raw);
           if (!base.place_id) {
             console.error("Skipping row without place_id");
             skippedNoPlaceId += 1;
@@ -705,25 +639,13 @@ async function main() {
             continue;
           }
 
-          if (
-            !base.postal_code &&
-            base.latitude != null &&
-            base.longitude != null
-          ) {
-            try {
-              const z = await reverseGeocodeZipCensus(
-                base.longitude,
-                base.latitude,
-              );
-              if (z) {
-                base.postal_code = z;
-              }
-            } catch (cgErr) {
-              console.error(
-                `Census reverse geocode (${base.name ?? base.place_id}):`,
-                cgErr.message ?? cgErr,
-              );
-            }
+          try {
+            await enrichLocationAsync(base, { scrapeZip: job.zip_code });
+          } catch (locErr) {
+            console.error(
+              `Location enrich (${base.name ?? base.place_id}):`,
+              locErr.message ?? locErr,
+            );
           }
 
           const inCategory = ENABLE_CATEGORY_VALIDATION

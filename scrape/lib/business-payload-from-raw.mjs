@@ -4,10 +4,7 @@
  */
 
 import { pick, toNum, omitUndefined } from "./scrape-pipeline/index.mjs";
-
-/** US Census Geocoder — coordinates → ZCTA (used as ZIP when Maps has no postal_code). */
-const CENSUS_COORD_GEOGRAPHIES_URL =
-  "https://geocoding.geo.census.gov/geocoder/geographies/coordinates";
+import { reverseGeocodeLocalityCensus } from "./location-fallbacks.mjs";
 
 /**
  * @param {number|string} longitude
@@ -15,64 +12,8 @@ const CENSUS_COORD_GEOGRAPHIES_URL =
  * @returns {Promise<string|null>} 5-digit ZIP/ZCTA or null
  */
 export async function reverseGeocodeZipCensus(longitude, latitude) {
-  const lon = Number(longitude);
-  const lat = Number(latitude);
-  if (!Number.isFinite(lon) || !Number.isFinite(lat)) {
-    return null;
-  }
-
-  const params = new URLSearchParams({
-    x: String(lon),
-    y: String(lat),
-    benchmark: "Public_AR_Current",
-    vintage: "Current_Current",
-    format: "json",
-  });
-
-  const res = await fetch(`${CENSUS_COORD_GEOGRAPHIES_URL}?${params}`, {
-    headers: {
-      Accept: "application/json",
-      "User-Agent": "nowebsite-extract-local-cache/1.0",
-    },
-  });
-  if (!res.ok) {
-    return null;
-  }
-
-  const data = await res.json();
-  const geos = data?.result?.geographies;
-  if (!geos || typeof geos !== "object") {
-    return null;
-  }
-
-  for (const layerName of Object.keys(geos)) {
-    if (!/ZCTA|ZIP Code Tabulation/i.test(layerName)) {
-      continue;
-    }
-    const arr = geos[layerName];
-    if (!Array.isArray(arr) || arr.length === 0) {
-      continue;
-    }
-    const row = arr[0];
-    const raw =
-      row.ZCTA5CE20 ??
-      row.ZCTA5CE10 ??
-      row.GEOID ??
-      row.BASENAME ??
-      row.NAME ??
-      null;
-    if (raw == null) {
-      continue;
-    }
-    const digits = String(raw).replace(/\D/g, "");
-    if (digits.length >= 5) {
-      return digits.slice(0, 5);
-    }
-    if (digits.length >= 3) {
-      return digits.padStart(5, "0");
-    }
-  }
-  return null;
+  const geo = await reverseGeocodeLocalityCensus(longitude, latitude);
+  return geo.postal_code;
 }
 
 function textToTokens(s) {

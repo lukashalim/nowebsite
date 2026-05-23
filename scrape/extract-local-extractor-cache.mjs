@@ -12,6 +12,7 @@
  *   SCRAPE_MIN_REVIEWS_IN_CALENDAR_YEAR — default 1 (need this many reviews dated in the filter year; set 2+ to tighten)
  *   SCRAPE_REVIEWS_YEAR_FILTER — calendar year (default: current year, e.g. 2026)
  *   SCRAPE_SKIP_MIN_REVIEWS_IN_CALENDAR_YEAR_FILTER=1 — disable the year review count gate
+ *   EXTRACT_LOCAL_SCRAPE_ZIP — optional 5-digit ZIP for city/state fallback when NDJSON lacks locality
  *
  * Flags:
  *   --root <path>              — same as GOOGLE_MAPS_EXTRACTOR_DIR
@@ -50,10 +51,11 @@ import {
   omitUndefined,
   parseBusinessTypeArg,
 } from "./lib/scrape-pipeline/index.mjs";
+import { buildBusinessUpsertPayload } from "./lib/business-payload-from-raw.mjs";
 import {
-  buildBusinessUpsertPayload,
-  reverseGeocodeZipCensus,
-} from "./lib/business-payload-from-raw.mjs";
+  applyLocationFallbacks,
+  enrichLocationAsync,
+} from "./lib/location-fallbacks.mjs";
 import {
   createDemoSlugAllocator,
   assignDemoSlugToPayload,
@@ -412,6 +414,7 @@ async function main() {
         }
 
         const base = rowToBusiness(raw, businessType);
+        applyLocationFallbacks(base, raw);
         if (!base.place_id) {
           stats.noPlaceId += 1;
           continue;
@@ -436,25 +439,15 @@ async function main() {
           continue;
         }
 
-        if (
-          !base.postal_code &&
-          base.latitude != null &&
-          base.longitude != null
-        ) {
-          try {
-            const z = await reverseGeocodeZipCensus(
-              base.longitude,
-              base.latitude,
-            );
-            if (z) {
-              base.postal_code = z;
-            }
-          } catch (cgErr) {
-            console.error(
-              `Census reverse geocode (${base.name ?? base.place_id}):`,
-              cgErr.message ?? cgErr,
-            );
-          }
+        try {
+          await enrichLocationAsync(base, {
+            scrapeZip: process.env.EXTRACT_LOCAL_SCRAPE_ZIP?.trim() || null,
+          });
+        } catch (locErr) {
+          console.error(
+            `Location enrich (${base.name ?? base.place_id}):`,
+            locErr.message ?? locErr,
+          );
         }
 
         const payload = buildBusinessUpsertPayload(raw, base);

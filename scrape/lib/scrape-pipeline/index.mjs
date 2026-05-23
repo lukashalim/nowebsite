@@ -576,7 +576,7 @@ export function rowToBusiness(row, businessTypeArg) {
   const website = pick(row, "website", "WEBSITE");
   const websiteTrim = website != null ? String(website).trim() : "";
   const street = da.street ?? pick(row, "address", "ADDRESS");
-  return {
+  const base = {
     place_id: pick(row, "place_id", "PLACE_ID"),
     name: pick(row, "name", "NAME"),
     address: street ?? null,
@@ -600,6 +600,7 @@ export function rowToBusiness(row, businessTypeArg) {
     /** Raw Maps website URL (Facebook / WhatsApp / etc.); stored for CRM contact-surface filters. */
     listing_website: websiteTrim ? websiteTrim : null,
   };
+  return base;
 }
 
 export function omitUndefined(obj) {
