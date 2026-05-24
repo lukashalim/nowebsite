@@ -76,9 +76,11 @@ export function stateHubMetaDescription(
   state: string,
   count: number,
   cityCount: number,
+  lastUpdatedLabel: string | null = null,
 ): string {
   const display = stateAbbrToDisplayName(stateToAbbr(state) ?? state);
-  return `Browse ${count.toLocaleString()} businesses across ${cityCount.toLocaleString()} cities in ${display} with no website. Updated regularly.`;
+  const updated = lastUpdatedLabel ? ` Updated ${lastUpdatedLabel}.` : "";
+  return `Browse ${count.toLocaleString()} businesses across ${cityCount.toLocaleString()} cities in ${display} with no website.${updated}`;
 }
 
 export function statePath(stateSlug: string): string {
@@ -93,9 +95,11 @@ export function cityHubMetaDescription(
   city: string,
   state: string,
   listingCount: number,
+  lastUpdatedLabel: string | null = null,
 ): string {
   const place = formatCityState(city, state);
-  return `Directory of ${listingCount} local businesses in ${place} that do not have a website — phone numbers, ratings, and Google Maps links for designers and agencies.`;
+  const updated = lastUpdatedLabel ? ` Updated ${lastUpdatedLabel}.` : "";
+  return `Directory of ${listingCount} local businesses in ${place} that do not have a website — phone numbers, ratings, and Google Maps links for designers and agencies.${updated}`;
 }
 
 export function categoryLinkLabel(categoryLabel: string): string {

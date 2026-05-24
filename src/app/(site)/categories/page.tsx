@@ -1,27 +1,43 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CategoryIcon } from "@/components/category-icon";
-import { fetchAllPublishedCategoryLinks } from "@/lib/directory/data";
+import { DirectoryLastUpdated } from "@/components/directory-last-updated";
+import {
+  fetchAllPublishedCategoryLinks,
+  fetchDirectoryLastUpdatedLabel,
+} from "@/lib/directory/data";
 import { categoryGridLabel } from "@/lib/directory/labels";
 import { DIRECTORY_MIN_CATEGORY_LISTINGS } from "@/lib/directory/types";
 import { absoluteUrl } from "@/lib/site-url";
 
 export const revalidate = 3600;
 
-export const metadata: Metadata = {
-  title: { absolute: "All categories | Businesses without a website" },
-  description:
-    "Browse nationwide directories of local businesses without their own website — by trade and service category.",
-  alternates: { canonical: absoluteUrl("/categories") },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  let lastUpdatedLabel: string | null = null;
+  try {
+    lastUpdatedLabel = await fetchDirectoryLastUpdatedLabel();
+  } catch {
+    // omit freshness from meta when directory data is unavailable
+  }
+  const updated = lastUpdatedLabel ? ` Updated ${lastUpdatedLabel}.` : "";
+  return {
+    title: { absolute: "All categories | Businesses without a website" },
+    description: `Browse nationwide directories of local businesses without their own website — by trade and service category.${updated}`,
+    alternates: { canonical: absoluteUrl("/categories") },
+  };
+}
 
 export default async function CategoriesIndexPage() {
   let categories: Awaited<ReturnType<typeof fetchAllPublishedCategoryLinks>> =
     [];
+  let lastUpdatedLabel: string | null = null;
   let loadError: string | null = null;
 
   try {
-    categories = await fetchAllPublishedCategoryLinks();
+    [categories, lastUpdatedLabel] = await Promise.all([
+      fetchAllPublishedCategoryLinks(),
+      fetchDirectoryLastUpdatedLabel(),
+    ]);
   } catch (e) {
     loadError = e instanceof Error ? e.message : "Could not load categories.";
   }
@@ -43,6 +59,8 @@ export default async function CategoriesIndexPage() {
           at least {DIRECTORY_MIN_CATEGORY_LISTINGS} listings.
         </p>
       </header>
+
+      <DirectoryLastUpdated label={lastUpdatedLabel} />
 
       {loadError ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">

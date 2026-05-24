@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { formatLastUpdatedMonthYear } from "@/lib/directory/labels";
 import {
+  categoryMatchesSlug,
   cityStateToSlug,
   directoryCategoryLabel,
   parseCitySlug,
@@ -8,7 +9,6 @@ import {
   resolveCategoryForRow,
   stateNameToSlug,
   stateToAbbr,
-  categoryMatchesSlug,
 } from "@/lib/directory/slugs";
 import type {
   DirectoryBusiness,
@@ -281,10 +281,17 @@ export interface DirectorySummary {
   cityHubCount: number;
   categoryPageCount: number;
   statePageCount: number;
+  lastUpdatedLabel: string | null;
+}
+
+export async function fetchDirectoryLastUpdatedLabel(): Promise<string | null> {
+  const { homepageLastModified } = await fetchDirectoryIndex();
+  return formatLastUpdatedMonthYear(homepageLastModified?.toISOString());
 }
 
 export async function fetchDirectorySummary(): Promise<DirectorySummary> {
-  const { cities, categories, states } = await fetchDirectoryIndex();
+  const { cities, categories, states, homepageLastModified } =
+    await fetchDirectoryIndex();
   return {
     totalListings: cities.reduce((sum, c) => sum + c.listingCount, 0),
     cityHubCount: cities.length,
@@ -292,6 +299,9 @@ export async function fetchDirectorySummary(): Promise<DirectorySummary> {
       (c) => c.totalCount >= DIRECTORY_MIN_CATEGORY_LISTINGS,
     ).length,
     statePageCount: states.length,
+    lastUpdatedLabel: formatLastUpdatedMonthYear(
+      homepageLastModified?.toISOString(),
+    ),
   };
 }
 
@@ -340,6 +350,7 @@ export async function fetchCityHub(citySlug: string): Promise<{
   listingCount: number;
   categories: DirectoryCategoryRef[];
   publishedCategories: DirectoryCategoryRef[];
+  lastUpdatedLabel: string | null;
 } | null> {
   const parsed = parseCitySlug(citySlug);
   if (!parsed) return null;
@@ -375,6 +386,7 @@ export async function fetchCityHub(citySlug: string): Promise<{
     listingCount: cityRef.listingCount,
     categories,
     publishedCategories,
+    lastUpdatedLabel: formatLastUpdatedMonthYear(cityRef.lastModifiedAt),
   };
 }
 
@@ -391,14 +403,6 @@ export async function fetchNationwideCategoryListings(
   const slug = categorySlug.trim().toLowerCase();
 
   const index = await fetchDirectoryIndex();
-  const categoryRef = index.categories.find((c) => c.categorySlug === slug);
-  if (
-    !categoryRef ||
-    categoryRef.totalCount < DIRECTORY_MIN_CATEGORY_LISTINGS
-  ) {
-    return null;
-  }
-
   const rows = await fetchAllNoWebsiteRows();
   const matched = rows.filter((row) =>
     categoryMatchesSlug(row.main_category, row.business_type, slug),
@@ -407,10 +411,19 @@ export async function fetchNationwideCategoryListings(
 
   if (businesses.length < DIRECTORY_MIN_CATEGORY_LISTINGS) return null;
 
+  const categoryRef = index.categories.find((c) => c.categorySlug === slug);
+  const categoryLabel =
+    categoryRef?.categoryLabel ??
+    directoryCategoryLabel(
+      matched[0]?.main_category,
+      matched[0]?.business_type,
+    ) ??
+    slug;
+
   const cityGroups = groupBusinessesByCity(businesses);
 
   return {
-    categoryLabel: categoryRef.categoryLabel,
+    categoryLabel,
     businesses,
     cityGroups,
     cityCount: cityGroups.length,

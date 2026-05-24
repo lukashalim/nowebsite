@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CategoryIcon } from "@/components/category-icon";
-import { ProCta } from "@/components/pro-cta";
 import { categoryGridLabel, cityPath, statePath } from "@/lib/directory/labels";
 import { stateAbbrToDisplayName, stateToAbbr } from "@/lib/directory/slugs";
 import {
   fetchAllDirectoryCities,
   fetchAllDirectoryStates,
   fetchAllPublishedCategoryLinks,
+  fetchDirectoryLastUpdatedLabel,
   fetchDirectorySummary,
   fetchTopStates,
 } from "@/lib/directory/data";
@@ -20,15 +20,23 @@ import { absoluteUrl } from "@/lib/site-url";
 
 export const revalidate = 3600;
 
-export const metadata: Metadata = {
-  title: {
-    absolute:
-      "Local Businesses Without a Website | Free Directory for Web Designers",
-  },
-  description:
-    "Browse our free list of local businesses without websites — restaurants, plumbers, painters and more across the US. Updated regularly. Free for web designers and agencies.",
-  alternates: { canonical: absoluteUrl("/") },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  let lastUpdatedLabel: string | null = null;
+  try {
+    lastUpdatedLabel = await fetchDirectoryLastUpdatedLabel();
+  } catch {
+    // omit freshness from meta when directory data is unavailable
+  }
+  const updated = lastUpdatedLabel ? ` Updated ${lastUpdatedLabel}.` : "";
+  return {
+    title: {
+      absolute:
+        "Local Businesses Without a Website | Free Directory for Web Designers",
+    },
+    description: `Browse our free list of local businesses without websites — restaurants, plumbers, painters and more across the US.${updated} Free for web designers and agencies.`,
+    alternates: { canonical: absoluteUrl("/") },
+  };
+}
 
 export default async function HomePage() {
   let cities: Awaited<ReturnType<typeof fetchAllDirectoryCities>> = [];
@@ -63,7 +71,10 @@ export default async function HomePage() {
           businesses without a website, sourced directly from Google Maps. Browse by
           city, state, or category; each listing includes ratings, review counts, phone
           numbers, and Google Maps links. Every listing is a real Google business
-          profile verified to have no website. Updated regularly.
+          profile verified to have no website.
+          {summary?.lastUpdatedLabel
+            ? ` Last updated ${summary.lastUpdatedLabel}.`
+            : null}
         </p>
       </section>
 
@@ -217,12 +228,15 @@ export default async function HomePage() {
                 Looking for local businesses without websites near you? Browse by city
                 or state below.
               </p>
+              {summary.lastUpdatedLabel ? (
+                <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+                  Directory last updated: {summary.lastUpdatedLabel}
+                </p>
+              ) : null}
             </section>
           ) : null}
         </>
       )}
-
-      <ProCta />
     </div>
   );
 }

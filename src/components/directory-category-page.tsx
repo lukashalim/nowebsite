@@ -1,7 +1,7 @@
 import Link from "next/link";
+import { DirectoryLastUpdated } from "@/components/directory-last-updated";
 import { DirectoryGroupedByCity } from "@/components/directory-grouped-by-city";
 import { DownloadCsvButton } from "@/components/download-csv-button";
-import { ProCta } from "@/components/pro-cta";
 import {
   nationwideCategoryPageTitle,
   pluralCategoryForTitle,
@@ -58,11 +58,7 @@ export function DirectoryCategoryPage({
         </p>
       </header>
 
-      {lastUpdatedLabel ? (
-        <p className="text-right text-sm text-gray-400 dark:text-zinc-500">
-          Last updated: {lastUpdatedLabel}
-        </p>
-      ) : null}
+      <DirectoryLastUpdated label={lastUpdatedLabel} />
 
       <DirectoryGroupedByCity
         cityGroups={cityGroups}
@@ -70,8 +66,6 @@ export function DirectoryCategoryPage({
       />
 
       <DownloadCsvButton businesses={businesses} pagePath={path} />
-
-      <ProCta />
     </div>
   );
 }

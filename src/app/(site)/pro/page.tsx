@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import {
   LayoutTemplate,
   MessageSquareText,
@@ -82,21 +81,12 @@ export default function ProPage() {
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
           Coming soon. Want early access? Email{" "}
           <a
-            href="mailto:hello@nowebsitebusinessleads.com"
+            href="mailto:lukas@nowebsitebusinessleads.com"
             className="font-medium text-blue-600 hover:underline dark:text-blue-400"
           >
-            hello@nowebsitebusinessleads.com
+            lukas@nowebsitebusinessleads.com
           </a>{" "}
           and we&apos;ll notify you when Pro launches.
-        </p>
-        <p className="mt-4 text-sm text-zinc-500">
-          Already have access?{" "}
-          <Link
-            href="/crm"
-            className="font-medium text-zinc-800 underline dark:text-zinc-200"
-          >
-            Open the CRM →
-          </Link>
         </p>
       </section>
     </div>
