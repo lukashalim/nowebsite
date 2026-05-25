@@ -252,6 +252,7 @@ export function pickDetailedAddress(row) {
       city: null,
       state: null,
       postal_code: null,
+      country: null,
     };
   }
   return {
@@ -263,6 +264,7 @@ export function pickDetailedAddress(row) {
       null,
     postal_code:
       pick(da, "postal_code", "postalCode", "zip", "zip_code", "postal") ?? null,
+    country: pick(da, "country", "country_code", "COUNTRY", "COUNTRY_CODE") ?? null,
   };
 }
 
@@ -591,6 +593,7 @@ export function rowToBusiness(row, businessTypeArg) {
     city: da.city,
     state: da.state,
     postal_code: da.postal_code,
+    country: null,
     latitude,
     longitude,
     main_category: pick(row, "main_category", "MAIN_CATEGORY"),

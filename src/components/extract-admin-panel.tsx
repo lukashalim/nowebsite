@@ -6,6 +6,8 @@ import type { ExtractRunnerSnapshot } from "@/lib/extract-local-runner-types";
 
 export function ExtractAdminPanel() {
   const [businessType, setBusinessType] = useState("");
+  const [country, setCountry] = useState<"" | "US" | "GB">("");
+  const [locationHint, setLocationHint] = useState("");
   const [dryRun, setDryRun] = useState(false);
   const [keepFiles, setKeepFiles] = useState(false);
   const [includeTasks, setIncludeTasks] = useState(false);
@@ -48,6 +50,8 @@ export function ExtractAdminPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           businessType: businessType.trim() || undefined,
+          country: country || undefined,
+          locationHint: locationHint.trim() || undefined,
           dryRun,
           keepFiles,
           includeTasks,
@@ -117,6 +121,36 @@ export function ExtractAdminPanel() {
             value={businessType}
             onChange={(e) => setBusinessType(e.target.value)}
             placeholder="e.g. restaurant (optional — default local_cache)"
+            className="rounded-md border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-medium text-zinc-800 dark:text-zinc-200">
+            Country (optional)
+          </span>
+          <select
+            value={country}
+            onChange={(e) =>
+              setCountry(e.target.value as "" | "US" | "GB")
+            }
+            className="rounded-md border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950"
+          >
+            <option value="">Detect per row</option>
+            <option value="US">US</option>
+            <option value="GB">United Kingdom (GB)</option>
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-medium text-zinc-800 dark:text-zinc-200">
+            Location hint (US ZIP or UK postcode)
+          </span>
+          <input
+            type="text"
+            value={locationHint}
+            onChange={(e) => setLocationHint(e.target.value)}
+            placeholder="e.g. 60601 or M1 1AA"
             className="rounded-md border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950"
           />
         </label>

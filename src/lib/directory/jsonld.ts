@@ -32,7 +32,7 @@ export function buildDirectoryListJsonLd(
         "@type": "PostalAddress",
         ...(city ? { addressLocality: city } : {}),
         ...(region ? { addressRegion: region } : {}),
-        addressCountry: "US",
+        addressCountry: b.country ?? "US",
       };
     }
     return item;

@@ -25,9 +25,19 @@ export async function POST(request: Request) {
     body = {};
   }
 
+  const countryRaw =
+    typeof body.country === "string" ? body.country.trim().toUpperCase() : "";
+  const country =
+    countryRaw === "GB" || countryRaw === "US"
+      ? (countryRaw as "US" | "GB")
+      : undefined;
+
   const options: ExtractStartOptions = {
     businessType:
       typeof body.businessType === "string" ? body.businessType : undefined,
+    country,
+    locationHint:
+      typeof body.locationHint === "string" ? body.locationHint : undefined,
     dryRun: body.dryRun === true,
     keepFiles: body.keepFiles === true,
     includeTasks: body.includeTasks === true,

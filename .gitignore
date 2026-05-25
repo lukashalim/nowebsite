@@ -32,6 +32,7 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 scrape/_extract_last_run.log
+scrape/logs/
 Same
 
 # env files (can opt-in for committing if needed)

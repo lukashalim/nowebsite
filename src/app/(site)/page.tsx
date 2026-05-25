@@ -5,11 +5,12 @@ import { categoryGridLabel, cityPath, statePath } from "@/lib/directory/labels";
 import { stateAbbrToDisplayName, stateToAbbr } from "@/lib/directory/slugs";
 import {
   fetchAllDirectoryCities,
-  fetchAllDirectoryStates,
   fetchAllPublishedCategoryLinks,
   fetchDirectoryLastUpdatedLabel,
   fetchDirectorySummary,
+  fetchFacebookDirectoryPageData,
   fetchTopStates,
+  fetchUkListingCount,
 } from "@/lib/directory/data";
 import {
   DIRECTORY_MIN_CATEGORY_LISTINGS,
@@ -17,6 +18,10 @@ import {
   DIRECTORY_MIN_STATE_LISTINGS,
 } from "@/lib/directory/types";
 import { absoluteUrl } from "@/lib/site-url";
+
+const HOME_TOP_CATEGORIES = 30;
+const HOME_TOP_STATES = 8;
+const HOME_TOP_CITIES = 27;
 
 export const revalidate = 3600;
 
@@ -44,21 +49,31 @@ export default async function HomePage() {
   let publishedCategories: Awaited<
     ReturnType<typeof fetchAllPublishedCategoryLinks>
   > = [];
-  let states: Awaited<ReturnType<typeof fetchAllDirectoryStates>> = [];
   let topStates: Awaited<ReturnType<typeof fetchTopStates>> = [];
+  let facebookCount: number | null = null;
+  let ukCount: number | null = null;
   let loadError: string | null = null;
 
   try {
-    [cities, summary, publishedCategories, states, topStates] = await Promise.all([
-      fetchAllDirectoryCities(),
-      fetchDirectorySummary(),
-      fetchAllPublishedCategoryLinks(),
-      fetchAllDirectoryStates(),
-      fetchTopStates(8),
-    ]);
+    [cities, summary, publishedCategories, topStates, facebookCount, ukCount] =
+      await Promise.all([
+        fetchAllDirectoryCities(),
+        fetchDirectorySummary(),
+        fetchAllPublishedCategoryLinks(),
+        fetchTopStates(HOME_TOP_STATES),
+        fetchFacebookDirectoryPageData().then((d) => d.totalCount),
+        fetchUkListingCount(),
+      ]);
   } catch (e) {
     loadError = e instanceof Error ? e.message : "Could not load directory data.";
   }
+
+  const topCategories = publishedCategories.slice(0, HOME_TOP_CATEGORIES);
+  const topCities = cities.slice(0, HOME_TOP_CITIES);
+  const totalCategoryCount =
+    summary?.categoryPageCount ?? publishedCategories.length;
+  const totalCityCount = summary?.cityHubCount ?? cities.length;
+  const totalStateCount = summary?.statePageCount ?? topStates.length;
 
   return (
     <div className="space-y-12">
@@ -89,23 +104,23 @@ export default async function HomePage() {
               <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
                 Categories
               </h2>
-              {publishedCategories.length > 0 ? (
+              {totalCategoryCount > 0 ? (
                 <Link
                   href="/categories"
                   className="text-sm font-medium text-zinc-600 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
                 >
-                  View all {publishedCategories.length} categories
+                  View all {totalCategoryCount.toLocaleString()} categories
                 </Link>
               ) : null}
             </div>
-            {publishedCategories.length === 0 ? (
+            {topCategories.length === 0 ? (
               <p className="text-sm text-zinc-500">
                 No category pages yet (need {DIRECTORY_MIN_CATEGORY_LISTINGS}+
                 listings per category nationwide).
               </p>
             ) : (
               <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {publishedCategories.map((cat) => (
+                {topCategories.map((cat) => (
                   <li key={cat.categorySlug}>
                     <Link
                       href={cat.href}
@@ -130,17 +145,56 @@ export default async function HomePage() {
             )}
           </section>
 
+          {ukCount !== null && ukCount > 0 ? (
+            <section className="rounded-xl border border-zinc-200 bg-zinc-50 p-6 dark:border-zinc-800 dark:bg-zinc-900/40">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                United Kingdom
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
+                {ukCount.toLocaleString()} UK listings where Google Maps has no
+                standalone website — browse by nation or city.
+              </p>
+              <Link
+                href="/uk"
+                className="mt-4 inline-block text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+              >
+                Open UK directory
+              </Link>
+            </section>
+          ) : null}
+
+          {facebookCount !== null && facebookCount > 0 ? (
+            <section className="space-y-4">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                Facebook as Google website
+              </h2>
+              <Link
+                href="/facebook"
+                className="block rounded-lg border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/50"
+              >
+                <span className="block font-medium text-zinc-900 dark:text-zinc-100">
+                  Businesses using Facebook on Google Maps
+                </span>
+                <span className="mt-1 block text-sm text-zinc-600 dark:text-zinc-400">
+                  {facebookCount.toLocaleString()} listings where Facebook appears as
+                  the website — often against Google guidelines and bad for local
+                  rankings. High-intent leads for web designers.
+                </span>
+              </Link>
+            </section>
+          ) : null}
+
           <section className="space-y-4">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
                 Browse by state
               </h2>
-              {states.length > 0 ? (
+              {totalStateCount > 0 ? (
                 <Link
                   href="/states"
                   className="text-sm font-medium text-zinc-600 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
                 >
-                  View all {states.length} states
+                  View all {totalStateCount.toLocaleString()} states
                 </Link>
               ) : null}
             </div>
@@ -175,23 +229,23 @@ export default async function HomePage() {
               <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
                 Cities
               </h2>
-              {cities.length > 0 ? (
+              {totalCityCount > 0 ? (
                 <Link
                   href="/cities"
                   className="text-sm font-medium text-zinc-600 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
                 >
-                  View all {cities.length} cities
+                  View all {totalCityCount.toLocaleString()} cities
                 </Link>
               ) : null}
             </div>
-            {cities.length === 0 ? (
+            {topCities.length === 0 ? (
               <p className="text-sm text-zinc-500">
                 No city hubs yet (need {DIRECTORY_MIN_CITY_LISTINGS}+ listings per
                 city).
               </p>
             ) : (
               <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {cities.map((c) => (
+                {topCities.map((c) => (
                   <li key={c.citySlug}>
                     <Link
                       href={cityPath(c.citySlug)}

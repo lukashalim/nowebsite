@@ -15,7 +15,10 @@ import {
   nationwideCategoryMetaTitle,
   stateHubMetaDescription,
   stateHubMetaTitle,
+  ukRegionHubMetaDescription,
+  ukRegionHubMetaTitle,
 } from "@/lib/directory/labels";
+import { COUNTRY_GB } from "@/lib/directory/country";
 import { fetchAllValidSlugParams } from "@/lib/directory/data";
 import { resolveDirectorySlugPage } from "@/lib/directory/resolve-slug-page";
 import { DIRECTORY_MIN_CATEGORY_LISTINGS } from "@/lib/directory/types";
@@ -60,14 +63,31 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   }
 
+  if (resolved.kind === "ukRegion") {
+    const { data } = resolved;
+    const title = ukRegionHubMetaTitle(data.region);
+    const description = ukRegionHubMetaDescription(
+      data.region,
+      data.listingCount,
+      data.cityCount,
+      data.lastUpdatedLabel,
+    );
+    return {
+      title: { absolute: title },
+      description,
+      alternates: { canonical: absoluteUrl(`/${slug.trim().toLowerCase()}`) },
+    };
+  }
+
   if (resolved.kind === "city") {
     const { hub } = resolved;
-    const title = cityHubTitle(hub.city, hub.state);
+    const title = cityHubTitle(hub.city, hub.state, hub.country);
     const description = cityHubMetaDescription(
       hub.city,
       hub.state,
       hub.listingCount,
       hub.lastUpdatedLabel,
+      hub.country,
     );
     return {
       title: { absolute: title },
@@ -119,6 +139,24 @@ export default async function SlugDirectoryPage({ params }: PageProps) {
     );
   }
 
+  if (resolved.kind === "ukRegion") {
+    const { data } = resolved;
+    return (
+      <DirectoryStatePage
+        stateSlug={lower}
+        state={data.region}
+        businesses={data.businesses}
+        cityGroups={data.cityGroups}
+        cityCount={data.cityCount}
+        lastUpdatedLabel={data.lastUpdatedLabel}
+        publishedCitySlugs={data.publishedCitySlugs}
+        hubHref="/uk"
+        hubLabel="United Kingdom"
+        isUkRegion
+      />
+    );
+  }
+
   if (resolved.kind === "state") {
     const { data } = resolved;
     return (
@@ -136,7 +174,7 @@ export default async function SlugDirectoryPage({ params }: PageProps) {
 
   if (resolved.kind === "city") {
     const { hub, businesses } = resolved;
-    const title = cityHubTitle(hub.city, hub.state);
+    const title = cityHubTitle(hub.city, hub.state, hub.country);
     const publishedSlugs = new Set(
       hub.publishedCategories.map((c) => c.categorySlug),
     );
@@ -148,6 +186,14 @@ export default async function SlugDirectoryPage({ params }: PageProps) {
             <Link href="/" className="hover:underline">
               Home
             </Link>
+            {hub.country === COUNTRY_GB ? (
+              <>
+                <span aria-hidden> / </span>
+                <Link href="/uk" className="hover:underline">
+                  United Kingdom
+                </Link>
+              </>
+            ) : null}
             <span aria-hidden> / </span>
             {hub.city}
           </p>

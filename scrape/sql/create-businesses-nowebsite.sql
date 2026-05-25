@@ -9,6 +9,7 @@ create table if not exists public.businesses_nowebsite (
   address text,
   city text,
   state text,
+  country text not null default 'US',
   postal_code text,
   latitude double precision,
   longitude double precision,
@@ -54,6 +55,7 @@ create table if not exists public.businesses_nowebsite (
   source_snapshot_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 
+  constraint businesses_nowebsite_country_check check (country in ('US', 'GB')),
   constraint businesses_nowebsite_place_id_key unique (place_id),
   constraint businesses_nowebsite_contact_count_check
     check (contact_count >= 0 and contact_count <= 50)

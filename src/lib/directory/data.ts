@@ -1,6 +1,13 @@
 import { cache } from "react";
 import { formatLastUpdatedMonthYear } from "@/lib/directory/labels";
 import {
+  COUNTRY_GB,
+  COUNTRY_US,
+  parseDirectoryCountry,
+  ukRegionMatchesState,
+  ukRegionNameToSlug,
+} from "@/lib/directory/country";
+import {
   categoryMatchesSlug,
   cityStateToSlug,
   directoryCategoryLabel,
@@ -16,13 +23,16 @@ import type {
   DirectoryCityCategoryRef,
   DirectoryCityGroup,
   DirectoryCityRef,
+  DirectoryCountry,
   DirectoryStateRef,
+  DirectoryUkRegionRef,
 } from "@/lib/directory/types";
 import {
   DIRECTORY_LIST_COLUMNS,
   DIRECTORY_MIN_CATEGORY_LISTINGS,
   DIRECTORY_MIN_CITY_LISTINGS,
   DIRECTORY_MIN_STATE_LISTINGS,
+  DIRECTORY_MIN_UK_REGION_LISTINGS,
 } from "@/lib/directory/types";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 
@@ -33,6 +43,7 @@ interface RawDirectoryRow {
   address: string | null;
   city: string | null;
   state: string | null;
+  country: string | null;
   business_type: string | null;
   main_category: string | null;
   rating: number | null;
@@ -50,6 +61,7 @@ function rowToBusiness(row: RawDirectoryRow): DirectoryBusiness {
     address: row.address,
     city: row.city,
     state: row.state,
+    country: parseDirectoryCountry(row.country),
     business_type: row.business_type,
     main_category: row.main_category,
     rating: row.rating,
@@ -88,7 +100,12 @@ const fetchAllNoWebsiteRows = cache(async (): Promise<RawDirectoryRow[]> => {
       .order("place_id", { ascending: true })
       .range(from, from + BATCH - 1);
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      const hint = /country|schema cache/i.test(error.message)
+        ? " Run scrape/sql/add-country-businesses-nowebsite.sql in Supabase."
+        : "";
+      throw new Error(error.message + hint);
+    }
     const batch = (data ?? []) as RawDirectoryRow[];
     rows.push(...batch);
     if (batch.length < BATCH) break;
@@ -97,6 +114,62 @@ const fetchAllNoWebsiteRows = cache(async (): Promise<RawDirectoryRow[]> => {
 
   return rows;
 });
+
+const fetchAllFacebookSurfaceRows = cache(async (): Promise<RawDirectoryRow[]> => {
+  const supabase = createSupabaseAdmin();
+  const rows: RawDirectoryRow[] = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("businesses_nowebsite")
+      .select(DIRECTORY_LIST_COLUMNS)
+      .eq("has_website", false)
+      .eq("crm_contact_surface", "facebook")
+      .not("city", "is", null)
+      .not("state", "is", null)
+      .order("reviews", { ascending: false })
+      .order("place_id", { ascending: true })
+      .range(from, from + BATCH - 1);
+
+    if (error) {
+      const hint = /crm_contact_surface|listing_website|schema cache/i.test(
+        error.message,
+      )
+        ? " Run scrape/sql/add-listing-website-crm-contact-surface.sql in Supabase, then refresh."
+        : "";
+      throw new Error(error.message + hint);
+    }
+    const batch = (data ?? []) as RawDirectoryRow[];
+    rows.push(...batch);
+    if (batch.length < BATCH) break;
+    from += BATCH;
+  }
+
+  return rows;
+});
+
+export interface FacebookDirectoryPageData {
+  businesses: DirectoryBusiness[];
+  cityGroups: DirectoryCityGroup[];
+  totalCount: number;
+  lastUpdatedLabel: string | null;
+}
+
+export const fetchFacebookDirectoryPageData = cache(
+  async (): Promise<FacebookDirectoryPageData> => {
+    const rows = await fetchAllFacebookSurfaceRows();
+    const businesses = rows.map(rowToBusiness).sort(sortByReviewsDesc);
+    const cityGroups = groupBusinessesByCity(businesses);
+
+    return {
+      businesses,
+      cityGroups,
+      totalCount: businesses.length,
+      lastUpdatedLabel: formatLastUpdatedMonthYear(maxFreshnessIso(rows)),
+    };
+  },
+);
 
 function sortByReviewsDesc(a: DirectoryBusiness, b: DirectoryBusiness): number {
   return (b.reviews ?? 0) - (a.reviews ?? 0);
@@ -121,7 +194,7 @@ export function groupBusinessesByCity(
     const city = b.city?.trim();
     const state = b.state?.trim();
     if (!city || !state) continue;
-    const citySlug = cityStateToSlug(city, state);
+    const citySlug = cityStateToSlug(city, state, b.country);
     if (!citySlug) continue;
 
     const key = citySlug;
@@ -129,7 +202,13 @@ export function groupBusinessesByCity(
     if (existing) {
       existing.businesses.push(b);
     } else {
-      groups.set(key, { city, state, citySlug, businesses: [b] });
+      groups.set(key, {
+        city,
+        state,
+        country: b.country,
+        citySlug,
+        businesses: [b],
+      });
     }
   }
 
@@ -166,47 +245,57 @@ export const fetchDirectoryIndex = cache(async (): Promise<{
 
     homepageLastModifiedIso = bumpFreshnessIso(homepageLastModifiedIso, row);
 
-    const citySlug = cityStateToSlug(city, state);
-    if (!citySlug) continue;
+    const country = parseDirectoryCountry(row.country);
 
-    const cityKey = citySlug;
-    const existingCity = cityCounts.get(cityKey);
-    if (existingCity) {
-      existingCity.listingCount += 1;
-      existingCity.lastModifiedAt = bumpFreshnessIso(
-        existingCity.lastModifiedAt,
-        row,
-      );
-    } else {
-      cityCounts.set(cityKey, {
-        citySlug,
-        city,
-        state,
-        listingCount: 1,
-        lastModifiedAt: bumpFreshnessIso(null, row),
-      });
-    }
+    if (country === COUNTRY_US) {
+      const citySlug = cityStateToSlug(city, state, COUNTRY_US);
+      if (citySlug) {
+        const cityKey = citySlug;
+        const existingCity = cityCounts.get(cityKey);
+        if (existingCity) {
+          existingCity.listingCount += 1;
+          existingCity.lastModifiedAt = bumpFreshnessIso(
+            existingCity.lastModifiedAt,
+            row,
+          );
+        } else {
+          cityCounts.set(cityKey, {
+            citySlug,
+            city,
+            state,
+            country: COUNTRY_US,
+            listingCount: 1,
+            lastModifiedAt: bumpFreshnessIso(null, row),
+          });
+        }
+      }
 
-    const stateSlug = stateNameToSlug(state);
-    const stateAbbr = stateToAbbr(state);
-    if (stateSlug && stateAbbr) {
-      const stateKey = stateSlug;
-      const existingState = stateCounts.get(stateKey);
-      if (existingState) {
-        existingState.listingCount += 1;
-        existingState.lastModifiedAt = bumpFreshnessIso(
-          existingState.lastModifiedAt,
-          row,
-        );
-      } else {
-        stateCounts.set(stateKey, {
-          stateSlug,
-          state,
-          listingCount: 1,
-          lastModifiedAt: bumpFreshnessIso(null, row),
-        });
+      const stateSlug = stateNameToSlug(state);
+      const stateAbbr = stateToAbbr(state);
+      if (stateSlug && stateAbbr) {
+        const stateKey = stateSlug;
+        const existingState = stateCounts.get(stateKey);
+        if (existingState) {
+          existingState.listingCount += 1;
+          existingState.lastModifiedAt = bumpFreshnessIso(
+            existingState.lastModifiedAt,
+            row,
+          );
+        } else {
+          stateCounts.set(stateKey, {
+            stateSlug,
+            state,
+            country: COUNTRY_US,
+            listingCount: 1,
+            lastModifiedAt: bumpFreshnessIso(null, row),
+          });
+        }
       }
     }
+
+    const citySlugForCategory =
+      cityStateToSlug(city, state, country) ?? cityStateToSlug(city, state, COUNTRY_US);
+    if (!citySlugForCategory) continue;
 
     const resolved = resolveCategoryForRow(
       row.main_category,
@@ -226,7 +315,7 @@ export const fetchDirectoryIndex = cache(async (): Promise<{
         });
       }
 
-      const ccKey = `${citySlug}::${resolved.slug}`;
+      const ccKey = `${citySlugForCategory}::${resolved.slug}`;
       const existingCc = cityCategoryCounts.get(ccKey);
       if (existingCc) {
         existingCc.listingCount += 1;
@@ -236,7 +325,7 @@ export const fetchDirectoryIndex = cache(async (): Promise<{
         );
       } else {
         cityCategoryCounts.set(ccKey, {
-          citySlug,
+          citySlug: citySlugForCategory,
           categorySlug: resolved.slug,
           city,
           state,
@@ -275,6 +364,140 @@ export const fetchDirectoryIndex = cache(async (): Promise<{
     homepageLastModified,
   };
 });
+
+export const fetchUkDirectoryIndex = cache(async (): Promise<{
+  cities: DirectoryCityRef[];
+  regions: DirectoryUkRegionRef[];
+  publishedCitySlugs: Set<string>;
+  lastModified: Date | null;
+}> => {
+  const rows = await fetchAllNoWebsiteRows();
+  const cityCounts = new Map<string, DirectoryCityRef>();
+  const regionCounts = new Map<string, DirectoryUkRegionRef>();
+  let lastModifiedIso: string | null = null;
+
+  for (const row of rows) {
+    const city = row.city?.trim();
+    const state = row.state?.trim();
+    if (!city || !state) continue;
+    if (parseDirectoryCountry(row.country) !== COUNTRY_GB) continue;
+
+    lastModifiedIso = bumpFreshnessIso(lastModifiedIso, row);
+
+    const citySlug = cityStateToSlug(city, state, COUNTRY_GB);
+    if (citySlug) {
+      const existingCity = cityCounts.get(citySlug);
+      if (existingCity) {
+        existingCity.listingCount += 1;
+        existingCity.lastModifiedAt = bumpFreshnessIso(
+          existingCity.lastModifiedAt,
+          row,
+        );
+      } else {
+        cityCounts.set(citySlug, {
+          citySlug,
+          city,
+          state,
+          country: COUNTRY_GB,
+          listingCount: 1,
+          lastModifiedAt: bumpFreshnessIso(null, row),
+        });
+      }
+    }
+
+    const regionSlug = ukRegionNameToSlug(state);
+    if (regionSlug) {
+      const existingRegion = regionCounts.get(regionSlug);
+      if (existingRegion) {
+        existingRegion.listingCount += 1;
+        existingRegion.lastModifiedAt = bumpFreshnessIso(
+          existingRegion.lastModifiedAt,
+          row,
+        );
+      } else {
+        regionCounts.set(regionSlug, {
+          regionSlug,
+          region: state,
+          listingCount: 1,
+          lastModifiedAt: bumpFreshnessIso(null, row),
+        });
+      }
+    }
+  }
+
+  const cities = [...cityCounts.values()]
+    .filter((c) => c.listingCount >= DIRECTORY_MIN_CITY_LISTINGS)
+    .sort((a, b) => b.listingCount - a.listingCount);
+
+  const regions = [...regionCounts.values()]
+    .filter((r) => r.listingCount >= DIRECTORY_MIN_UK_REGION_LISTINGS)
+    .sort((a, b) => b.listingCount - a.listingCount);
+
+  return {
+    cities,
+    regions,
+    publishedCitySlugs: new Set(cities.map((c) => c.citySlug)),
+    lastModified: lastModifiedIso ? new Date(lastModifiedIso) : null,
+  };
+});
+
+export async function fetchUkCities(): Promise<DirectoryCityRef[]> {
+  const { cities } = await fetchUkDirectoryIndex();
+  return cities;
+}
+
+export async function fetchUkListingCount(): Promise<number> {
+  const rows = await fetchAllNoWebsiteRows();
+  return rows.filter((r) => parseDirectoryCountry(r.country) === COUNTRY_GB)
+    .length;
+}
+
+function rowMatchesCitySlug(row: RawDirectoryRow, citySlug: string): boolean {
+  const parsed = parseCitySlug(citySlug);
+  if (!parsed) return false;
+  const country = parseDirectoryCountry(row.country);
+  if (parsed.country !== country) return false;
+  return (
+    cityStateToSlug(row.city ?? "", row.state ?? "", country) ===
+    citySlug.trim().toLowerCase()
+  );
+}
+
+export async function fetchUkRegionListings(
+  regionSlug: string,
+): Promise<{
+  region: string;
+  businesses: DirectoryBusiness[];
+  cityGroups: DirectoryCityGroup[];
+  cityCount: number;
+  listingCount: number;
+  lastUpdatedLabel: string | null;
+  publishedCitySlugs: Set<string>;
+} | null> {
+  const { regions, publishedCitySlugs } = await fetchUkDirectoryIndex();
+  const regionRef = regions.find((r) => r.regionSlug === regionSlug.toLowerCase());
+  if (!regionRef) return null;
+
+  const rows = await fetchAllNoWebsiteRows();
+  const matched = rows.filter(
+    (row) =>
+      parseDirectoryCountry(row.country) === COUNTRY_GB &&
+      ukRegionMatchesState(regionRef.region, row.state),
+  );
+  const businesses = matched.map(rowToBusiness).sort(sortByReviewsDesc);
+  if (businesses.length < DIRECTORY_MIN_UK_REGION_LISTINGS) return null;
+
+  const cityGroups = groupBusinessesByCity(businesses);
+  return {
+    region: regionRef.region,
+    businesses,
+    cityGroups,
+    cityCount: cityGroups.length,
+    listingCount: businesses.length,
+    lastUpdatedLabel: formatLastUpdatedMonthYear(maxFreshnessIso(matched)),
+    publishedCitySlugs,
+  };
+}
 
 export interface DirectorySummary {
   totalListings: number;
@@ -328,18 +551,21 @@ export async function fetchCityListings(
   const parsed = parseCitySlug(citySlug);
   if (!parsed) return null;
 
-  const { cities } = await fetchDirectoryIndex();
-  if (!cities.some((c) => c.citySlug === citySlug.toLowerCase())) {
-    return null;
+  if (parsed.country === COUNTRY_GB) {
+    const { cities } = await fetchUkDirectoryIndex();
+    if (!cities.some((c) => c.citySlug === citySlug.toLowerCase())) {
+      return null;
+    }
+  } else {
+    const { cities } = await fetchDirectoryIndex();
+    if (!cities.some((c) => c.citySlug === citySlug.toLowerCase())) {
+      return null;
+    }
   }
 
   const rows = await fetchAllNoWebsiteRows();
   return rows
-    .filter(
-      (row) =>
-        cityStateToSlug(row.city ?? "", row.state ?? "") ===
-        citySlug.toLowerCase(),
-    )
+    .filter((row) => rowMatchesCitySlug(row, citySlug))
     .map(rowToBusiness)
     .sort(sortByReviewsDesc);
 }
@@ -347,6 +573,7 @@ export async function fetchCityListings(
 export async function fetchCityHub(citySlug: string): Promise<{
   city: string;
   state: string;
+  country: DirectoryCountry;
   listingCount: number;
   categories: DirectoryCategoryRef[];
   publishedCategories: DirectoryCategoryRef[];
@@ -356,7 +583,11 @@ export async function fetchCityHub(citySlug: string): Promise<{
   if (!parsed) return null;
 
   const index = await fetchDirectoryIndex();
-  const cityRef = index.cities.find((c) => c.citySlug === citySlug.toLowerCase());
+  const ukIndex = await fetchUkDirectoryIndex();
+  const cityRef =
+    parsed.country === COUNTRY_GB
+      ? ukIndex.cities.find((c) => c.citySlug === citySlug.toLowerCase())
+      : index.cities.find((c) => c.citySlug === citySlug.toLowerCase());
   if (!cityRef) return null;
 
   const allCityCategories = index.cityCategoriesAll.filter(
@@ -383,6 +614,7 @@ export async function fetchCityHub(citySlug: string): Promise<{
   return {
     city: cityRef.city,
     state: cityRef.state,
+    country: cityRef.country,
     listingCount: cityRef.listingCount,
     categories,
     publishedCategories,
@@ -454,7 +686,9 @@ export async function fetchStateListings(
 
   const rows = await fetchAllNoWebsiteRows();
   const matched = rows.filter(
-    (row) => stateToAbbr(row.state ?? "") === parsed.stateAbbr,
+    (row) =>
+      parseDirectoryCountry(row.country) === COUNTRY_US &&
+      stateToAbbr(row.state ?? "") === parsed.stateAbbr,
   );
   const businesses = matched.map(rowToBusiness).sort(sortByReviewsDesc);
 
@@ -490,13 +724,25 @@ export async function fetchAllValidStateSlugs(): Promise<{ slug: string }[]> {
   return states.map((s) => ({ slug: s.stateSlug }));
 }
 
+export async function fetchAllValidUkCitySlugs(): Promise<{ slug: string }[]> {
+  const { cities } = await fetchUkDirectoryIndex();
+  return cities.map((c) => ({ slug: c.citySlug }));
+}
+
+export async function fetchAllValidUkRegionSlugs(): Promise<{ slug: string }[]> {
+  const { regions } = await fetchUkDirectoryIndex();
+  return regions.map((r) => ({ slug: r.regionSlug }));
+}
+
 export async function fetchAllValidSlugParams(): Promise<{ slug: string }[]> {
-  const [cities, categories, states] = await Promise.all([
+  const [cities, ukCities, categories, states, ukRegions] = await Promise.all([
     fetchAllValidCitySlugs(),
+    fetchAllValidUkCitySlugs(),
     fetchAllValidCategorySlugs(),
     fetchAllValidStateSlugs(),
+    fetchAllValidUkRegionSlugs(),
   ]);
-  return [...cities, ...categories, ...states];
+  return [...cities, ...ukCities, ...categories, ...states, ...ukRegions];
 }
 
 export interface PublishedCategoryLink {

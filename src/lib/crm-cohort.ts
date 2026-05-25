@@ -16,7 +16,7 @@ import { demoPublicPath, isLikelyGooglePlaceId } from "@/lib/demo-slug";
 export type { DemoReviewHighlight } from "@/lib/demo-review-types";
 
 export const CRM_BUSINESS_LIST_COLUMNS =
-  "place_id, demo_slug, name, address, city, state, postal_code, business_type, main_category, rating, reviews, phone, google_maps_link, facebook_url, listing_website, crm_contact_surface, contact_count" as const;
+  "place_id, demo_slug, name, address, city, state, country, postal_code, business_type, main_category, rating, reviews, phone, google_maps_link, facebook_url, listing_website, crm_contact_surface, contact_count" as const;
 
 const DEMO_CORE_COLUMNS =
   "place_id, demo_slug, name, address, city, state, postal_code, business_type, main_category, rating, reviews, phone, google_maps_link, facebook_url, listing_website, crm_contact_surface, contact_enrichment" as const;
@@ -173,6 +173,8 @@ function mapRowToDemoBusiness(
     city: (data.city as string | null) ?? null,
     state: (data.state as string | null) ?? null,
     postal_code: (data.postal_code as string | null) ?? null,
+    country:
+      data.country === "GB" ? "GB" : data.country === "US" ? "US" : "US",
     business_type: (data.business_type as string | null) ?? null,
     main_category: (data.main_category as string | null) ?? null,
     rating: data.rating != null ? Number(data.rating) : null,

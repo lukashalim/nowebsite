@@ -12,7 +12,9 @@
  *   SCRAPE_MIN_REVIEWS_IN_CALENDAR_YEAR — default 1 (need this many reviews dated in the filter year; set 2+ to tighten)
  *   SCRAPE_REVIEWS_YEAR_FILTER — calendar year (default: current year, e.g. 2026)
  *   SCRAPE_SKIP_MIN_REVIEWS_IN_CALENDAR_YEAR_FILTER=1 — disable the year review count gate
- *   EXTRACT_LOCAL_SCRAPE_ZIP — optional 5-digit ZIP for city/state fallback when NDJSON lacks locality
+ *   EXTRACT_LOCAL_COUNTRY — optional US|GB; default per-row detection
+ *   EXTRACT_LOCAL_LOCATION_HINT — US 5-digit ZIP or UK postcode when NDJSON lacks locality
+ *   EXTRACT_LOCAL_SCRAPE_ZIP — deprecated alias for EXTRACT_LOCAL_LOCATION_HINT
  *
  * Flags:
  *   --root <path>              — same as GOOGLE_MAPS_EXTRACTOR_DIR
@@ -412,7 +414,12 @@ async function main() {
         }
 
         const base = rowToBusiness(raw, businessType);
-        applyLocationFallbacks(base, raw);
+        const forcedCountry = process.env.EXTRACT_LOCAL_COUNTRY?.trim() || null;
+        const locationHint =
+          process.env.EXTRACT_LOCAL_LOCATION_HINT?.trim() ||
+          process.env.EXTRACT_LOCAL_SCRAPE_ZIP?.trim() ||
+          null;
+        applyLocationFallbacks(base, raw, { forcedCountry });
         if (!base.place_id) {
           stats.noPlaceId += 1;
           continue;
@@ -439,7 +446,10 @@ async function main() {
 
         try {
           await enrichLocationAsync(base, {
-            scrapeZip: process.env.EXTRACT_LOCAL_SCRAPE_ZIP?.trim() || null,
+            locationHint,
+            scrapeZip: locationHint,
+            forcedCountry,
+            country: base.country,
           });
         } catch (locErr) {
           console.error(
@@ -458,6 +468,7 @@ async function main() {
             name: payload.name,
             city: payload.city,
             state: payload.state,
+            country: payload.country,
             postal_code: payload.postal_code,
             rating: payload.rating,
             reviews: payload.reviews,

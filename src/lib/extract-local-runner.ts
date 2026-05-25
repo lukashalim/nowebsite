@@ -65,9 +65,17 @@ export function startExtractLocal(
     args.push("--max-files", String(Math.floor(options.maxFiles)));
   }
 
+  const env = { ...process.env };
+  if (options.country) {
+    env.EXTRACT_LOCAL_COUNTRY = options.country;
+  }
+  if (options.locationHint?.trim()) {
+    env.EXTRACT_LOCAL_LOCATION_HINT = options.locationHint.trim();
+  }
+
   const child = spawn(process.execPath, args, {
     cwd: scrapeDir,
-    env: { ...process.env },
+    env,
     stdio: ["ignore", "pipe", "pipe"],
   });
 

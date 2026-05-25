@@ -3,6 +3,15 @@
  */
 
 import { pick } from "./scrape-pipeline/index.mjs";
+import {
+  COUNTRY_GB,
+  COUNTRY_US,
+  detectCountryFromRow,
+  looksLikeUkPostcode,
+  normalizeUkPostcode,
+  normalizeUkRegion,
+  parseUkLocalityFromFormattedAddress,
+} from "./country.mjs";
 
 const CENSUS_COORD_GEOGRAPHIES_URL =
   "https://geocoding.geo.census.gov/geocoder/geographies/coordinates";
@@ -296,20 +305,37 @@ export async function lookupCityStateByZip(zip) {
   }
 }
 
+function normalizeLocationByCountry(base) {
+  if (base.country === COUNTRY_GB) {
+    if (base.state) base.state = normalizeUkRegion(base.state);
+    if (base.postal_code) {
+      base.postal_code = normalizeUkPostcode(base.postal_code) ?? base.postal_code;
+    }
+    return base;
+  }
+  if (base.state) base.state = normalizeUsStateName(base.state);
+  if (base.postal_code) {
+    const d = String(base.postal_code).replace(/\D/g, "").slice(0, 5);
+    base.postal_code = d.length === 5 ? d : base.postal_code;
+  }
+  return base;
+}
+
 /**
  * Sync fallbacks: top-level row fields + parse formatted address strings.
- * Mutates and returns `base`.
+ * Mutates and returns `base` (sets `base.country`).
  * @param {object} base — rowToBusiness result
  * @param {object} row — raw NDJSON row
+ * @param {{ forcedCountry?: string|null }} [opts]
  */
-export function applyLocationFallbacks(base, row) {
+export function applyLocationFallbacks(base, row, opts = {}) {
   if (!base.city) {
     base.city =
       pick(row, "city", "CITY", "locality", "LOCALITY", "town", "TOWN") ?? null;
     if (base.city) base.city = titleCaseWords(String(base.city));
   }
   if (!base.state) {
-    const st =
+    base.state =
       pick(
         row,
         "state",
@@ -318,18 +344,21 @@ export function applyLocationFallbacks(base, row) {
         "STATE_CODE",
         "region",
         "REGION",
+        "administrative_area",
+        "ADMINISTRATIVE_AREA",
       ) ?? null;
-    base.state = normalizeUsStateName(st);
+    if (base.state) base.state = String(base.state).trim();
   }
   if (!base.postal_code) {
     base.postal_code =
       pick(row, "postal_code", "POSTAL_CODE", "zip", "ZIP", "zip_code", "ZIP_CODE") ??
       null;
-    if (base.postal_code) {
-      const d = String(base.postal_code).replace(/\D/g, "").slice(0, 5);
-      base.postal_code = d.length === 5 ? d : base.postal_code;
-    }
   }
+
+  const preCountry = detectCountryFromRow(row, base, opts.forcedCountry);
+  const preferUk =
+    preCountry === COUNTRY_GB ||
+    looksLikeUkPostcode(base.postal_code);
 
   const formattedCandidates = [
     base.address,
@@ -342,24 +371,44 @@ export function applyLocationFallbacks(base, row) {
     const s = String(candidate).trim();
     if (!s || seen.has(s)) continue;
     seen.add(s);
-    const parsed = parseCityStateFromFormattedAddress(s);
+    const parsed = preferUk
+      ? parseUkLocalityFromFormattedAddress(s)
+      : parseCityStateFromFormattedAddress(s);
     if (!base.city && parsed.city) base.city = parsed.city;
     if (!base.state && parsed.state) base.state = parsed.state;
-    if (!base.postal_code && parsed.postal_code) base.postal_code = parsed.postal_code;
+    if (!base.postal_code && parsed.postal_code) {
+      base.postal_code = parsed.postal_code;
+    }
     if (base.city && base.state) break;
   }
 
-  if (base.state) base.state = normalizeUsStateName(base.state);
-  return base;
+  base.country = detectCountryFromRow(row, base, opts.forcedCountry);
+  return normalizeLocationByCountry(base);
 }
 
 /**
  * Async fallbacks: Census coordinates, then ZIP lookup (scrape job or postal_code).
+ * Skips US geocoding for GB rows.
  * Mutates and returns `base`.
  * @param {object} base
- * @param {{ scrapeZip?: string|null }} [opts]
+ * @param {{ scrapeZip?: string|null, locationHint?: string|null, country?: string|null, forcedCountry?: string|null }} [opts]
  */
 export async function enrichLocationAsync(base, opts = {}) {
+  if (!base.country) {
+    base.country = opts.country ?? COUNTRY_US;
+  }
+
+  const locationHint =
+    opts.locationHint?.trim() || opts.scrapeZip?.trim() || null;
+
+  if (base.country === COUNTRY_GB || opts.forcedCountry === COUNTRY_GB) {
+    base.country = COUNTRY_GB;
+    if (!base.postal_code && locationHint && looksLikeUkPostcode(locationHint)) {
+      base.postal_code = normalizeUkPostcode(locationHint);
+    }
+    return normalizeLocationByCountry(base);
+  }
+
   const needsCity = !base.city;
   const needsState = !base.state;
   const needsZip = !base.postal_code;
@@ -372,9 +421,9 @@ export async function enrichLocationAsync(base, opts = {}) {
   }
 
   const zipHint =
-    opts.scrapeZip?.trim() ||
+    locationHint ||
     (base.postal_code ? String(base.postal_code).replace(/\D/g, "").slice(0, 5) : "");
-  if ((!base.city || !base.state) && zipHint.length === 5) {
+  if ((!base.city || !base.state) && zipHint.length === 5 && /^\d{5}$/.test(zipHint)) {
     const fromZip = await lookupCityStateByZip(zipHint);
     if (fromZip) {
       if (!base.city && fromZip.city) base.city = fromZip.city;
@@ -383,5 +432,6 @@ export async function enrichLocationAsync(base, opts = {}) {
     }
   }
 
-  return base;
+  base.country = base.country ?? COUNTRY_US;
+  return normalizeLocationByCountry(base);
 }

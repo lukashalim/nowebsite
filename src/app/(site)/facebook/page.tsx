@@ -1,0 +1,136 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { DirectoryGroupedByCity } from "@/components/directory-grouped-by-city";
+import { DirectoryLastUpdated } from "@/components/directory-last-updated";
+import { DownloadCsvButton } from "@/components/download-csv-button";
+import {
+  fetchAllDirectoryCities,
+  fetchFacebookDirectoryPageData,
+} from "@/lib/directory/data";
+import { buildDirectoryListJsonLd } from "@/lib/directory/jsonld";
+import { DIRECTORY_MIN_CITY_LISTINGS } from "@/lib/directory/types";
+import { absoluteUrl } from "@/lib/site-url";
+
+export const revalidate = 3600;
+
+const PAGE_PATH = "/facebook";
+const PAGE_TITLE = "Businesses Using Facebook as Their Google Website";
+
+export async function generateMetadata(): Promise<Metadata> {
+  let lastUpdatedLabel: string | null = null;
+  try {
+    const data = await fetchFacebookDirectoryPageData();
+    lastUpdatedLabel = data.lastUpdatedLabel;
+  } catch {
+    // omit freshness from meta when directory data is unavailable
+  }
+  const updated = lastUpdatedLabel ? ` Updated ${lastUpdatedLabel}.` : "";
+  return {
+    title: { absolute: PAGE_TITLE },
+    description: `Local businesses whose Google Business Profile uses Facebook in the Website field — a guideline violation that can hurt local rankings and visibility.${updated}`,
+    alternates: { canonical: absoluteUrl(PAGE_PATH) },
+  };
+}
+
+export default async function FacebookDirectoryPage() {
+  let data: Awaited<ReturnType<typeof fetchFacebookDirectoryPageData>> | null =
+    null;
+  let publishedCitySlugs: Set<string> | undefined;
+  let loadError: string | null = null;
+
+  try {
+    const [pageData, cities] = await Promise.all([
+      fetchFacebookDirectoryPageData(),
+      fetchAllDirectoryCities(),
+    ]);
+    data = pageData;
+    publishedCitySlugs = new Set(
+      cities
+        .filter((c) => c.listingCount >= DIRECTORY_MIN_CITY_LISTINGS)
+        .map((c) => c.citySlug),
+    );
+  } catch (e) {
+    loadError = e instanceof Error ? e.message : "Could not load Facebook listings.";
+  }
+
+  const jsonLd = data
+    ? buildDirectoryListJsonLd(data.businesses, PAGE_PATH, PAGE_TITLE)
+    : null;
+
+  return (
+    <div className="space-y-8">
+      {jsonLd ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      ) : null}
+
+      <header className="space-y-3">
+        <p className="text-sm text-zinc-500">
+          <Link href="/" className="hover:underline">
+            Home
+          </Link>
+        </p>
+        <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+          {PAGE_TITLE}
+        </h1>
+        <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
+          These businesses appear on Google Maps without a standalone website. Many
+          use a Facebook URL in the Website field on their Google Business Profile —
+          or have a Facebook link from Maps enrichment. That is not the same as having
+          no online presence at all.
+        </p>
+        <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
+          Google&apos;s Business Profile guidelines require the Website field to point
+          to a site the business controls, not a social profile. Using Facebook (or
+          other social URLs) as the website is non-compliant and is treated as a
+          quality issue that can reduce how prominently you appear in local search and
+          Maps rankings.
+        </p>
+        <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
+          For web designers and agencies, this is a high-intent outreach list:
+          prospects who already show up on Google but are likely hurting their own
+          visibility by substituting Facebook for a real site.
+        </p>
+      </header>
+
+      <div className="max-w-2xl rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-300">
+        Google expects an owned website in the Website field. A Facebook or other
+        social URL is non-compliant and can reduce local visibility. See{" "}
+        <a
+          href="https://support.google.com/business/answer/3038177"
+          className="font-medium text-zinc-900 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-200"
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          Google Business Profile guidelines
+        </a>
+        .
+      </div>
+
+      {loadError ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+          {loadError}
+        </p>
+      ) : data ? (
+        <>
+          <DirectoryLastUpdated label={data.lastUpdatedLabel} />
+
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            {data.totalCount.toLocaleString()} businesses across{" "}
+            {data.cityGroups.length.toLocaleString()} cities — grouped below with
+            ratings, phones, and Google Maps links.
+          </p>
+
+          <DirectoryGroupedByCity
+            cityGroups={data.cityGroups}
+            publishedCitySlugs={publishedCitySlugs}
+          />
+
+          <DownloadCsvButton businesses={data.businesses} pagePath={PAGE_PATH} />
+        </>
+      ) : null}
+    </div>
+  );
+}

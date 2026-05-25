@@ -1,9 +1,10 @@
 import type { MetadataRoute } from "next";
-import { fetchDirectoryIndex } from "@/lib/directory/data";
+import { fetchDirectoryIndex, fetchUkDirectoryIndex } from "@/lib/directory/data";
 import {
   DIRECTORY_MIN_CATEGORY_LISTINGS,
   DIRECTORY_MIN_CITY_LISTINGS,
   DIRECTORY_MIN_STATE_LISTINGS,
+  DIRECTORY_MIN_UK_REGION_LISTINGS,
 } from "@/lib/directory/types";
 
 const SITE_ORIGIN = "https://nowebsitebusinessleads.com";
@@ -19,8 +20,8 @@ function toLastModified(iso: string | null | undefined): Date {
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
-    const { cities, categories, states, homepageLastModified } =
-      await fetchDirectoryIndex();
+    const [{ cities, categories, states, homepageLastModified }, ukIndex] =
+      await Promise.all([fetchDirectoryIndex(), fetchUkDirectoryIndex()]);
 
     const entries: MetadataRoute.Sitemap = [
       {
@@ -47,6 +48,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         changeFrequency: "weekly",
         priority: 0.85,
       },
+      {
+        url: `${SITE_ORIGIN}/facebook`,
+        lastModified: homepageLastModified ?? new Date(),
+        changeFrequency: "weekly",
+        priority: 0.8,
+      },
+      {
+        url: `${SITE_ORIGIN}/uk`,
+        lastModified: ukIndex.lastModified ?? homepageLastModified ?? new Date(),
+        changeFrequency: "weekly",
+        priority: 0.85,
+      },
       ...cities
         .filter((hub) => hub.listingCount >= DIRECTORY_MIN_CITY_LISTINGS)
         .map((hub) => ({
@@ -68,6 +81,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         .map((state) => ({
           url: `${SITE_ORIGIN}/${state.stateSlug}`,
           lastModified: toLastModified(state.lastModifiedAt),
+          changeFrequency: "weekly" as const,
+          priority: 0.75,
+        })),
+      ...ukIndex.cities
+        .filter((c) => c.listingCount >= DIRECTORY_MIN_CITY_LISTINGS)
+        .map((hub) => ({
+          url: `${SITE_ORIGIN}/${hub.citySlug}`,
+          lastModified: toLastModified(hub.lastModifiedAt),
+          changeFrequency: "weekly" as const,
+          priority: 0.8,
+        })),
+      ...ukIndex.regions
+        .filter((r) => r.listingCount >= DIRECTORY_MIN_UK_REGION_LISTINGS)
+        .map((region) => ({
+          url: `${SITE_ORIGIN}/${region.regionSlug}`,
+          lastModified: toLastModified(region.lastModifiedAt),
           changeFrequency: "weekly" as const,
           priority: 0.75,
         })),

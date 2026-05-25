@@ -1,7 +1,7 @@
 import { ExternalLink, MapPin, Phone, Star } from "lucide-react";
 import type { DirectoryBusiness } from "@/lib/directory/types";
 import {
-  formatCityState,
+  formatLocationLabel,
   formatNeighborhoodOrArea,
 } from "@/lib/directory/labels";
 
@@ -31,8 +31,11 @@ export function DirectoryBusinessList({
         <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
           {businesses.map((b, i) => {
             const area = showCityState
-              ? formatCityState(b.city ?? "", b.state ?? "") ||
-                formatNeighborhoodOrArea(b.address, b.city)
+              ? formatLocationLabel(
+                  b.city ?? "",
+                  b.state ?? "",
+                  b.country,
+                ) || formatNeighborhoodOrArea(b.address, b.city)
               : formatNeighborhoodOrArea(b.address, b.city);
             const phone = b.phone?.trim();
             return (

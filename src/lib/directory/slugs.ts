@@ -1,4 +1,9 @@
+import { COUNTRY_GB, COUNTRY_US } from "@/lib/directory/country";
+import type { DirectoryCountry } from "@/lib/directory/types";
 import { mapSearchKeywordToBusinessType } from "@/lib/directory/search-category-map";
+
+export { parseUkRegionSlug, ukRegionNameToSlug } from "@/lib/directory/country";
+export type { DirectoryCountry } from "@/lib/directory/types";
 
 const STATE_NAME_TO_ABBR: Record<string, string> = {
   alabama: "al",
@@ -123,22 +128,42 @@ export function categoryLabelToFlatSlug(label: string): string {
   return slug || "business";
 }
 
-export function cityStateToSlug(city: string, state: string): string | null {
+const UK_CITY_SUFFIX = "gb";
+
+export function cityStateToSlug(
+  city: string,
+  state: string,
+  country: DirectoryCountry = COUNTRY_US,
+): string | null {
   const cityPart = slugifySegment(city);
+  if (!cityPart) return null;
+  if (country === COUNTRY_GB) {
+    return `${cityPart}-${UK_CITY_SUFFIX}`;
+  }
   const abbr = stateToAbbr(state);
-  if (!cityPart || !abbr) return null;
+  if (!abbr) return null;
   return `${cityPart}-${abbr}`;
 }
 
-export function parseCitySlug(
-  citySlug: string,
-): { cityPattern: string; stateAbbr: string } | null {
-  const match = /^(.+)-([a-z]{2})$/i.exec(citySlug.trim().toLowerCase());
+export type ParsedCitySlug =
+  | { country: typeof COUNTRY_US; cityPattern: string; stateAbbr: string }
+  | { country: typeof COUNTRY_GB; cityPattern: string };
+
+export function parseCitySlug(citySlug: string): ParsedCitySlug | null {
+  const lower = citySlug.trim().toLowerCase();
+  const gbMatch = /^(.+)-gb$/i.exec(lower);
+  if (gbMatch) {
+    return {
+      country: COUNTRY_GB,
+      cityPattern: gbMatch[1].replace(/-/g, " ").trim(),
+    };
+  }
+  const match = /^(.+)-([a-z]{2})$/i.exec(lower);
   if (!match) return null;
   const cityPattern = match[1].replace(/-/g, " ").trim();
   const stateAbbr = match[2].toLowerCase();
-  if (!STATE_ABBR_TO_NAME[stateAbbr]) return null;
-  return { cityPattern, stateAbbr };
+  if (stateAbbr === UK_CITY_SUFFIX || !STATE_ABBR_TO_NAME[stateAbbr]) return null;
+  return { country: COUNTRY_US, cityPattern, stateAbbr };
 }
 
 /** Legacy `painting-without-a-website` → flat slug e.g. `painter`. */
@@ -225,9 +250,12 @@ export function cityMatchesSlug(
   city: string | null | undefined,
   state: string | null | undefined,
   citySlug: string,
+  country: DirectoryCountry = COUNTRY_US,
 ): boolean {
   if (!city?.trim() || !state?.trim()) return false;
-  return cityStateToSlug(city, state) === citySlug.trim().toLowerCase();
+  return (
+    cityStateToSlug(city, state, country) === citySlug.trim().toLowerCase()
+  );
 }
 
 export function categoryMatchesSlug(

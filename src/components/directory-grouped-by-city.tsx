@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { DirectoryBusinessList } from "@/components/directory-business-list";
-import { cityPath, formatCityState } from "@/lib/directory/labels";
+import { cityPath, formatLocationLabel } from "@/lib/directory/labels";
 import type { DirectoryCityGroup } from "@/lib/directory/types";
 
 interface DirectoryGroupedByCityProps {
@@ -21,7 +21,11 @@ export function DirectoryGroupedByCity({
   return (
     <div className="space-y-10">
       {cityGroups.map((group) => {
-        const heading = formatCityState(group.city, group.state);
+        const heading = formatLocationLabel(
+          group.city,
+          group.state,
+          group.country,
+        );
         const isPublished = publishedCitySlugs?.has(group.citySlug) ?? false;
 
         return (

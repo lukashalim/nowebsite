@@ -625,7 +625,7 @@ async function main() {
             resolveBusinessTypeFromMapsSearch(jobSearchUrl, mainCategory) ??
             job.business_type;
           const base = rowToBusiness(raw, businessType);
-          applyLocationFallbacks(base, raw);
+          applyLocationFallbacks(base, raw, {});
           if (!base.place_id) {
             console.error("Skipping row without place_id");
             skippedNoPlaceId += 1;
@@ -640,7 +640,11 @@ async function main() {
           }
 
           try {
-            await enrichLocationAsync(base, { scrapeZip: job.zip_code });
+            await enrichLocationAsync(base, {
+              scrapeZip: job.zip_code,
+              locationHint: job.zip_code,
+              country: base.country ?? "US",
+            });
           } catch (locErr) {
             console.error(
               `Location enrich (${base.name ?? base.place_id}):`,
