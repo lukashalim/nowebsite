@@ -22,6 +22,10 @@ import { COUNTRY_GB } from "@/lib/directory/country";
 import { fetchAllValidSlugParams } from "@/lib/directory/data";
 import { resolveDirectorySlugPage } from "@/lib/directory/resolve-slug-page";
 import { DIRECTORY_MIN_CATEGORY_LISTINGS } from "@/lib/directory/types";
+import {
+  categoryPathWithPage,
+  parseDirectoryPageParam,
+} from "@/lib/directory/pagination";
 import { absoluteUrl } from "@/lib/site-url";
 
 export const revalidate = 3600;
@@ -29,6 +33,7 @@ export const dynamicParams = true;
 
 interface PageProps {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ page?: string | string[] }>;
 }
 
 export async function generateStaticParams() {
@@ -39,9 +44,13 @@ export async function generateStaticParams() {
   }
 }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+  searchParams,
+}: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const resolved = await resolveDirectorySlugPage(slug);
+  const page = parseDirectoryPageParam((await searchParams).page);
+  const resolved = await resolveDirectorySlugPage(slug, page);
 
   if (resolved.kind === "redirect") {
     return { title: "Redirecting…" };
@@ -49,17 +58,25 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (resolved.kind === "category") {
     const { data } = resolved;
-    const title = nationwideCategoryMetaTitle(data.categoryLabel);
+    const title = nationwideCategoryMetaTitle(
+      data.categoryLabel,
+      data.page > 1 ? data.page : undefined,
+    );
     const description = nationwideCategoryMetaDescription(
       data.categoryLabel,
-      data.businesses.length,
+      data.totalCount,
       data.cityCount,
       data.lastUpdatedLabel,
+      data.totalPages > 1
+        ? { current: data.page, totalPages: data.totalPages }
+        : undefined,
     );
+    const slugLower = slug.trim().toLowerCase();
+    const canonicalPath = categoryPathWithPage(slugLower, data.page);
     return {
       title: { absolute: title },
       description,
-      alternates: { canonical: absoluteUrl(`/${slug.trim().toLowerCase()}`) },
+      alternates: { canonical: absoluteUrl(canonicalPath) },
     };
   }
 
@@ -115,10 +132,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return { title: "Not found" };
 }
 
-export default async function SlugDirectoryPage({ params }: PageProps) {
+export default async function SlugDirectoryPage({
+  params,
+  searchParams,
+}: PageProps) {
   const { slug } = await params;
+  const page = parseDirectoryPageParam((await searchParams).page);
   const lower = slug.trim().toLowerCase();
-  const resolved = await resolveDirectorySlugPage(slug);
+  const resolved = await resolveDirectorySlugPage(slug, page);
 
   if (resolved.kind === "redirect") {
     permanentRedirect(`/${resolved.to}`);
@@ -133,6 +154,10 @@ export default async function SlugDirectoryPage({ params }: PageProps) {
         businesses={data.businesses}
         cityGroups={data.cityGroups}
         cityCount={data.cityCount}
+        totalCount={data.totalCount}
+        page={data.page}
+        pageSize={data.pageSize}
+        totalPages={data.totalPages}
         lastUpdatedLabel={data.lastUpdatedLabel}
         publishedCitySlugs={data.publishedCitySlugs}
       />

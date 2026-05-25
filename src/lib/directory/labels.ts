@@ -63,16 +63,27 @@ export function nationwideCategoryMetaDescription(
   count: number,
   cityCount: number,
   lastUpdatedLabel: string | null,
+  page?: { current: number; totalPages: number },
 ): string {
   const plural = pluralCategoryForTitle(categoryLabel).toLowerCase();
   const updated = lastUpdatedLabel ? ` Updated ${lastUpdatedLabel}.` : "";
-  return `Browse ${count.toLocaleString()} ${plural} across ${cityCount.toLocaleString()} cities with no website.${updated}`;
+  const pageNote =
+    page && page.totalPages > 1
+      ? ` Page ${page.current} of ${page.totalPages}.`
+      : "";
+  return `Browse ${count.toLocaleString()} ${plural} across ${cityCount.toLocaleString()} cities with no website.${pageNote}${updated}`;
 }
 
 const SITE_BRAND = "No Website Business Leads";
 
-export function nationwideCategoryMetaTitle(categoryLabel: string): string {
-  return `${nationwideCategoryPageTitle(categoryLabel)} | ${SITE_BRAND}`;
+export function nationwideCategoryMetaTitle(
+  categoryLabel: string,
+  page?: number,
+): string {
+  const base = nationwideCategoryPageTitle(categoryLabel);
+  const pageSuffix =
+    page != null && page > 1 ? ` — Page ${page.toLocaleString()}` : "";
+  return `${base}${pageSuffix} | ${SITE_BRAND}`;
 }
 
 export function stateHubTitle(state: string): string {

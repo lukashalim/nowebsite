@@ -2,6 +2,7 @@ import { cache } from "react";
 import {
   fetchCityHub,
   fetchCityListings,
+  fetchDirectoryIndex,
   fetchNationwideCategoryListings,
   fetchStateListings,
   fetchUkRegionListings,
@@ -42,14 +43,21 @@ export type ResolvedSlugPage =
  */
 export const resolveDirectorySlugPage = cache(async function resolveDirectorySlugPage(
   slug: string,
+  page = 1,
 ): Promise<ResolvedSlugPage> {
   const lower = slug.trim().toLowerCase();
 
   const legacy = legacyCategorySlugToCanonical(lower);
   if (legacy) return { kind: "redirect", to: legacy };
 
-  const categoryData = await fetchNationwideCategoryListings(lower);
-  if (categoryData) return { kind: "category", data: categoryData };
+  const index = await fetchDirectoryIndex();
+  const categoryRef = index.categories.find((c) => c.categorySlug === lower);
+  if (categoryRef) {
+    const categoryData = await fetchNationwideCategoryListings(lower, {
+      page,
+    });
+    if (categoryData) return { kind: "category", data: categoryData };
+  }
 
   const ukRegion = parseUkRegionSlug(lower);
   if (ukRegion) {

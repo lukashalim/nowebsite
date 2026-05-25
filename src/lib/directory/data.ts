@@ -34,6 +34,11 @@ import {
   DIRECTORY_MIN_STATE_LISTINGS,
   DIRECTORY_MIN_UK_REGION_LISTINGS,
 } from "@/lib/directory/types";
+import {
+  clampDirectoryPage,
+  DIRECTORY_CATEGORY_PAGE_SIZE,
+  totalDirectoryPages,
+} from "@/lib/directory/pagination";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 
 const BATCH = 1000;
@@ -622,45 +627,114 @@ export async function fetchCityHub(citySlug: string): Promise<{
   };
 }
 
+const fetchCategoryMatchedRows = cache(
+  async (categorySlug: string): Promise<RawDirectoryRow[]> => {
+    const slug = categorySlug.trim().toLowerCase();
+    const rows = await fetchAllNoWebsiteRows();
+    return rows.filter((row) =>
+      categoryMatchesSlug(row.main_category, row.business_type, slug),
+    );
+  },
+);
+
 export async function fetchNationwideCategoryListings(
   categorySlug: string,
+  opts?: { page?: number; pageSize?: number },
 ): Promise<{
   categoryLabel: string;
   businesses: DirectoryBusiness[];
   cityGroups: DirectoryCityGroup[];
   cityCount: number;
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
   lastUpdatedLabel: string | null;
   publishedCitySlugs: Set<string>;
 } | null> {
   const slug = categorySlug.trim().toLowerCase();
+  const pageSize = opts?.pageSize ?? DIRECTORY_CATEGORY_PAGE_SIZE;
 
   const index = await fetchDirectoryIndex();
-  const rows = await fetchAllNoWebsiteRows();
-  const matched = rows.filter((row) =>
-    categoryMatchesSlug(row.main_category, row.business_type, slug),
-  );
-  const businesses = matched.map(rowToBusiness).sort(sortByReviewsDesc);
-
-  if (businesses.length < DIRECTORY_MIN_CATEGORY_LISTINGS) return null;
-
   const categoryRef = index.categories.find((c) => c.categorySlug === slug);
+  if (
+    !categoryRef ||
+    categoryRef.totalCount < DIRECTORY_MIN_CATEGORY_LISTINGS
+  ) {
+    return null;
+  }
+
+  const matched = await fetchCategoryMatchedRows(slug);
+  const allBusinesses = matched.map(rowToBusiness).sort(sortByReviewsDesc);
+  const totalCount = allBusinesses.length;
+
+  if (totalCount < DIRECTORY_MIN_CATEGORY_LISTINGS) return null;
+
+  const totalPages = totalDirectoryPages(totalCount, pageSize);
+  const page = clampDirectoryPage(opts?.page ?? 1, totalPages);
+  const start = (page - 1) * pageSize;
+  const businesses = allBusinesses.slice(start, start + pageSize);
+
   const categoryLabel =
-    categoryRef?.categoryLabel ??
+    categoryRef.categoryLabel ??
     directoryCategoryLabel(
       matched[0]?.main_category,
       matched[0]?.business_type,
     ) ??
     slug;
 
-  const cityGroups = groupBusinessesByCity(businesses);
+  const cityGroups =
+    totalPages > 1
+      ? []
+      : groupBusinessesByCity(businesses);
+
+  const cityCount = new Set(
+    allBusinesses.map((b) => {
+      const city = b.city?.trim();
+      const state = b.state?.trim();
+      if (!city || !state) return null;
+      return cityStateToSlug(city, state, b.country);
+    }).filter(Boolean),
+  ).size;
 
   return {
     categoryLabel,
     businesses,
     cityGroups,
-    cityCount: cityGroups.length,
+    cityCount,
+    totalCount,
+    page,
+    pageSize,
+    totalPages,
     lastUpdatedLabel: formatLastUpdatedMonthYear(maxFreshnessIso(matched)),
     publishedCitySlugs: index.publishedCitySlugs,
+  };
+}
+
+/** All listings for a published category (e.g. CSV export). */
+export async function fetchNationwideCategoryAllListings(
+  categorySlug: string,
+): Promise<{
+  categoryLabel: string;
+  businesses: DirectoryBusiness[];
+} | null> {
+  const slug = categorySlug.trim().toLowerCase();
+  const index = await fetchDirectoryIndex();
+  const categoryRef = index.categories.find((c) => c.categorySlug === slug);
+  if (
+    !categoryRef ||
+    categoryRef.totalCount < DIRECTORY_MIN_CATEGORY_LISTINGS
+  ) {
+    return null;
+  }
+
+  const matched = await fetchCategoryMatchedRows(slug);
+  const businesses = matched.map(rowToBusiness).sort(sortByReviewsDesc);
+  if (businesses.length < DIRECTORY_MIN_CATEGORY_LISTINGS) return null;
+
+  return {
+    categoryLabel: categoryRef.categoryLabel,
+    businesses,
   };
 }
 
