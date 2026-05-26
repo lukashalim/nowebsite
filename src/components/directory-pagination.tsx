@@ -1,25 +1,24 @@
 import Link from "next/link";
-import {
-  categoryPathWithPage,
-  directoryPaginationItems,
-} from "@/lib/directory/pagination";
+import { directoryPaginationItems } from "@/lib/directory/pagination";
 
 interface DirectoryPaginationProps {
-  categorySlug: string;
+  hrefForPage: (page: number) => string;
   page: number;
   totalPages: number;
   totalCount: number;
   rangeStart: number;
   rangeEnd: number;
+  ariaLabel?: string;
 }
 
 export function DirectoryPagination({
-  categorySlug,
+  hrefForPage,
   page,
   totalPages,
   totalCount,
   rangeStart,
   rangeEnd,
+  ariaLabel = "Listings pagination",
 }: DirectoryPaginationProps) {
   if (totalPages <= 1) return null;
 
@@ -28,7 +27,7 @@ export function DirectoryPagination({
   return (
     <nav
       className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
-      aria-label="Category listings pagination"
+      aria-label={ariaLabel}
     >
       <p className="text-sm text-zinc-600 dark:text-zinc-400">
         Showing{" "}
@@ -45,7 +44,7 @@ export function DirectoryPagination({
         <li>
           {page > 1 ? (
             <Link
-              href={categoryPathWithPage(categorySlug, page - 1)}
+              href={hrefForPage(page - 1)}
               className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
               rel="prev"
             >
@@ -77,7 +76,7 @@ export function DirectoryPagination({
                 </span>
               ) : (
                 <Link
-                  href={categoryPathWithPage(categorySlug, item)}
+                  href={hrefForPage(item)}
                   className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm tabular-nums hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
                 >
                   {item}
@@ -89,7 +88,7 @@ export function DirectoryPagination({
         <li>
           {page < totalPages ? (
             <Link
-              href={categoryPathWithPage(categorySlug, page + 1)}
+              href={hrefForPage(page + 1)}
               className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
               rel="next"
             >

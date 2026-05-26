@@ -41,7 +41,7 @@ export interface DirectoryCityCategoryRef {
   lastModifiedAt: string | null;
 }
 
-export const DIRECTORY_MIN_CITY_LISTINGS = 5;
+export const DIRECTORY_MIN_CITY_LISTINGS = 50;
 export const DIRECTORY_MIN_CATEGORY_LISTINGS = 10;
 export const DIRECTORY_MIN_STATE_LISTINGS = 10;
 

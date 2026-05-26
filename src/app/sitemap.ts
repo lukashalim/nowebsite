@@ -6,11 +6,12 @@ import {
   DIRECTORY_MIN_STATE_LISTINGS,
   DIRECTORY_MIN_UK_REGION_LISTINGS,
 } from "@/lib/directory/types";
-
-const SITE_ORIGIN = "https://nowebsitebusinessleads.com";
+import { absoluteUrl } from "@/lib/site-url";
 
 /** Regenerate on each request so Vercel always has Supabase env at runtime. */
 export const dynamic = "force-dynamic";
+
+const MARKETING_PATHS = ["/about", "/contact", "/how-it-works", "/pro"] as const;
 
 function toLastModified(iso: string | null | undefined): Date {
   if (!iso) return new Date();
@@ -18,52 +19,40 @@ function toLastModified(iso: string | null | undefined): Date {
   return Number.isNaN(d.getTime()) ? new Date() : d;
 }
 
+function hubEntry(
+  path: string,
+  lastModified: Date,
+  priority: number,
+): MetadataRoute.Sitemap[number] {
+  return {
+    url: absoluteUrl(path),
+    lastModified,
+    changeFrequency: "weekly",
+    priority,
+  };
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const [{ cities, categories, states, homepageLastModified }, ukIndex] =
       await Promise.all([fetchDirectoryIndex(), fetchUkDirectoryIndex()]);
 
+    const hubLastModified = homepageLastModified ?? new Date();
+    const ukHubLastModified =
+      ukIndex.lastModified ?? homepageLastModified ?? new Date();
+
     const entries: MetadataRoute.Sitemap = [
-      {
-        url: `${SITE_ORIGIN}/`,
-        lastModified: homepageLastModified ?? new Date(),
-        changeFrequency: "weekly",
-        priority: 1.0,
-      },
-      {
-        url: `${SITE_ORIGIN}/cities`,
-        lastModified: homepageLastModified ?? new Date(),
-        changeFrequency: "weekly",
-        priority: 0.85,
-      },
-      {
-        url: `${SITE_ORIGIN}/categories`,
-        lastModified: homepageLastModified ?? new Date(),
-        changeFrequency: "weekly",
-        priority: 0.85,
-      },
-      {
-        url: `${SITE_ORIGIN}/states`,
-        lastModified: homepageLastModified ?? new Date(),
-        changeFrequency: "weekly",
-        priority: 0.85,
-      },
-      {
-        url: `${SITE_ORIGIN}/facebook`,
-        lastModified: homepageLastModified ?? new Date(),
-        changeFrequency: "weekly",
-        priority: 0.8,
-      },
-      {
-        url: `${SITE_ORIGIN}/uk`,
-        lastModified: ukIndex.lastModified ?? homepageLastModified ?? new Date(),
-        changeFrequency: "weekly",
-        priority: 0.85,
-      },
+      hubEntry("/", hubLastModified, 1.0),
+      hubEntry("/cities", hubLastModified, 0.85),
+      hubEntry("/categories", hubLastModified, 0.85),
+      hubEntry("/states", hubLastModified, 0.85),
+      hubEntry("/facebook", hubLastModified, 0.8),
+      hubEntry("/uk", ukHubLastModified, 0.85),
+      ...MARKETING_PATHS.map((path) => hubEntry(path, hubLastModified, 0.55)),
       ...cities
         .filter((hub) => hub.listingCount >= DIRECTORY_MIN_CITY_LISTINGS)
         .map((hub) => ({
-          url: `${SITE_ORIGIN}/${hub.citySlug}`,
+          url: absoluteUrl(`/${hub.citySlug}`),
           lastModified: toLastModified(hub.lastModifiedAt),
           changeFrequency: "weekly" as const,
           priority: 0.8,
@@ -71,15 +60,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       ...categories
         .filter((c) => c.totalCount >= DIRECTORY_MIN_CATEGORY_LISTINGS)
         .map((cat) => ({
-          url: `${SITE_ORIGIN}/${cat.categorySlug}`,
-          lastModified: homepageLastModified ?? new Date(),
+          url: absoluteUrl(`/${cat.categorySlug}`),
+          lastModified: toLastModified(cat.lastModifiedAt),
           changeFrequency: "weekly" as const,
           priority: 0.7,
         })),
       ...states
         .filter((s) => s.listingCount >= DIRECTORY_MIN_STATE_LISTINGS)
         .map((state) => ({
-          url: `${SITE_ORIGIN}/${state.stateSlug}`,
+          url: absoluteUrl(`/${state.stateSlug}`),
           lastModified: toLastModified(state.lastModifiedAt),
           changeFrequency: "weekly" as const,
           priority: 0.75,
@@ -87,7 +76,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       ...ukIndex.cities
         .filter((c) => c.listingCount >= DIRECTORY_MIN_CITY_LISTINGS)
         .map((hub) => ({
-          url: `${SITE_ORIGIN}/${hub.citySlug}`,
+          url: absoluteUrl(`/${hub.citySlug}`),
           lastModified: toLastModified(hub.lastModifiedAt),
           changeFrequency: "weekly" as const,
           priority: 0.8,
@@ -95,7 +84,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       ...ukIndex.regions
         .filter((r) => r.listingCount >= DIRECTORY_MIN_UK_REGION_LISTINGS)
         .map((region) => ({
-          url: `${SITE_ORIGIN}/${region.regionSlug}`,
+          url: absoluteUrl(`/${region.regionSlug}`),
           lastModified: toLastModified(region.lastModifiedAt),
           changeFrequency: "weekly" as const,
           priority: 0.75,
@@ -105,13 +94,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     return entries;
   } catch (err) {
     console.error("[sitemap] fetchDirectoryIndex failed:", err);
-    return [
-      {
-        url: `${SITE_ORIGIN}/`,
-        lastModified: new Date(),
-        changeFrequency: "weekly",
-        priority: 1.0,
-      },
-    ];
+    return [hubEntry("/", new Date(), 1.0)];
   }
 }

@@ -3,7 +3,10 @@ import {
   buildDirectoryBusinessesCsv,
   csvFilenameFromPagePath,
 } from "@/lib/directory/csv-export";
-import { fetchNationwideCategoryAllListings } from "@/lib/directory/data";
+import {
+  fetchNationwideCategoryAllListings,
+  fetchStateAllListings,
+} from "@/lib/directory/data";
 
 export const dynamic = "force-dynamic";
 
@@ -12,13 +15,17 @@ export async function GET(request: Request) {
   const slug = searchParams.get("slug")?.trim().toLowerCase();
   const type = searchParams.get("type")?.trim().toLowerCase();
 
-  if (!slug || type !== "category") {
+  if (!slug || (type !== "category" && type !== "state")) {
     return NextResponse.json({ error: "Invalid export request" }, { status: 400 });
   }
 
-  const data = await fetchNationwideCategoryAllListings(slug);
+  const data =
+    type === "category"
+      ? await fetchNationwideCategoryAllListings(slug)
+      : await fetchStateAllListings(slug);
+
   if (!data) {
-    return NextResponse.json({ error: "Category not found" }, { status: 404 });
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   const csv = buildDirectoryBusinessesCsv(data.businesses);

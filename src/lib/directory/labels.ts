@@ -91,9 +91,13 @@ export function stateHubTitle(state: string): string {
   return `Businesses Without a Website in ${display}`;
 }
 
-export function stateHubMetaTitle(state: string): string {
+export function stateHubMetaTitle(
+  state: string,
+  page?: number,
+): string {
   const display = stateAbbrToDisplayName(stateToAbbr(state) ?? state);
-  return `${display} Businesses Without a Website | ${SITE_BRAND}`;
+  const pageSuffix = page && page > 1 ? ` — Page ${page}` : "";
+  return `${display} Businesses Without a Website${pageSuffix} | ${SITE_BRAND}`;
 }
 
 export function stateHubMetaDescription(
@@ -101,10 +105,15 @@ export function stateHubMetaDescription(
   count: number,
   cityCount: number,
   lastUpdatedLabel: string | null = null,
+  page?: { current: number; totalPages: number },
 ): string {
   const display = stateAbbrToDisplayName(stateToAbbr(state) ?? state);
   const updated = lastUpdatedLabel ? ` Updated ${lastUpdatedLabel}.` : "";
-  return `Browse ${count.toLocaleString()} businesses across ${cityCount.toLocaleString()} cities in ${display} with no website.${updated}`;
+  const pageNote =
+    page && page.totalPages > 1
+      ? ` Page ${page.current} of ${page.totalPages}.`
+      : "";
+  return `Browse ${count.toLocaleString()} businesses across ${cityCount.toLocaleString()} cities in ${display} with no website.${pageNote}${updated}`;
 }
 
 export function statePath(stateSlug: string): string {

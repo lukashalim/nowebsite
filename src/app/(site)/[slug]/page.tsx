@@ -25,6 +25,7 @@ import { DIRECTORY_MIN_CATEGORY_LISTINGS } from "@/lib/directory/types";
 import {
   categoryPathWithPage,
   parseDirectoryPageParam,
+  statePathWithPage,
 } from "@/lib/directory/pagination";
 import { absoluteUrl } from "@/lib/site-url";
 
@@ -115,17 +116,24 @@ export async function generateMetadata({
 
   if (resolved.kind === "state") {
     const { data } = resolved;
-    const title = stateHubMetaTitle(data.state);
+    const slugLower = slug.trim().toLowerCase();
+    const title = stateHubMetaTitle(
+      data.state,
+      data.page > 1 ? data.page : undefined,
+    );
     const description = stateHubMetaDescription(
       data.state,
-      data.listingCount,
+      data.totalCount,
       data.cityCount,
       data.lastUpdatedLabel,
+      data.totalPages > 1
+        ? { current: data.page, totalPages: data.totalPages }
+        : undefined,
     );
     return {
       title: { absolute: title },
       description,
-      alternates: { canonical: absoluteUrl(`/${slug.trim().toLowerCase()}`) },
+      alternates: { canonical: absoluteUrl(statePathWithPage(slugLower, data.page)) },
     };
   }
 
@@ -191,6 +199,10 @@ export default async function SlugDirectoryPage({
         businesses={data.businesses}
         cityGroups={data.cityGroups}
         cityCount={data.cityCount}
+        totalCount={data.totalCount}
+        page={data.page}
+        pageSize={data.pageSize}
+        totalPages={data.totalPages}
         lastUpdatedLabel={data.lastUpdatedLabel}
         publishedCitySlugs={data.publishedCitySlugs}
       />

@@ -1,3 +1,7 @@
+import {
+  canonicalCategorySlug,
+  canonicalizeBusinessTypeToken,
+} from "@/lib/directory/category-merge";
 import { COUNTRY_GB, COUNTRY_US } from "@/lib/directory/country";
 import type { DirectoryCountry } from "@/lib/directory/types";
 import { mapSearchKeywordToBusinessType } from "@/lib/directory/search-category-map";
@@ -225,12 +229,14 @@ export function directoryCategoryLabel(
   const type = businessType?.trim();
   if (type && !isPlaceholderBusinessType(type)) {
     const mapped = mapSearchKeywordToBusinessType(type);
-    return mapped ?? type;
+    const raw = mapped ?? type;
+    return canonicalizeBusinessTypeToken(raw) ?? raw;
   }
   const main = mainCategory?.trim();
   if (!main) return null;
   const fromMap = mapSearchKeywordToBusinessType(main);
-  return fromMap ?? main;
+  const raw = fromMap ?? main;
+  return canonicalizeBusinessTypeToken(raw) ?? raw;
 }
 
 /** Resolve row to a stable category slug + label for URLs and counts. */
@@ -240,8 +246,9 @@ export function resolveCategoryForRow(
 ): ResolvedCategory | null {
   const label = directoryCategoryLabel(mainCategory, businessType);
   if (!label) return null;
+  const slug = canonicalCategorySlug(categoryLabelToFlatSlug(label));
   return {
-    slug: categoryLabelToFlatSlug(label),
+    slug,
     label,
   };
 }
@@ -265,7 +272,8 @@ export function categoryMatchesSlug(
 ): boolean {
   const resolved = resolveCategoryForRow(mainCategory, businessType);
   if (!resolved) return false;
-  return resolved.slug === categorySlug.trim().toLowerCase();
+  const target = canonicalCategorySlug(categorySlug.trim().toLowerCase());
+  return resolved.slug === target;
 }
 
 /** @deprecated Whitelist removed — use fetchNationwideCategoryListings to test publishability. */

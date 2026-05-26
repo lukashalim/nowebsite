@@ -37,6 +37,7 @@ import {
 import {
   clampDirectoryPage,
   DIRECTORY_CATEGORY_PAGE_SIZE,
+  DIRECTORY_STATE_PAGE_SIZE,
   totalDirectoryPages,
 } from "@/lib/directory/pagination";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
@@ -227,7 +228,12 @@ export function groupBusinessesByCity(
 
 export const fetchDirectoryIndex = cache(async (): Promise<{
   cities: DirectoryCityRef[];
-  categories: { categoryLabel: string; categorySlug: string; totalCount: number }[];
+  categories: {
+    categoryLabel: string;
+    categorySlug: string;
+    totalCount: number;
+    lastModifiedAt: string | null;
+  }[];
   states: DirectoryStateRef[];
   cityCategoriesAll: DirectoryCityCategoryRef[];
   publishedCitySlugs: Set<string>;
@@ -237,7 +243,12 @@ export const fetchDirectoryIndex = cache(async (): Promise<{
   const cityCounts = new Map<string, DirectoryCityRef>();
   const categoryCounts = new Map<
     string,
-    { categoryLabel: string; categorySlug: string; totalCount: number }
+    {
+      categoryLabel: string;
+      categorySlug: string;
+      totalCount: number;
+      lastModifiedAt: string | null;
+    }
   >();
   const stateCounts = new Map<string, DirectoryStateRef>();
   const cityCategoryCounts = new Map<string, DirectoryCityCategoryRef>();
@@ -312,11 +323,16 @@ export const fetchDirectoryIndex = cache(async (): Promise<{
       const existingCat = categoryCounts.get(catKey);
       if (existingCat) {
         existingCat.totalCount += 1;
+        existingCat.lastModifiedAt = bumpFreshnessIso(
+          existingCat.lastModifiedAt,
+          row,
+        );
       } else {
         categoryCounts.set(catKey, {
           categoryLabel: label ?? resolved.label,
           categorySlug: resolved.slug,
           totalCount: 1,
+          lastModifiedAt: bumpFreshnessIso(null, row),
         });
       }
 
@@ -738,15 +754,10 @@ export async function fetchNationwideCategoryAllListings(
   };
 }
 
-export async function fetchStateListings(
-  stateSlug: string,
-): Promise<{
+async function fetchStateMatchedBusinesses(stateSlug: string): Promise<{
   state: string;
-  businesses: DirectoryBusiness[];
-  cityGroups: DirectoryCityGroup[];
-  cityCount: number;
-  listingCount: number;
-  lastUpdatedLabel: string | null;
+  allBusinesses: DirectoryBusiness[];
+  matchedRows: RawDirectoryRow[];
   publishedCitySlugs: Set<string>;
 } | null> {
   const parsed = parseStateSlug(stateSlug);
@@ -764,20 +775,83 @@ export async function fetchStateListings(
       parseDirectoryCountry(row.country) === COUNTRY_US &&
       stateToAbbr(row.state ?? "") === parsed.stateAbbr,
   );
-  const businesses = matched.map(rowToBusiness).sort(sortByReviewsDesc);
+  const allBusinesses = matched.map(rowToBusiness).sort(sortByReviewsDesc);
 
-  if (businesses.length < DIRECTORY_MIN_STATE_LISTINGS) return null;
-
-  const cityGroups = groupBusinessesByCity(businesses);
+  if (allBusinesses.length < DIRECTORY_MIN_STATE_LISTINGS) return null;
 
   return {
     state: stateRef.state,
+    allBusinesses,
+    matchedRows: matched,
+    publishedCitySlugs: index.publishedCitySlugs,
+  };
+}
+
+export async function fetchStateListings(
+  stateSlug: string,
+  opts?: { page?: number; pageSize?: number },
+): Promise<{
+  state: string;
+  businesses: DirectoryBusiness[];
+  cityGroups: DirectoryCityGroup[];
+  cityCount: number;
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  lastUpdatedLabel: string | null;
+  publishedCitySlugs: Set<string>;
+} | null> {
+  const base = await fetchStateMatchedBusinesses(stateSlug);
+  if (!base) return null;
+
+  const pageSize = opts?.pageSize ?? DIRECTORY_STATE_PAGE_SIZE;
+  const totalCount = base.allBusinesses.length;
+  const totalPages = totalDirectoryPages(totalCount, pageSize);
+  const page = clampDirectoryPage(opts?.page ?? 1, totalPages);
+  const start = (page - 1) * pageSize;
+  const businesses = base.allBusinesses.slice(start, start + pageSize);
+
+  const cityGroups =
+    totalPages > 1 ? [] : groupBusinessesByCity(base.allBusinesses);
+
+  const cityCount = new Set(
+    base.allBusinesses.map((b) => {
+      const city = b.city?.trim();
+      const state = b.state?.trim();
+      if (!city || !state) return null;
+      return cityStateToSlug(city, state, b.country);
+    }).filter(Boolean),
+  ).size;
+
+  return {
+    state: base.state,
     businesses,
     cityGroups,
-    cityCount: cityGroups.length,
-    listingCount: businesses.length,
-    lastUpdatedLabel: formatLastUpdatedMonthYear(maxFreshnessIso(matched)),
-    publishedCitySlugs: index.publishedCitySlugs,
+    cityCount,
+    totalCount,
+    page,
+    pageSize,
+    totalPages,
+    lastUpdatedLabel: formatLastUpdatedMonthYear(
+      maxFreshnessIso(base.matchedRows),
+    ),
+    publishedCitySlugs: base.publishedCitySlugs,
+  };
+}
+
+export async function fetchStateAllListings(
+  stateSlug: string,
+): Promise<{
+  state: string;
+  businesses: DirectoryBusiness[];
+} | null> {
+  const base = await fetchStateMatchedBusinesses(stateSlug);
+  if (!base) return null;
+
+  return {
+    state: base.state,
+    businesses: base.allBusinesses,
   };
 }
 

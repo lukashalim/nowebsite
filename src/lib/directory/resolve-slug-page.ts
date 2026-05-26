@@ -7,6 +7,7 @@ import {
   fetchStateListings,
   fetchUkRegionListings,
 } from "@/lib/directory/data";
+import { mergedCategorySlugToCanonical } from "@/lib/directory/category-merge";
 import {
   legacyCategorySlugToCanonical,
   parseCitySlug,
@@ -50,6 +51,9 @@ export const resolveDirectorySlugPage = cache(async function resolveDirectorySlu
   const legacy = legacyCategorySlugToCanonical(lower);
   if (legacy) return { kind: "redirect", to: legacy };
 
+  const merged = mergedCategorySlugToCanonical(lower);
+  if (merged) return { kind: "redirect", to: merged };
+
   const index = await fetchDirectoryIndex();
   const categoryRef = index.categories.find((c) => c.categorySlug === lower);
   if (categoryRef) {
@@ -74,7 +78,7 @@ export const resolveDirectorySlugPage = cache(async function resolveDirectorySlu
   }
 
   if (parseStateSlug(lower)) {
-    const data = await fetchStateListings(lower);
+    const data = await fetchStateListings(lower, { page });
     if (data) return { kind: "state", data };
   }
 

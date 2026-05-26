@@ -9,7 +9,10 @@ import {
   pluralCategoryForTitle,
 } from "@/lib/directory/labels";
 import { buildDirectoryListJsonLd } from "@/lib/directory/jsonld";
-import { directoryPageRange } from "@/lib/directory/pagination";
+import {
+  categoryPathWithPage,
+  directoryPageRange,
+} from "@/lib/directory/pagination";
 import type { DirectoryCityGroup } from "@/lib/directory/types";
 import type { DirectoryBusiness } from "@/lib/directory/types";
 
@@ -47,6 +50,7 @@ export function DirectoryCategoryPage({
   const paginated = totalPages > 1;
   const range = directoryPageRange(page, pageSize, totalCount);
   const fullCsvHref = `/api/directory-export?slug=${encodeURIComponent(categorySlug)}&type=category`;
+  const hrefForPage = (p: number) => categoryPathWithPage(categorySlug, p);
 
   return (
     <div className="space-y-8">
@@ -102,12 +106,13 @@ export function DirectoryCategoryPage({
 
       {paginated ? (
         <DirectoryPagination
-          categorySlug={categorySlug}
+          hrefForPage={hrefForPage}
           page={page}
           totalPages={totalPages}
           totalCount={totalCount}
           rangeStart={range.start}
           rangeEnd={range.end}
+          ariaLabel="Category listings pagination"
         />
       ) : null}
 
@@ -129,12 +134,13 @@ export function DirectoryCategoryPage({
 
       {paginated ? (
         <DirectoryPagination
-          categorySlug={categorySlug}
+          hrefForPage={hrefForPage}
           page={page}
           totalPages={totalPages}
           totalCount={totalCount}
           rangeStart={range.start}
           rangeEnd={range.end}
+          ariaLabel="Category listings pagination"
         />
       ) : null}
 
