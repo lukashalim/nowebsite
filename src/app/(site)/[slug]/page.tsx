@@ -15,10 +15,7 @@ import {
   nationwideCategoryMetaTitle,
   stateHubMetaDescription,
   stateHubMetaTitle,
-  ukRegionHubMetaDescription,
-  ukRegionHubMetaTitle,
 } from "@/lib/directory/labels";
-import { COUNTRY_GB } from "@/lib/directory/country";
 import { fetchAllValidSlugParams } from "@/lib/directory/data";
 import { resolveDirectorySlugPage } from "@/lib/directory/resolve-slug-page";
 import { DIRECTORY_MIN_CATEGORY_LISTINGS } from "@/lib/directory/types";
@@ -27,6 +24,7 @@ import {
   parseDirectoryPageParam,
   statePathWithPage,
 } from "@/lib/directory/pagination";
+import { categoryContentMetaDescription } from "@/lib/directory/category-content";
 import { absoluteUrl } from "@/lib/site-url";
 
 export const revalidate = 3600;
@@ -63,37 +61,24 @@ export async function generateMetadata({
       data.categoryLabel,
       data.page > 1 ? data.page : undefined,
     );
-    const description = nationwideCategoryMetaDescription(
-      data.categoryLabel,
-      data.totalCount,
-      data.cityCount,
-      data.lastUpdatedLabel,
-      data.totalPages > 1
-        ? { current: data.page, totalPages: data.totalPages }
-        : undefined,
-    );
+    const description =
+      data.page === 1 && data.content?.pitch?.trim()
+        ? categoryContentMetaDescription(data.content.pitch)
+        : nationwideCategoryMetaDescription(
+            data.categoryLabel,
+            data.totalCount,
+            data.cityCount,
+            data.lastUpdatedLabel,
+            data.totalPages > 1
+              ? { current: data.page, totalPages: data.totalPages }
+              : undefined,
+          );
     const slugLower = slug.trim().toLowerCase();
     const canonicalPath = categoryPathWithPage(slugLower, data.page);
     return {
       title: { absolute: title },
       description,
       alternates: { canonical: absoluteUrl(canonicalPath) },
-    };
-  }
-
-  if (resolved.kind === "ukRegion") {
-    const { data } = resolved;
-    const title = ukRegionHubMetaTitle(data.region);
-    const description = ukRegionHubMetaDescription(
-      data.region,
-      data.listingCount,
-      data.cityCount,
-      data.lastUpdatedLabel,
-    );
-    return {
-      title: { absolute: title },
-      description,
-      alternates: { canonical: absoluteUrl(`/${slug.trim().toLowerCase()}`) },
     };
   }
 
@@ -168,24 +153,7 @@ export default async function SlugDirectoryPage({
         totalPages={data.totalPages}
         lastUpdatedLabel={data.lastUpdatedLabel}
         publishedCitySlugs={data.publishedCitySlugs}
-      />
-    );
-  }
-
-  if (resolved.kind === "ukRegion") {
-    const { data } = resolved;
-    return (
-      <DirectoryStatePage
-        stateSlug={lower}
-        state={data.region}
-        businesses={data.businesses}
-        cityGroups={data.cityGroups}
-        cityCount={data.cityCount}
-        lastUpdatedLabel={data.lastUpdatedLabel}
-        publishedCitySlugs={data.publishedCitySlugs}
-        hubHref="/uk"
-        hubLabel="United Kingdom"
-        isUkRegion
+        content={data.content}
       />
     );
   }
@@ -223,14 +191,6 @@ export default async function SlugDirectoryPage({
             <Link href="/" className="hover:underline">
               Home
             </Link>
-            {hub.country === COUNTRY_GB ? (
-              <>
-                <span aria-hidden> / </span>
-                <Link href="/uk" className="hover:underline">
-                  United Kingdom
-                </Link>
-              </>
-            ) : null}
             <span aria-hidden> / </span>
             {hub.city}
           </p>

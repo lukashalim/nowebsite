@@ -6,11 +6,15 @@ import type { DirectoryCityGroup } from "@/lib/directory/types";
 interface DirectoryGroupedByCityProps {
   cityGroups: DirectoryCityGroup[];
   publishedCitySlugs?: Set<string>;
+  getCityHref?: (group: DirectoryCityGroup) => string;
+  isCityPublished?: (group: DirectoryCityGroup) => boolean;
 }
 
 export function DirectoryGroupedByCity({
   cityGroups,
   publishedCitySlugs,
+  getCityHref,
+  isCityPublished,
 }: DirectoryGroupedByCityProps) {
   if (cityGroups.length === 0) {
     return (
@@ -25,17 +29,18 @@ export function DirectoryGroupedByCity({
           group.city,
           group.state,
           group.country,
+          group.region,
         );
-        const isPublished = publishedCitySlugs?.has(group.citySlug) ?? false;
+        const isPublished = isCityPublished
+          ? isCityPublished(group)
+          : (publishedCitySlugs?.has(group.citySlug) ?? false);
+        const href = getCityHref ? getCityHref(group) : cityPath(group.citySlug);
 
         return (
           <section key={group.citySlug} className="space-y-3">
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
               {isPublished ? (
-                <Link
-                  href={cityPath(group.citySlug)}
-                  className="hover:underline"
-                >
+                <Link href={href} className="hover:underline">
                   {heading}
                 </Link>
               ) : (

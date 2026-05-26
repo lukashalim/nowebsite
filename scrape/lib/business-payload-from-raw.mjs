@@ -5,6 +5,7 @@
 
 import { pick, toNum, omitUndefined } from "./scrape-pipeline/index.mjs";
 import { reverseGeocodeLocalityCensus } from "./location-fallbacks.mjs";
+import { deriveRegionFields } from "./region-fields.mjs";
 
 /**
  * @param {number|string} longitude
@@ -200,8 +201,14 @@ export function extractHoursData(raw) {
  * Ensure the target table has these columns (see scrape/sql/businesses-demo-seo-fields.sql).
  */
 export function buildBusinessUpsertPayload(raw, base) {
+  const regionFields = deriveRegionFields({
+    country: base.country,
+    city: base.city,
+    state: base.state,
+  });
   const core = omitUndefined({
     ...base,
+    ...regionFields,
     facebook_url: base.facebook_url ?? undefined,
   });
   const limit = Number(process.env.REVIEW_HIGHLIGHTS_LIMIT ?? 5);

@@ -19,7 +19,7 @@ export function PublicNav() {
             About
           </Link>
           <Link
-            href="/uk"
+            href="/united-kingdom"
             className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
           >
             United Kingdom

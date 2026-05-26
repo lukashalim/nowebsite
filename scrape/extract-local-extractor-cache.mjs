@@ -38,6 +38,11 @@
  *
  * Run log: each execution appends a row to Supabase `extract_local_cache_runs` (see scrape/sql).
  * Set EXTRACT_LOCAL_DISABLE_RUN_LOG=1 to skip inserts.
+ *
+ * Category stats: each run additively updates `category_content` (business_in_category,
+ * business_without_website, website_adoption_pct) from the Maps sample before cohort filters.
+ * Set EXTRACT_LOCAL_DISABLE_CATEGORY_STATS=1 to skip. Requires --business-type (not local_cache).
+ * Additive counts may double-count place_id across runs; stats reflect extractor samples, not DB totals.
  */
 
 import fs from "node:fs";
@@ -62,6 +67,12 @@ import {
   createDemoSlugAllocator,
   assignDemoSlugToPayload,
 } from "./lib/demo-slug.mjs";
+import {
+  businessTypeArgToCategorySlug,
+  humanizeDisplayName,
+  isCategoryStatsDisabled,
+  mergeCategoryContentStats,
+} from "./lib/category-content-stats.mjs";
 
 const DEFAULT_WIN_EXTRACTOR_DIR = "googlemapsextractor";
 
@@ -228,7 +239,46 @@ function emptyRunStats(filesCount = 0) {
     upsertBatchErrors: 0,
     filesDeleted: 0,
     filesDeleteFailed: 0,
+    categorySampleTotal: 0,
+    categorySampleWithoutWebsite: 0,
   };
+}
+
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {string} businessType
+ * @param {ReturnType<typeof emptyRunStats>} stats
+ * @param {boolean} dryRun
+ * @returns {Promise<object|null>}
+ */
+async function applyCategoryContentStats(supabase, businessType, stats, dryRun) {
+  if (isCategoryStatsDisabled()) {
+    return { skipped: true, reason: "EXTRACT_LOCAL_DISABLE_CATEGORY_STATS" };
+  }
+  const slug = businessTypeArgToCategorySlug(businessType);
+  if (!slug) {
+    return { skipped: true, reason: "no category slug for business type" };
+  }
+  const runInCategory = stats.categorySampleTotal;
+  const runWithoutWebsite = stats.categorySampleWithoutWebsite;
+  if (runInCategory <= 0) {
+    return { skipped: true, reason: "categorySampleTotal is 0", slug };
+  }
+  if (dryRun) {
+    return {
+      dryRun: true,
+      slug,
+      runInCategory,
+      runWithoutWebsite,
+    };
+  }
+  const result = await mergeCategoryContentStats(supabase, {
+    slug,
+    displayName: humanizeDisplayName(businessType),
+    runInCategory,
+    runWithoutWebsite,
+  });
+  return { slug, ...result };
 }
 
 /**
@@ -430,6 +480,11 @@ async function main() {
         }
         seenPlace.add(base.place_id);
 
+        stats.categorySampleTotal += 1;
+        if (!base.has_website) {
+          stats.categorySampleWithoutWebsite += 1;
+        }
+
         if (!allowWebsite && base.has_website === true) {
           stats.hasWebsite += 1;
           continue;
@@ -501,6 +556,9 @@ async function main() {
 
   await flushPayloadBuffer(true);
 
+  /** @type {object|null} */
+  let categoryContentStats = null;
+
   const buildStatPayload = () => ({
     root,
     ...stats,
@@ -508,6 +566,7 @@ async function main() {
     businessesTable: dryRun ? null : BUSINESSES_TABLE,
     deleteAfter,
     pendingCacheDeletes: pendingFileDeletes.length,
+    categoryContent: categoryContentStats,
     filters: {
       allowWebsite,
       noSweetSpot,
@@ -581,6 +640,23 @@ async function main() {
         );
       }
     }
+  }
+
+  try {
+    categoryContentStats = await applyCategoryContentStats(
+      supabase,
+      businessType,
+      stats,
+      dryRun,
+    );
+  } catch (catErr) {
+    console.error(
+      "category_content stats failed:",
+      catErr?.message ?? catErr,
+    );
+    categoryContentStats = {
+      error: String(catErr?.message ?? catErr),
+    };
   }
 
   console.error(JSON.stringify(buildStatPayload(), null, 2));

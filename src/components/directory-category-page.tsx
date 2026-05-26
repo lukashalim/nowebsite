@@ -4,6 +4,7 @@ import { DirectoryGroupedByCity } from "@/components/directory-grouped-by-city";
 import { DirectoryBusinessList } from "@/components/directory-business-list";
 import { DirectoryPagination } from "@/components/directory-pagination";
 import { DownloadCsvButton } from "@/components/download-csv-button";
+import type { CategoryContent } from "@/lib/directory/category-content";
 import {
   nationwideCategoryPageTitle,
   pluralCategoryForTitle,
@@ -28,6 +29,7 @@ interface DirectoryCategoryPageProps {
   totalPages: number;
   lastUpdatedLabel: string | null;
   publishedCitySlugs?: Set<string>;
+  content?: CategoryContent | null;
 }
 
 export function DirectoryCategoryPage({
@@ -42,6 +44,7 @@ export function DirectoryCategoryPage({
   totalPages,
   lastUpdatedLabel,
   publishedCitySlugs,
+  content,
 }: DirectoryCategoryPageProps) {
   const title = nationwideCategoryPageTitle(categoryLabel);
   const path = `/${categorySlug}`;
@@ -51,6 +54,7 @@ export function DirectoryCategoryPage({
   const range = directoryPageRange(page, pageSize, totalCount);
   const fullCsvHref = `/api/directory-export?slug=${encodeURIComponent(categorySlug)}&type=category`;
   const hrefForPage = (p: number) => categoryPathWithPage(categorySlug, p);
+  const showPitch = Boolean(content?.pitch?.trim() && page === 1);
 
   return (
     <div className="space-y-8">
@@ -82,24 +86,50 @@ export function DirectoryCategoryPage({
             </span>
           ) : null}
         </h1>
-        <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
-          {paginated ? (
-            <>
-              Browse page {page.toLocaleString()} of {totalPages.toLocaleString()}{" "}
-              ({totalCount.toLocaleString()} {pluralLower} across{" "}
-              {cityCount.toLocaleString()} US cities). Listings are sorted by Google
-              review count. Each row includes ratings, phone numbers, and Maps links
-              for outreach.
-            </>
-          ) : (
-            <>
-              Browse {totalCount.toLocaleString()} {pluralLower} across{" "}
-              {cityCount.toLocaleString()} US cities that do not have their own
-              website. Each listing includes ratings, review counts, phone numbers,
-              and Google Maps links for outreach.
-            </>
-          )}
-        </p>
+
+        {showPitch && content ? (
+          <p className="max-w-2xl whitespace-pre-line text-base text-zinc-600 dark:text-zinc-400">
+            {content.pitch}
+          </p>
+        ) : (
+          <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
+            {paginated ? (
+              <>
+                Browse page {page.toLocaleString()} of {totalPages.toLocaleString()}{" "}
+                ({totalCount.toLocaleString()} {pluralLower} across{" "}
+                {cityCount.toLocaleString()} US cities). Listings are sorted by Google
+                review count. Each row includes ratings, phone numbers, and Maps links
+                for outreach.
+              </>
+            ) : (
+              <>
+                Browse {totalCount.toLocaleString()} {pluralLower} across{" "}
+                {cityCount.toLocaleString()} US cities that do not have their own
+                website. Each listing includes ratings, review counts, phone numbers,
+                and Google Maps links for outreach.
+              </>
+            )}
+          </p>
+        )}
+
+        {content && page === 1 && content.websiteAdoptionPct != null ? (
+          <p className="max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
+            About {content.websiteAdoptionPct.toLocaleString()}% of{" "}
+            {content.displayName} businesses have their own website — the rest are
+            listed here for designers and agencies building sites for them.
+          </p>
+        ) : null}
+
+        {content && page === 1 && content.outreachAngle ? (
+          <div className="max-w-2xl space-y-1 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/40">
+            <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+              Outreach angle
+            </h2>
+            <p className="whitespace-pre-line text-sm text-zinc-600 dark:text-zinc-400">
+              {content.outreachAngle}
+            </p>
+          </div>
+        ) : null}
       </header>
 
       <DirectoryLastUpdated label={lastUpdatedLabel} />

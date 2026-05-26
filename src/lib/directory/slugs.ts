@@ -134,6 +134,18 @@ export function categoryLabelToFlatSlug(label: string): string {
 
 const UK_CITY_SUFFIX = "gb";
 
+/** URL city segment for GB nested paths (e.g. Bristol → `bristol`). */
+export function cityNameToSlug(city: string): string | null {
+  const cityPart = slugifySegment(city);
+  return cityPart || null;
+}
+
+/** Legacy flat slug `bristol-gb` for redirects from old URLs. */
+export function legacyGbFlatCitySlug(city: string): string | null {
+  const part = cityNameToSlug(city);
+  return part ? `${part}-${UK_CITY_SUFFIX}` : null;
+}
+
 export function cityStateToSlug(
   city: string,
   state: string,

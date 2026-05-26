@@ -5,15 +5,15 @@ import {
   fetchDirectoryIndex,
   fetchNationwideCategoryListings,
   fetchStateListings,
-  fetchUkRegionListings,
 } from "@/lib/directory/data";
 import { mergedCategorySlugToCanonical } from "@/lib/directory/category-merge";
 import {
   legacyCategorySlugToCanonical,
   parseCitySlug,
   parseStateSlug,
-  parseUkRegionSlug,
 } from "@/lib/directory/slugs";
+import { resolveLegacyGbFlatSlugRedirect } from "@/lib/directory/resolve-gb-path";
+import { COUNTRY_GB } from "@/lib/directory/country";
 
 export type ResolvedSlugPage =
   | { kind: "redirect"; to: string }
@@ -32,15 +32,11 @@ export type ResolvedSlugPage =
       kind: "state";
       data: NonNullable<Awaited<ReturnType<typeof fetchStateListings>>>;
     }
-  | {
-      kind: "ukRegion";
-      data: NonNullable<Awaited<ReturnType<typeof fetchUkRegionListings>>>;
-    }
   | { kind: "notFound" };
 
 /**
- * Resolve /[slug] to city, state, UK region, or nationwide category.
- * Category is checked before city so slugs like `repair-pa` are not treated as a city hub.
+ * Resolve /[slug] to US city, US state, or nationwide category.
+ * UK paths live under /united-kingdom/…; legacy flat UK slugs redirect.
  */
 export const resolveDirectorySlugPage = cache(async function resolveDirectorySlugPage(
   slug: string,
@@ -54,6 +50,16 @@ export const resolveDirectorySlugPage = cache(async function resolveDirectorySlu
   const merged = mergedCategorySlugToCanonical(lower);
   if (merged) return { kind: "redirect", to: merged };
 
+  const gbRedirect = await resolveLegacyGbFlatSlugRedirect(lower);
+  if (gbRedirect) return { kind: "redirect", to: gbRedirect };
+
+  const parsedCity = parseCitySlug(lower);
+  if (parsedCity?.country === COUNTRY_GB) {
+    const to = await resolveLegacyGbFlatSlugRedirect(lower);
+    if (to) return { kind: "redirect", to };
+    return { kind: "notFound" };
+  }
+
   const index = await fetchDirectoryIndex();
   const categoryRef = index.categories.find((c) => c.categorySlug === lower);
   if (categoryRef) {
@@ -61,12 +67,6 @@ export const resolveDirectorySlugPage = cache(async function resolveDirectorySlu
       page,
     });
     if (categoryData) return { kind: "category", data: categoryData };
-  }
-
-  const ukRegion = parseUkRegionSlug(lower);
-  if (ukRegion) {
-    const data = await fetchUkRegionListings(ukRegion.regionSlug);
-    if (data) return { kind: "ukRegion", data };
   }
 
   if (parseCitySlug(lower)) {

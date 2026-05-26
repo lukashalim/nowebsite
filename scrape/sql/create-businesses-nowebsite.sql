@@ -9,6 +9,8 @@ create table if not exists public.businesses_nowebsite (
   address text,
   city text,
   state text,
+  region text,
+  region_code text,
   country text not null default 'US',
   postal_code text,
   latitude double precision,
@@ -75,6 +77,10 @@ create index if not exists idx_businesses_nowebsite_open_now
 
 create index if not exists idx_businesses_nowebsite_state_type
   on public.businesses_nowebsite (state, business_type);
+
+create index if not exists idx_businesses_nowebsite_country_region_city
+  on public.businesses_nowebsite (country, region_code, city)
+  where has_website = false;
 
 create index if not exists idx_businesses_nowebsite_crm_contact_surface
   on public.businesses_nowebsite (crm_contact_surface)

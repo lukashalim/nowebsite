@@ -1,4 +1,5 @@
 import { COUNTRY_GB } from "@/lib/directory/country";
+import { gbCountryPath } from "@/lib/directory/paths";
 import type { DirectoryCountry } from "@/lib/directory/types";
 import { stateAbbrToDisplayName, stateToAbbr } from "@/lib/directory/slugs";
 
@@ -10,9 +11,11 @@ export function formatLocationLabel(
   city: string,
   state: string,
   country: DirectoryCountry = "US",
+  region?: string | null,
 ): string {
   if (country === COUNTRY_GB) {
-    return `${city.trim()}, ${state.trim()}`;
+    const place = region?.trim() || state.trim();
+    return `${city.trim()}, ${place}`;
   }
   const abbr = stateToAbbr(state);
   if (abbr) {
@@ -124,6 +127,25 @@ export function ukHubTitle(): string {
   return "Businesses Without a Website in the United Kingdom";
 }
 
+export function gbCountryHubTitle(): string {
+  return ukHubTitle();
+}
+
+export function gbCountryHubMetaTitle(): string {
+  return `${gbCountryHubTitle()} | ${SITE_BRAND}`;
+}
+
+export function gbCountryHubMetaDescription(
+  count: number,
+  cityCount: number,
+  lastUpdatedLabel: string | null = null,
+): string {
+  const updated = lastUpdatedLabel ? ` Updated ${lastUpdatedLabel}.` : "";
+  return `Browse ${count.toLocaleString()} UK businesses without their own website across ${cityCount.toLocaleString()} cities.${updated}`;
+}
+
+export { gbCountryPath } from "@/lib/directory/paths";
+
 export function ukRegionHubTitle(region: string): string {
   return `Businesses Without a Website in ${region}`;
 }
@@ -146,8 +168,9 @@ export function cityHubTitle(
   city: string,
   state: string,
   country: DirectoryCountry = "US",
+  region?: string | null,
 ): string {
-  return `Businesses Without a Website in ${formatLocationLabel(city, state, country)}`;
+  return `Businesses Without a Website in ${formatLocationLabel(city, state, country, region)}`;
 }
 
 export function cityHubMetaDescription(
@@ -156,8 +179,9 @@ export function cityHubMetaDescription(
   listingCount: number,
   lastUpdatedLabel: string | null = null,
   country: DirectoryCountry = "US",
+  region?: string | null,
 ): string {
-  const place = formatLocationLabel(city, state, country);
+  const place = formatLocationLabel(city, state, country, region);
   const updated = lastUpdatedLabel ? ` Updated ${lastUpdatedLabel}.` : "";
   return `Directory of ${listingCount} local businesses in ${place} that do not have a website — phone numbers, ratings, and Google Maps links for designers and agencies.${updated}`;
 }

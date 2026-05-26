@@ -25,6 +25,9 @@ interface DirectoryStatePageProps {
   hubHref?: string;
   hubLabel?: string;
   isUkRegion?: boolean;
+  pathPrefix?: string;
+  getCityHref?: (group: DirectoryCityGroup) => string;
+  isCityPublished?: (group: DirectoryCityGroup) => boolean;
   totalCount?: number;
   page?: number;
   pageSize?: number;
@@ -42,13 +45,18 @@ export function DirectoryStatePage({
   hubHref = "/",
   hubLabel = "Home",
   isUkRegion = false,
+  pathPrefix,
+  getCityHref,
+  isCityPublished,
   totalCount: totalCountProp,
   page = 1,
   pageSize = 100,
   totalPages = 1,
 }: DirectoryStatePageProps) {
   const title = isUkRegion ? ukRegionHubTitle(state) : stateHubTitle(state);
-  const path = `/${stateSlug}`;
+  const path = pathPrefix
+    ? `${pathPrefix}/${stateSlug}`
+    : `/${stateSlug}`;
   const jsonLd = buildDirectoryListJsonLd(businesses, path, title);
   const displayState = isUkRegion
     ? state
@@ -138,6 +146,8 @@ export function DirectoryStatePage({
           <DirectoryGroupedByCity
             cityGroups={cityGroups}
             publishedCitySlugs={publishedCitySlugs}
+            getCityHref={getCityHref}
+            isCityPublished={isCityPublished}
           />
         )}
       </section>

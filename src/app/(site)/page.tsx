@@ -155,7 +155,7 @@ export default async function HomePage() {
                 standalone website — browse by nation or city.
               </p>
               <Link
-                href="/uk"
+                href="/united-kingdom"
                 className="mt-4 inline-block text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
               >
                 Open UK directory
