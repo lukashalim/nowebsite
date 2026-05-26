@@ -23,8 +23,18 @@ export interface RawDirectoryRow {
   phone: string | null;
   google_maps_link: string | null;
   demo_slug: string | null;
-  last_scraped_at: string | null;
+  last_checked: string | null;
   scraped_at: string | null;
+}
+
+export type ListingFreshnessRow = Pick<
+  RawDirectoryRow,
+  "last_checked" | "scraped_at"
+>;
+
+/** Most recent time this listing was verified in the scrape pipeline. */
+export function listingCheckedAtIso(row: ListingFreshnessRow): string | null {
+  return row.last_checked ?? row.scraped_at;
 }
 
 export function rowToBusiness(row: RawDirectoryRow): DirectoryBusiness {
@@ -43,15 +53,14 @@ export function rowToBusiness(row: RawDirectoryRow): DirectoryBusiness {
     phone: row.phone,
     google_maps_link: row.google_maps_link,
     demo_slug: row.demo_slug,
+    checkedAt: listingCheckedAtIso(row),
   };
 }
 
-export function maxFreshnessIso(
-  rows: { last_scraped_at?: string | null; scraped_at?: string | null }[],
-): string | null {
+export function maxFreshnessIso(rows: ListingFreshnessRow[]): string | null {
   let max: string | null = null;
   for (const row of rows) {
-    const t = row.last_scraped_at ?? row.scraped_at;
+    const t = listingCheckedAtIso(row);
     if (!t) continue;
     if (!max || t > max) max = t;
   }
@@ -60,9 +69,9 @@ export function maxFreshnessIso(
 
 export function bumpFreshnessIso(
   current: string | null,
-  row: Pick<RawDirectoryRow, "last_scraped_at" | "scraped_at">,
+  row: ListingFreshnessRow,
 ): string | null {
-  const t = row.last_scraped_at ?? row.scraped_at;
+  const t = listingCheckedAtIso(row);
   if (!t) return current;
   if (!current || t > current) return t;
   return current;

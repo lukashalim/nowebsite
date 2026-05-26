@@ -1,4 +1,4 @@
--- Freshness timestamp for directory "Last updated" (set on each Botasaurus/extract upsert).
+-- Deprecated: superseded by last_checked. Kept for legacy DBs; see backfill-last-checked-from-last-scraped-at.sql.
 alter table public.businesses_nowebsite
   add column if not exists last_scraped_at timestamptz;
 

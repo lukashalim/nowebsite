@@ -213,6 +213,33 @@ export function formatLastUpdatedMonthYear(
   return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
 
+/** Short date for listing table cells, e.g. "May 12, 2026". */
+export function formatListingCheckedAt(
+  iso: string | null | undefined,
+): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+/** Full datetime for listing `title` tooltips. */
+export function formatListingCheckedAtTitle(
+  iso: string | null | undefined,
+): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
 export function formatNeighborhoodOrArea(
   address: string | null | undefined,
   city: string | null | undefined,

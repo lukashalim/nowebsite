@@ -73,6 +73,12 @@ import {
   isCategoryStatsDisabled,
   mergeCategoryContentStats,
 } from "./lib/category-content-stats.mjs";
+import {
+  applyConversionUpdate,
+  createExistingLookup,
+  mergeTrackingIntoPayloadBatch,
+  shouldRecordConversion,
+} from "./lib/conversion-tracking.mjs";
 
 const DEFAULT_WIN_EXTRACTOR_DIR = "googlemapsextractor";
 
@@ -241,6 +247,7 @@ function emptyRunStats(filesCount = 0) {
     filesDeleteFailed: 0,
     categorySampleTotal: 0,
     categorySampleWithoutWebsite: 0,
+    conversionsRecorded: 0,
   };
 }
 
@@ -366,6 +373,7 @@ async function main() {
   const businessType = parseBusinessTypeArg(argv) || "local_cache";
 
   const supabase = getSupabase();
+  const existingLookup = createExistingLookup(supabase, BUSINESSES_TABLE);
   /** @type {object[]} */
   const payloadBuffer = [];
   /** @type {Promise<{ slugToPlace: Map<string, string>, placeToSlug: Map<string, string> }>|null} */
@@ -429,6 +437,18 @@ async function main() {
       for (const row of chunk) {
         assignDemoSlugToPayload(slugState, row);
       }
+      try {
+        const { conversionsRecorded } = await mergeTrackingIntoPayloadBatch(
+          supabase,
+          BUSINESSES_TABLE,
+          chunk,
+        );
+        stats.conversionsRecorded += conversionsRecorded;
+      } catch (trackErr) {
+        console.error(
+          `Conversion tracking (batch): ${trackErr?.message ?? trackErr}`,
+        );
+      }
       const { error: upErr } = await supabase
         .from(BUSINESSES_TABLE)
         .upsert(chunk, { onConflict: "place_id" });
@@ -486,7 +506,43 @@ async function main() {
         }
 
         if (!allowWebsite && base.has_website === true) {
-          stats.hasWebsite += 1;
+          const existing = await existingLookup.ensureOne(base.place_id);
+          if (shouldRecordConversion(base, existing)) {
+            try {
+              await enrichLocationAsync(base, {
+                locationHint,
+                scrapeZip: locationHint,
+                forcedCountry,
+                country: base.country,
+              });
+            } catch (locErr) {
+              console.error(
+                `Location enrich (conversion ${base.name ?? base.place_id}):`,
+                locErr.message ?? locErr,
+              );
+            }
+            try {
+              const converted = await applyConversionUpdate(
+                supabase,
+                BUSINESSES_TABLE,
+                base,
+                existing,
+              );
+              if (converted) {
+                stats.conversionsRecorded += 1;
+                console.log(
+                  `Converted (website found): ${base.name ?? base.place_id}`,
+                );
+              }
+            } catch (convErr) {
+              console.error(
+                `Conversion update (${base.place_id}):`,
+                convErr?.message ?? convErr,
+              );
+            }
+          } else {
+            stats.hasWebsite += 1;
+          }
           continue;
         }
         if (!noSweetSpot && !passesSweetSpotRatingFilter(base.rating)) {

@@ -15,6 +15,8 @@ export interface DirectoryBusiness {
   phone: string | null;
   google_maps_link: string | null;
   demo_slug: string | null;
+  /** Latest scrape check: last_checked, else scraped_at (first ingest). */
+  checkedAt: string | null;
 }
 
 export interface DirectoryCityRef {
@@ -27,7 +29,7 @@ export interface DirectoryCityRef {
   regionSlug: string | null;
   country: DirectoryCountry;
   listingCount: number;
-  /** Latest `last_scraped_at` or `scraped_at` in this city. */
+  /** Latest listing check time in this city (see listingCheckedAtIso). */
   lastModifiedAt: string | null;
 }
 
@@ -84,4 +86,4 @@ export interface DirectoryUkRegionRef {
 export const DIRECTORY_MIN_UK_REGION_LISTINGS = 10;
 
 export const DIRECTORY_LIST_COLUMNS =
-  "name, address, city, state, region, region_code, country, business_type, main_category, rating, reviews, phone, google_maps_link, demo_slug, last_scraped_at, scraped_at" as const;
+  "name, address, city, state, region, region_code, country, business_type, main_category, rating, reviews, phone, google_maps_link, demo_slug, last_checked, scraped_at" as const;

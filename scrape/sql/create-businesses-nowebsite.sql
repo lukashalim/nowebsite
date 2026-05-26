@@ -52,6 +52,11 @@ create table if not exists public.businesses_nowebsite (
   open_now boolean,
   review_highlights_updated_at timestamptz,
 
+  first_seen_without_website date,
+  website_acquired_date date,
+  converted boolean not null default false,
+  last_checked timestamptz,
+
   -- Pipeline/job bookkeeping
   scraped_at timestamptz not null default now(),
   source_snapshot_at timestamptz not null default now(),

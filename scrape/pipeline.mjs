@@ -16,6 +16,12 @@ import {
   applyLocationFallbacks,
   enrichLocationAsync,
 } from "./lib/location-fallbacks.mjs";
+import {
+  applyConversionUpdate,
+  mergeTrackingIntoPayload,
+  prefetchExistingByPlaceId,
+  shouldRecordConversion,
+} from "./lib/conversion-tracking.mjs";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const BUSINESSES_UPSERT_BATCH_SIZE = Math.max(
@@ -607,6 +613,7 @@ async function main() {
   let skippedSweetSpot = 0;
   let rowErrors = 0;
   let upsertBatchErrors = 0;
+  let conversionsRecorded = 0;
 
   for (const job of jobs) {
     try {
@@ -615,6 +622,15 @@ async function main() {
       const jobSearchUrl = mapsSearchLinkForZip(job.business_type, job.zip_code);
       console.log(
         `Processing ${job.business_type} in ${job.zip_code} — ${rows.length} businesses found`,
+      );
+
+      const jobPlaceIds = rows
+        .map((raw) => pick(raw, "place_id", "PLACE_ID"))
+        .filter(Boolean);
+      const existingByPlace = await prefetchExistingByPlaceId(
+        supabase,
+        BUSINESSES_TABLE,
+        jobPlaceIds,
       );
 
       const payloads = [];
@@ -631,11 +647,49 @@ async function main() {
             skippedNoPlaceId += 1;
             continue;
           }
+
+          const existing = existingByPlace.get(base.place_id) ?? null;
+
           if (base.has_website === true) {
-            console.log(
-              `Skipping (has website): ${base.name ?? base.place_id}`,
-            );
-            skippedHasWebsite += 1;
+            if (shouldRecordConversion(base, existing)) {
+              try {
+                await enrichLocationAsync(base, {
+                  scrapeZip: job.zip_code,
+                  locationHint: job.zip_code,
+                  country: base.country ?? "US",
+                });
+              } catch (locErr) {
+                console.error(
+                  `Location enrich (conversion ${base.name ?? base.place_id}):`,
+                  locErr.message ?? locErr,
+                );
+              }
+              try {
+                const converted = await applyConversionUpdate(
+                  supabase,
+                  BUSINESSES_TABLE,
+                  base,
+                  existing,
+                );
+                if (converted) {
+                  conversionsRecorded += 1;
+                  console.log(
+                    `Converted (website found): ${base.name ?? base.place_id}`,
+                  );
+                }
+              } catch (convErr) {
+                console.error(
+                  `Conversion update (${base.place_id}):`,
+                  convErr.message ?? convErr,
+                );
+                rowErrors += 1;
+              }
+            } else {
+              console.log(
+                `Skipping (has website): ${base.name ?? base.place_id}`,
+              );
+              skippedHasWebsite += 1;
+            }
             continue;
           }
 
@@ -683,19 +737,24 @@ async function main() {
             }
           }
 
-          const payload = omitUndefined({
-            ...base,
-            facebook_url: base.facebook_url ?? undefined,
-            competitive_weakness,
-            review_highlights: extractReviewHighlights(
-              raw,
-              Number(process.env.REVIEW_HIGHLIGHTS_LIMIT ?? 5),
+          const now = new Date();
+          const payload = omitUndefined(
+            mergeTrackingIntoPayload(
+              {
+                ...base,
+                facebook_url: base.facebook_url ?? undefined,
+                competitive_weakness,
+                review_highlights: extractReviewHighlights(
+                  raw,
+                  Number(process.env.REVIEW_HIGHLIGHTS_LIMIT ?? 5),
+                ),
+                services_offered: extractServicesOffered(raw, base),
+                ...extractHoursData(raw),
+                review_highlights_updated_at: now.toISOString(),
+              },
+              { existing, now },
             ),
-            services_offered: extractServicesOffered(raw, base),
-            ...extractHoursData(raw),
-            review_highlights_updated_at: new Date().toISOString(),
-            last_scraped_at: new Date().toISOString(),
-          });
+          );
 
           payloads.push(payload);
           payloadCandidates += 1;
@@ -743,7 +802,7 @@ async function main() {
     `Done. ${businessesUpserted} businesses upserted across ${jobsCompleted} jobs`,
   );
   console.log(
-    `Stats: rows_seen=${rowsSeen}, payload_candidates=${payloadCandidates}, skipped_no_place_id=${skippedNoPlaceId}, skipped_has_website=${skippedHasWebsite}, skipped_not_in_category=${skippedNotInCategory}, skipped_sweet_spot=${skippedSweetSpot}, row_errors=${rowErrors}, upsert_batch_errors=${upsertBatchErrors}`,
+    `Stats: rows_seen=${rowsSeen}, payload_candidates=${payloadCandidates}, conversions_recorded=${conversionsRecorded}, skipped_no_place_id=${skippedNoPlaceId}, skipped_has_website=${skippedHasWebsite}, skipped_not_in_category=${skippedNotInCategory}, skipped_sweet_spot=${skippedSweetSpot}, row_errors=${rowErrors}, upsert_batch_errors=${upsertBatchErrors}`,
   );
 }
 
