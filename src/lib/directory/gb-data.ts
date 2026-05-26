@@ -33,7 +33,7 @@ import {
   DIRECTORY_MIN_GB_CITY_LISTINGS,
   DIRECTORY_MIN_UK_REGION_LISTINGS,
 } from "@/lib/directory/types";
-import { gbCityCategoryPath, gbCityPath, gbRegionPath } from "@/lib/directory/paths";
+import { gbCityPath, gbRegionPath } from "@/lib/directory/paths";
 
 export interface GbDirectoryIndex {
   cities: DirectoryCityRef[];
@@ -45,6 +45,25 @@ export interface GbDirectoryIndex {
 
 function gbCityKey(regionSlug: string, citySlug: string): string {
   return `${regionSlug}::${citySlug}`;
+}
+
+/** Resolve a published GB city; prefers highest listing count when slug collides across regions. */
+export async function resolveGbCityRef(
+  citySlug: string,
+  regionSlug?: string,
+): Promise<DirectoryCityRef | null> {
+  const { cities } = await fetchGbDirectoryIndex();
+  const slug = citySlug.trim().toLowerCase();
+  if (regionSlug) {
+    const key = gbCityKey(regionSlug.toLowerCase(), slug);
+    return (
+      cities.find((c) => gbCityKey(c.regionSlug ?? "", c.citySlug) === key) ??
+      null
+    );
+  }
+  const matches = cities.filter((c) => c.citySlug === slug);
+  if (matches.length === 0) return null;
+  return matches.sort((a, b) => b.listingCount - a.listingCount)[0]!;
 }
 
 function rowRegionCode(row: {
@@ -260,26 +279,24 @@ export async function fetchGbRegionListings(regionSlug: string): Promise<{
 }
 
 export async function fetchGbCityListings(
-  regionSlug: string,
   citySlug: string,
+  regionSlug?: string,
 ): Promise<DirectoryBusiness[] | null> {
-  const index = await fetchGbDirectoryIndex();
-  const key = gbCityKey(regionSlug.toLowerCase(), citySlug.toLowerCase());
-  const cityRef = index.cities.find(
-    (c) => gbCityKey(c.regionSlug ?? "", c.citySlug) === key,
-  );
-  if (!cityRef) return null;
+  const cityRef = await resolveGbCityRef(citySlug, regionSlug);
+  if (!cityRef?.regionSlug) return null;
 
   const rows = await fetchAllNoWebsiteRows();
   return rows
-    .filter((row) => rowMatchesGbCity(row, regionSlug, citySlug))
+    .filter((row) =>
+      rowMatchesGbCity(row, cityRef.regionSlug!, cityRef.citySlug),
+    )
     .map(rowToBusiness)
     .sort(sortByReviewsDesc);
 }
 
 export async function fetchGbCityHub(
-  regionSlug: string,
   citySlug: string,
+  regionSlug?: string,
 ): Promise<{
   city: string;
   state: string;
@@ -290,21 +307,18 @@ export async function fetchGbCityHub(
   publishedCategories: DirectoryCategoryRef[];
   lastUpdatedLabel: string | null;
 } | null> {
-  const index = await fetchGbDirectoryIndex();
-  const key = gbCityKey(regionSlug.toLowerCase(), citySlug.toLowerCase());
-  const cityRef = index.cities.find(
-    (c) => gbCityKey(c.regionSlug ?? "", c.citySlug) === key,
-  );
-  if (!cityRef || !cityRef.regionSlug) return null;
+  const cityRef = await resolveGbCityRef(citySlug, regionSlug);
+  if (!cityRef?.regionSlug) return null;
 
   const usIndex = await import("@/lib/directory/data").then((m) =>
     m.fetchDirectoryIndex(),
   );
 
+  const index = await fetchGbDirectoryIndex();
   const allCityCategories = index.cityCategoriesAll.filter((c) => {
     const cRegion = ukRegionNameToSlug(c.state);
     return (
-      c.citySlug === citySlug.toLowerCase() && cRegion === cityRef.regionSlug
+      c.citySlug === cityRef.citySlug && cRegion === cityRef.regionSlug
     );
   });
 
@@ -338,9 +352,9 @@ export async function fetchGbCityHub(
 }
 
 export async function fetchGbCityCategoryListings(
-  regionSlug: string,
   citySlug: string,
   categorySlug: string,
+  regionSlug?: string,
 ): Promise<{
   categoryLabel: string;
   businesses: DirectoryBusiness[];
@@ -348,7 +362,10 @@ export async function fetchGbCityCategoryListings(
   lastUpdatedLabel: string | null;
 } | null> {
   const slug = categorySlug.trim().toLowerCase();
-  const hub = await fetchGbCityHub(regionSlug, citySlug);
+  const cityRef = await resolveGbCityRef(citySlug, regionSlug);
+  if (!cityRef?.regionSlug) return null;
+
+  const hub = await fetchGbCityHub(cityRef.citySlug, cityRef.regionSlug);
   if (!hub) return null;
 
   const cat = hub.categories.find((c) => c.categorySlug === slug);
@@ -357,7 +374,7 @@ export async function fetchGbCityCategoryListings(
   const rows = await fetchAllNoWebsiteRows();
   const matched = rows.filter(
     (row) =>
-      rowMatchesGbCity(row, regionSlug, citySlug) &&
+      rowMatchesGbCity(row, cityRef.regionSlug!, cityRef.citySlug) &&
       categoryMatchesSlug(row.main_category, row.business_type, slug),
   );
   const businesses = matched.map(rowToBusiness).sort(sortByReviewsDesc);
@@ -372,7 +389,7 @@ export async function fetchGbCityCategoryListings(
 }
 
 export function gbCityHref(city: DirectoryCityRef): string {
-  return gbCityPath(city.regionSlug ?? "england", city.citySlug);
+  return gbCityPath(city.citySlug);
 }
 
 export function gbRegionHref(region: DirectoryUkRegionRef): string {
@@ -393,10 +410,3 @@ export async function fetchGbListingCount(): Promise<number> {
 /** @deprecated Use fetchGbListingCount */
 export const fetchUkListingCount = fetchGbListingCount;
 
-export function gbCityCategoryHref(
-  regionSlug: string,
-  citySlug: string,
-  categorySlug: string,
-): string {
-  return gbCityCategoryPath(regionSlug, citySlug, categorySlug);
-}

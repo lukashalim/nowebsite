@@ -8,13 +8,8 @@ import {
   DIRECTORY_MIN_STATE_LISTINGS,
   DIRECTORY_MIN_UK_REGION_LISTINGS,
 } from "@/lib/directory/types";
-import {
-  gbCityPath,
-  gbCountryPath,
-  gbRegionPath,
-} from "@/lib/directory/paths";
+import { gbCityPath, gbCountryPath, gbRegionPath } from "@/lib/directory/paths";
 import { absoluteUrl } from "@/lib/site-url";
-import { ukRegionNameToSlug } from "@/lib/directory/country";
 
 /** Regenerate on each request so Vercel always has Supabase env at runtime. */
 export const dynamic = "force-dynamic";
@@ -55,15 +50,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const hubLastModified = homepageLastModified ?? new Date();
     const gbHubLastModified = gbIndex.lastModified ?? homepageLastModified ?? new Date();
 
-    const gbCityEntries = gbIndex.cities
-      .filter((c) => c.listingCount >= DIRECTORY_MIN_GB_CITY_LISTINGS)
-      .filter((c) => c.regionSlug)
-      .map((hub) => ({
-        url: absoluteUrl(gbCityPath(hub.regionSlug!, hub.citySlug)),
-        lastModified: toLastModified(hub.lastModifiedAt),
-        changeFrequency: "weekly" as const,
-        priority: 0.8,
-      }));
+    const gbCityBySlug = new Map<
+      string,
+      (typeof gbIndex.cities)[number]
+    >();
+    for (const hub of gbIndex.cities) {
+      if (hub.listingCount < DIRECTORY_MIN_GB_CITY_LISTINGS) continue;
+      const prev = gbCityBySlug.get(hub.citySlug);
+      if (!prev || hub.listingCount > prev.listingCount) {
+        gbCityBySlug.set(hub.citySlug, hub);
+      }
+    }
+    const gbCityEntries = [...gbCityBySlug.values()].map((hub) => ({
+      url: absoluteUrl(gbCityPath(hub.citySlug)),
+      lastModified: toLastModified(hub.lastModifiedAt),
+      changeFrequency: "weekly" as const,
+      priority: 0.8,
+    }));
 
     const gbRegionEntries = gbIndex.regions
       .filter((r) => r.listingCount >= DIRECTORY_MIN_UK_REGION_LISTINGS)
@@ -73,23 +76,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         changeFrequency: "weekly" as const,
         priority: 0.75,
       }));
-
-    const gbCityCategoryEntries: MetadataRoute.Sitemap = gbIndex.cityCategoriesAll
-      .filter((cc) => cc.listingCount >= DIRECTORY_MIN_CATEGORY_LISTINGS)
-      .flatMap((cc) => {
-        const regionSlug = ukRegionNameToSlug(cc.state)?.toLowerCase();
-        if (!regionSlug) return [];
-        return [
-          {
-            url: absoluteUrl(
-              `${gbCountryPath()}/${regionSlug}/${cc.citySlug}/${cc.categorySlug}`,
-            ),
-            lastModified: toLastModified(cc.lastModifiedAt),
-            changeFrequency: "weekly" as const,
-            priority: 0.65,
-          },
-        ];
-      });
 
     const entries: MetadataRoute.Sitemap = [
       hubEntry("/", hubLastModified, 1.0),
@@ -125,7 +111,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         })),
       ...gbCityEntries,
       ...gbRegionEntries,
-      ...gbCityCategoryEntries,
     ];
 
     return entries;

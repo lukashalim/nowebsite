@@ -25,14 +25,8 @@ export function gbRegionPath(regionSlug: string): string {
   return `/${GB_COUNTRY_SLUG}/${regionSlug.trim().toLowerCase()}`;
 }
 
-export function gbCityPath(regionSlug: string, citySlug: string): string {
-  return `/${GB_COUNTRY_SLUG}/${regionSlug.trim().toLowerCase()}/${citySlug.trim().toLowerCase()}`;
+/** City hub under country only (no region segment in URL). */
+export function gbCityPath(citySlug: string): string {
+  return `/${GB_COUNTRY_SLUG}/${citySlug.trim().toLowerCase()}`;
 }
 
-export function gbCityCategoryPath(
-  regionSlug: string,
-  citySlug: string,
-  categorySlug: string,
-): string {
-  return `/${GB_COUNTRY_SLUG}/${regionSlug.trim().toLowerCase()}/${citySlug.trim().toLowerCase()}/${categorySlug.trim().toLowerCase()}`;
-}
