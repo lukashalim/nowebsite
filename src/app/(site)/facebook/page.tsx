@@ -1,13 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { DirectoryBusinessList } from "@/components/directory-business-list";
 import { DirectoryGroupedByCity } from "@/components/directory-grouped-by-city";
 import { DirectoryLastUpdated } from "@/components/directory-last-updated";
+import { DirectoryPagination } from "@/components/directory-pagination";
 import { DownloadCsvButton } from "@/components/download-csv-button";
 import {
   fetchAllDirectoryCities,
   fetchFacebookDirectoryPageData,
 } from "@/lib/directory/data";
 import { buildDirectoryListJsonLd } from "@/lib/directory/jsonld";
+import {
+  directoryPageRange,
+  facebookPathWithPage,
+  parseDirectoryPageParam,
+} from "@/lib/directory/pagination";
 import { DIRECTORY_MIN_CITY_LISTINGS } from "@/lib/directory/types";
 import { absoluteUrl } from "@/lib/site-url";
 
@@ -16,23 +23,43 @@ export const revalidate = 3600;
 const PAGE_PATH = "/facebook";
 const PAGE_TITLE = "Businesses Using Facebook as Their Google Website";
 
-export async function generateMetadata(): Promise<Metadata> {
+interface PageProps {
+  searchParams: Promise<{ page?: string | string[] }>;
+}
+
+export async function generateMetadata({
+  searchParams,
+}: PageProps): Promise<Metadata> {
+  const page = parseDirectoryPageParam((await searchParams).page);
   let lastUpdatedLabel: string | null = null;
+  let totalCount = 0;
+  let totalPages = 1;
   try {
-    const data = await fetchFacebookDirectoryPageData();
+    const data = await fetchFacebookDirectoryPageData({ page });
     lastUpdatedLabel = data.lastUpdatedLabel;
+    totalCount = data.totalCount;
+    totalPages = data.totalPages;
   } catch {
     // omit freshness from meta when directory data is unavailable
   }
   const updated = lastUpdatedLabel ? ` Updated ${lastUpdatedLabel}.` : "";
+  const pageNote =
+    totalPages > 1
+      ? ` Page ${page.toLocaleString()} of ${totalPages.toLocaleString()} (${totalCount.toLocaleString()} businesses).`
+      : "";
+  const title =
+    page > 1 ? `${PAGE_TITLE} — Page ${page.toLocaleString()}` : PAGE_TITLE;
   return {
-    title: { absolute: PAGE_TITLE },
-    description: `Local businesses whose Google Business Profile uses Facebook in the Website field — a guideline violation that can hurt local rankings and visibility.${updated}`,
-    alternates: { canonical: absoluteUrl(PAGE_PATH) },
+    title: { absolute: title },
+    description: `Local businesses whose Google Business Profile uses Facebook in the Website field — a guideline violation that can hurt local rankings and visibility.${pageNote}${updated}`,
+    alternates: { canonical: absoluteUrl(facebookPathWithPage(page)) },
   };
 }
 
-export default async function FacebookDirectoryPage() {
+export default async function FacebookDirectoryPage({
+  searchParams,
+}: PageProps) {
+  const page = parseDirectoryPageParam((await searchParams).page);
   let data: Awaited<ReturnType<typeof fetchFacebookDirectoryPageData>> | null =
     null;
   let publishedCitySlugs: Set<string> | undefined;
@@ -40,7 +67,7 @@ export default async function FacebookDirectoryPage() {
 
   try {
     const [pageData, cities] = await Promise.all([
-      fetchFacebookDirectoryPageData(),
+      fetchFacebookDirectoryPageData({ page }),
       fetchAllDirectoryCities(),
     ]);
     data = pageData;
@@ -52,6 +79,13 @@ export default async function FacebookDirectoryPage() {
   } catch (e) {
     loadError = e instanceof Error ? e.message : "Could not load Facebook listings.";
   }
+
+  const paginated = Boolean(data && data.totalPages > 1);
+  const range = data
+    ? directoryPageRange(data.page, data.pageSize, data.totalCount)
+    : null;
+  const hrefForPage = (p: number) => facebookPathWithPage(p);
+  const fullCsvHref = "/api/directory-export?type=facebook";
 
   const jsonLd = data
     ? buildDirectoryListJsonLd(data.businesses, PAGE_PATH, PAGE_TITLE)
@@ -71,9 +105,23 @@ export default async function FacebookDirectoryPage() {
           <Link href="/" className="hover:underline">
             Home
           </Link>
+          {paginated ? (
+            <>
+              <span aria-hidden> / </span>
+              <Link href={PAGE_PATH} className="hover:underline">
+                Facebook listings
+              </Link>
+            </>
+          ) : null}
         </p>
         <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
           {PAGE_TITLE}
+          {paginated && data ? (
+            <span className="text-xl font-normal text-zinc-500">
+              {" "}
+              — Page {data.page.toLocaleString()}
+            </span>
+          ) : null}
         </h1>
         <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
           These businesses appear on Google Maps without a standalone website. Many
@@ -118,17 +166,80 @@ export default async function FacebookDirectoryPage() {
           <DirectoryLastUpdated label={data.lastUpdatedLabel} />
 
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {data.totalCount.toLocaleString()} businesses across{" "}
-            {data.cityGroups.length.toLocaleString()} cities — grouped below with
-            ratings, phones, and Google Maps links.
+            {paginated ? (
+              <>
+                Browse page {data.page.toLocaleString()} of{" "}
+                {data.totalPages.toLocaleString()} ({data.totalCount.toLocaleString()}{" "}
+                businesses across {data.cityCount.toLocaleString()} cities). Listings
+                are sorted by Google review count. Each row includes ratings, phone
+                numbers, and Maps links for outreach.
+              </>
+            ) : (
+              <>
+                {data.totalCount.toLocaleString()} businesses across{" "}
+                {data.cityGroups.length.toLocaleString()} cities — grouped below with
+                ratings, phones, and Google Maps links.
+              </>
+            )}
           </p>
 
-          <DirectoryGroupedByCity
-            cityGroups={data.cityGroups}
-            publishedCitySlugs={publishedCitySlugs}
-          />
+          {paginated && range ? (
+            <DirectoryPagination
+              hrefForPage={hrefForPage}
+              page={data.page}
+              totalPages={data.totalPages}
+              totalCount={data.totalCount}
+              rangeStart={range.start}
+              rangeEnd={range.end}
+              ariaLabel="Facebook listings pagination"
+            />
+          ) : null}
 
-          <DownloadCsvButton businesses={data.businesses} pagePath={PAGE_PATH} />
+          <section className="space-y-3">
+            {paginated ? (
+              <>
+                <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                  Listings
+                </h2>
+                <DirectoryBusinessList businesses={data.businesses} showCityState />
+              </>
+            ) : (
+              <DirectoryGroupedByCity
+                cityGroups={data.cityGroups}
+                publishedCitySlugs={publishedCitySlugs}
+              />
+            )}
+          </section>
+
+          {paginated && range ? (
+            <DirectoryPagination
+              hrefForPage={hrefForPage}
+              page={data.page}
+              totalPages={data.totalPages}
+              totalCount={data.totalCount}
+              rangeStart={range.start}
+              rangeEnd={range.end}
+              ariaLabel="Facebook listings pagination"
+            />
+          ) : null}
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+            {paginated ? (
+              <a
+                href={fullCsvHref}
+                className="inline-flex items-center justify-center rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
+              >
+                Download all {data.totalCount.toLocaleString()} as CSV
+              </a>
+            ) : (
+              <DownloadCsvButton businesses={data.businesses} pagePath={PAGE_PATH} />
+            )}
+            {paginated ? (
+              <p className="text-xs text-zinc-500">
+                CSV includes every listing on this hub, not only this page.
+              </p>
+            ) : null}
+          </div>
         </>
       ) : null}
     </div>

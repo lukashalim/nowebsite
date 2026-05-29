@@ -38,6 +38,7 @@ import { sortCategoriesByPriority } from "@/lib/directory/category-priority";
 import {
   clampDirectoryPage,
   DIRECTORY_CATEGORY_PAGE_SIZE,
+  DIRECTORY_FACEBOOK_PAGE_SIZE,
   DIRECTORY_STATE_PAGE_SIZE,
   totalDirectoryPages,
 } from "@/lib/directory/pagination";
@@ -98,24 +99,64 @@ const fetchAllFacebookSurfaceRows = cache(async (): Promise<RawDirectoryRow[]> =
 export interface FacebookDirectoryPageData {
   businesses: DirectoryBusiness[];
   cityGroups: DirectoryCityGroup[];
+  cityCount: number;
   totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
   lastUpdatedLabel: string | null;
 }
 
 export const fetchFacebookDirectoryPageData = cache(
-  async (): Promise<FacebookDirectoryPageData> => {
+  async (opts?: {
+    page?: number;
+    pageSize?: number;
+  }): Promise<FacebookDirectoryPageData> => {
     const rows = await fetchAllFacebookSurfaceRows();
-    const businesses = rows.map(rowToBusiness).sort(sortByReviewsDesc);
-    const cityGroups = groupBusinessesByCity(businesses);
+    const allBusinesses = rows.map(rowToBusiness).sort(sortByReviewsDesc);
+    const totalCount = allBusinesses.length;
+    const pageSize = opts?.pageSize ?? DIRECTORY_FACEBOOK_PAGE_SIZE;
+    const totalPages = totalDirectoryPages(totalCount, pageSize);
+    const page = clampDirectoryPage(opts?.page ?? 1, totalPages);
+    const start = (page - 1) * pageSize;
+    const businesses = allBusinesses.slice(start, start + pageSize);
+
+    const cityCount = new Set(
+      allBusinesses
+        .map((b) => {
+          const city = b.city?.trim();
+          const state = b.state?.trim();
+          if (!city || !state) return null;
+          return cityStateToSlug(city, state, b.country);
+        })
+        .filter(Boolean),
+    ).size;
+
+    const cityGroups =
+      totalPages > 1 ? [] : groupBusinessesByCity(allBusinesses);
 
     return {
       businesses,
       cityGroups,
-      totalCount: businesses.length,
+      cityCount,
+      totalCount,
+      page,
+      pageSize,
+      totalPages,
       lastUpdatedLabel: formatLastUpdatedMonthYear(maxFreshnessIso(rows)),
     };
   },
 );
+
+/** All Facebook-surface listings (e.g. CSV export). */
+export const fetchFacebookDirectoryAllListings = cache(async (): Promise<{
+  businesses: DirectoryBusiness[];
+} | null> => {
+  const rows = await fetchAllFacebookSurfaceRows();
+  const businesses = rows.map(rowToBusiness).sort(sortByReviewsDesc);
+  if (businesses.length === 0) return null;
+  return { businesses };
+});
 
 export const fetchDirectoryIndex = cache(async (): Promise<{
   cities: DirectoryCityRef[];

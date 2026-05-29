@@ -4,6 +4,9 @@ export const DIRECTORY_CATEGORY_PAGE_SIZE = 100;
 /** Listings per page on US state directory hubs. */
 export const DIRECTORY_STATE_PAGE_SIZE = 100;
 
+/** Listings per page on the Facebook outreach hub. */
+export const DIRECTORY_FACEBOOK_PAGE_SIZE = 100;
+
 export function parseDirectoryPageParam(
   raw: string | string[] | undefined,
 ): number {
@@ -68,4 +71,8 @@ export function categoryPathWithPage(
 export function statePathWithPage(stateSlug: string, page: number): string {
   const base = `/${stateSlug.trim().toLowerCase()}`;
   return page <= 1 ? base : `${base}?page=${page}`;
+}
+
+export function facebookPathWithPage(page: number): string {
+  return page <= 1 ? "/facebook" : `/facebook?page=${page}`;
 }
