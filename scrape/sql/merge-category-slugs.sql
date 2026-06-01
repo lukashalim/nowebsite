@@ -9,9 +9,6 @@ set
 from (
   values
     ('barber', 'barber_shop'),
-    ('hair_salon', 'barber_shop'),
-    ('beauty_salon', 'barber_shop'),
-    ('hairdresser', 'barber_shop'),
     ('laundry_service', 'laundromat'),
     ('laundry', 'laundromat'),
     ('dental_clinic', 'dentist'),
@@ -45,9 +42,6 @@ set
 from (
   values
     ('barber', 'barber_shop'),
-    ('hair_salon', 'barber_shop'),
-    ('beauty_salon', 'barber_shop'),
-    ('hairdresser', 'barber_shop'),
     ('laundry_service', 'laundromat'),
     ('laundry', 'laundromat'),
     ('dental_clinic', 'dentist'),

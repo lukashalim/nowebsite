@@ -4,15 +4,16 @@
 
 export const CATEGORY_MERGE_GROUPS = [
   {
+    primarySlug: "hair-salon",
+    canonicalBusinessType: "hair_salon",
+    secondarySlugs: ["beauty-salon", "hairdresser"],
+    legacyBusinessTypes: ["hair_salon", "beauty_salon", "hairdresser"],
+  },
+  {
     primarySlug: "barber-shop",
     canonicalBusinessType: "barber_shop",
-    secondarySlugs: ["barber", "hair-salon", "beauty-salon", "hairdresser"],
-    legacyBusinessTypes: [
-      "barber",
-      "hair_salon",
-      "beauty_salon",
-      "hairdresser",
-    ],
+    secondarySlugs: ["barber"],
+    legacyBusinessTypes: ["barber"],
   },
   {
     primarySlug: "laundromat",

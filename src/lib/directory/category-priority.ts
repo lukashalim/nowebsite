@@ -29,8 +29,6 @@ export const CATEGORY_PRIORITY = [
   "laundry",
   "dry-cleaner",
   "hair-salon",
-  "beauty-salon",
-  "hairdresser",
   "barber-shop",
   "shopping-mall",
 ] as const;
