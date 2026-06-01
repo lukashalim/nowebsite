@@ -1,3 +1,6 @@
+import type { DirectoryListingFilters } from "@/lib/directory/listing-filters";
+import { directoryListingPathWithQuery } from "@/lib/directory/listing-filters";
+
 /** Listings per page on nationwide category hubs (keeps ISR payloads under Vercel limits). */
 export const DIRECTORY_CATEGORY_PAGE_SIZE = 100;
 
@@ -63,16 +66,32 @@ export function directoryPaginationItems(
 export function categoryPathWithPage(
   categorySlug: string,
   page: number,
+  filters?: DirectoryListingFilters,
 ): string {
   const base = `/${categorySlug.trim().toLowerCase()}`;
-  return page <= 1 ? base : `${base}?page=${page}`;
+  return directoryListingPathWithQuery(base, { page, filters });
 }
 
-export function statePathWithPage(stateSlug: string, page: number): string {
+export function statePathWithPage(
+  stateSlug: string,
+  page: number,
+  filters?: DirectoryListingFilters,
+): string {
   const base = `/${stateSlug.trim().toLowerCase()}`;
-  return page <= 1 ? base : `${base}?page=${page}`;
+  return directoryListingPathWithQuery(base, { page, filters });
 }
 
-export function facebookPathWithPage(page: number): string {
-  return page <= 1 ? "/facebook" : `/facebook?page=${page}`;
+export function facebookPathWithPage(
+  page: number,
+  filters?: DirectoryListingFilters,
+): string {
+  return directoryListingPathWithQuery("/facebook", { page, filters });
+}
+
+export function cityPathWithQuery(
+  citySlug: string,
+  filters?: DirectoryListingFilters,
+): string {
+  const base = `/${citySlug.trim().toLowerCase()}`;
+  return directoryListingPathWithQuery(base, { filters });
 }

@@ -14,6 +14,8 @@ import {
 } from "@/lib/directory/slugs";
 import { resolveLegacyGbFlatSlugRedirect } from "@/lib/directory/resolve-gb-path";
 import { COUNTRY_GB } from "@/lib/directory/country";
+import type { DirectoryListingFilters } from "@/lib/directory/listing-filters";
+import type { DirectoryBusiness } from "@/lib/directory/types";
 
 export type ResolvedSlugPage =
   | { kind: "redirect"; to: string }
@@ -26,7 +28,8 @@ export type ResolvedSlugPage =
   | {
       kind: "city";
       hub: NonNullable<Awaited<ReturnType<typeof fetchCityHub>>>;
-      businesses: NonNullable<Awaited<ReturnType<typeof fetchCityListings>>>;
+      businesses: DirectoryBusiness[];
+      cityData: NonNullable<Awaited<ReturnType<typeof fetchCityListings>>>;
     }
   | {
       kind: "state";
@@ -41,6 +44,7 @@ export type ResolvedSlugPage =
 export const resolveDirectorySlugPage = cache(async function resolveDirectorySlugPage(
   slug: string,
   page = 1,
+  filters?: DirectoryListingFilters,
 ): Promise<ResolvedSlugPage> {
   const lower = slug.trim().toLowerCase();
 
@@ -65,20 +69,22 @@ export const resolveDirectorySlugPage = cache(async function resolveDirectorySlu
   if (categoryRef) {
     const categoryData = await fetchNationwideCategoryListings(lower, {
       page,
+      filters,
     });
     if (categoryData) return { kind: "category", data: categoryData };
   }
 
   if (parseCitySlug(lower)) {
-    const [hub, businesses] = await Promise.all([
+    const [hub, cityData] = await Promise.all([
       fetchCityHub(lower),
-      fetchCityListings(lower),
+      fetchCityListings(lower, { filters }),
     ]);
-    if (hub && businesses) return { kind: "city", hub, businesses };
+    if (hub && cityData)
+      return { kind: "city", hub, businesses: cityData.businesses, cityData };
   }
 
   if (parseStateSlug(lower)) {
-    const data = await fetchStateListings(lower, { page });
+    const data = await fetchStateListings(lower, { page, filters });
     if (data) return { kind: "state", data };
   }
 

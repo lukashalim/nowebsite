@@ -10,6 +10,12 @@ import {
   pluralCategoryForTitle,
 } from "@/lib/directory/labels";
 import { buildDirectoryListJsonLd } from "@/lib/directory/jsonld";
+import { DirectoryListingFilters } from "@/components/directory-listing-filters";
+import {
+  hasActiveDirectoryListingFilters,
+  type DirectoryFilterOptions,
+  type DirectoryListingFilters as DirectoryListingFiltersState,
+} from "@/lib/directory/listing-filters";
 import {
   categoryPathWithPage,
   directoryPageRange,
@@ -24,12 +30,15 @@ interface DirectoryCategoryPageProps {
   cityGroups: DirectoryCityGroup[];
   cityCount: number;
   totalCount: number;
+  unfilteredCount: number;
   page: number;
   pageSize: number;
   totalPages: number;
   lastUpdatedLabel: string | null;
   publishedCitySlugs?: Set<string>;
   content?: CategoryContent | null;
+  filters: DirectoryListingFiltersState;
+  filterOptions: DirectoryFilterOptions;
 }
 
 export function DirectoryCategoryPage({
@@ -39,12 +48,15 @@ export function DirectoryCategoryPage({
   cityGroups,
   cityCount,
   totalCount,
+  unfilteredCount,
   page,
   pageSize,
   totalPages,
   lastUpdatedLabel,
   publishedCitySlugs,
   content,
+  filters,
+  filterOptions,
 }: DirectoryCategoryPageProps) {
   const title = nationwideCategoryPageTitle(categoryLabel);
   const path = `/${categorySlug}`;
@@ -53,8 +65,12 @@ export function DirectoryCategoryPage({
   const paginated = totalPages > 1;
   const range = directoryPageRange(page, pageSize, totalCount);
   const fullCsvHref = `/api/directory-export?slug=${encodeURIComponent(categorySlug)}&type=category`;
-  const hrefForPage = (p: number) => categoryPathWithPage(categorySlug, p);
-  const showPitch = Boolean(content?.pitch?.trim() && page === 1);
+  const hrefForPage = (p: number) =>
+    categoryPathWithPage(categorySlug, p, filters);
+  const showPitch = Boolean(
+    content?.pitch?.trim() && page === 1 && !hasActiveDirectoryListingFilters(filters),
+  );
+  const filtersActive = hasActiveDirectoryListingFilters(filters);
 
   return (
     <div className="space-y-8">
@@ -134,6 +150,15 @@ export function DirectoryCategoryPage({
 
       <DirectoryLastUpdated label={lastUpdatedLabel} />
 
+      <DirectoryListingFilters
+        action={path}
+        mode="full"
+        filters={filters}
+        filterOptions={filterOptions}
+        unfilteredCount={unfilteredCount}
+        totalCount={totalCount}
+      />
+
       {paginated ? (
         <DirectoryPagination
           hrefForPage={hrefForPage}
@@ -154,11 +179,15 @@ export function DirectoryCategoryPage({
             </h2>
             <DirectoryBusinessList businesses={businesses} showCityState />
           </>
-        ) : (
+        ) : cityGroups.length > 0 ? (
           <DirectoryGroupedByCity
             cityGroups={cityGroups}
             publishedCitySlugs={publishedCitySlugs}
           />
+        ) : (
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            No listings match these filters.
+          </p>
         )}
       </section>
 
@@ -185,9 +214,10 @@ export function DirectoryCategoryPage({
         ) : (
           <DownloadCsvButton businesses={businesses} pagePath={path} />
         )}
-        {paginated ? (
+        {paginated || filtersActive ? (
           <p className="text-xs text-zinc-500">
-            CSV includes every listing in this category, not only this page.
+            CSV includes every listing in this category, not only this page
+            {filtersActive ? " (unfiltered)" : ""}.
           </p>
         ) : null}
       </div>

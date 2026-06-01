@@ -3,6 +3,7 @@ import Link from "next/link";
 import { DirectoryBusinessList } from "@/components/directory-business-list";
 import { DirectoryGroupedByCity } from "@/components/directory-grouped-by-city";
 import { DirectoryLastUpdated } from "@/components/directory-last-updated";
+import { DirectoryListingFilters } from "@/components/directory-listing-filters";
 import { DirectoryPagination } from "@/components/directory-pagination";
 import { DownloadCsvButton } from "@/components/download-csv-button";
 import {
@@ -10,6 +11,10 @@ import {
   fetchFacebookDirectoryPageData,
 } from "@/lib/directory/data";
 import { buildDirectoryListJsonLd } from "@/lib/directory/jsonld";
+import {
+  hasActiveDirectoryListingFilters,
+  parseDirectoryListingFilters,
+} from "@/lib/directory/listing-filters";
 import {
   directoryPageRange,
   facebookPathWithPage,
@@ -24,18 +29,20 @@ const PAGE_PATH = "/facebook";
 const PAGE_TITLE = "Businesses Using Facebook as Their Google Website";
 
 interface PageProps {
-  searchParams: Promise<{ page?: string | string[] }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export async function generateMetadata({
   searchParams,
 }: PageProps): Promise<Metadata> {
-  const page = parseDirectoryPageParam((await searchParams).page);
+  const raw = await searchParams;
+  const page = parseDirectoryPageParam(raw.page);
+  const filters = parseDirectoryListingFilters(raw);
   let lastUpdatedLabel: string | null = null;
   let totalCount = 0;
   let totalPages = 1;
   try {
-    const data = await fetchFacebookDirectoryPageData({ page });
+    const data = await fetchFacebookDirectoryPageData({ page, filters });
     lastUpdatedLabel = data.lastUpdatedLabel;
     totalCount = data.totalCount;
     totalPages = data.totalPages;
@@ -49,17 +56,22 @@ export async function generateMetadata({
       : "";
   const title =
     page > 1 ? `${PAGE_TITLE} — Page ${page.toLocaleString()}` : PAGE_TITLE;
+  const canonicalPath = hasActiveDirectoryListingFilters(filters)
+    ? facebookPathWithPage(1)
+    : facebookPathWithPage(page, filters);
   return {
     title: { absolute: title },
     description: `Local businesses whose Google Business Profile uses Facebook in the Website field — a guideline violation that can hurt local rankings and visibility.${pageNote}${updated}`,
-    alternates: { canonical: absoluteUrl(facebookPathWithPage(page)) },
+    alternates: { canonical: absoluteUrl(canonicalPath) },
   };
 }
 
 export default async function FacebookDirectoryPage({
   searchParams,
 }: PageProps) {
-  const page = parseDirectoryPageParam((await searchParams).page);
+  const raw = await searchParams;
+  const page = parseDirectoryPageParam(raw.page);
+  const filters = parseDirectoryListingFilters(raw);
   let data: Awaited<ReturnType<typeof fetchFacebookDirectoryPageData>> | null =
     null;
   let publishedCitySlugs: Set<string> | undefined;
@@ -67,7 +79,7 @@ export default async function FacebookDirectoryPage({
 
   try {
     const [pageData, cities] = await Promise.all([
-      fetchFacebookDirectoryPageData({ page }),
+      fetchFacebookDirectoryPageData({ page, filters }),
       fetchAllDirectoryCities(),
     ]);
     data = pageData;
@@ -81,10 +93,11 @@ export default async function FacebookDirectoryPage({
   }
 
   const paginated = Boolean(data && data.totalPages > 1);
+  const filtersActive = data ? hasActiveDirectoryListingFilters(data.filters) : false;
   const range = data
     ? directoryPageRange(data.page, data.pageSize, data.totalCount)
     : null;
-  const hrefForPage = (p: number) => facebookPathWithPage(p);
+  const hrefForPage = (p: number) => facebookPathWithPage(p, data?.filters);
   const fullCsvHref = "/api/directory-export?type=facebook";
 
   const jsonLd = data
@@ -165,6 +178,15 @@ export default async function FacebookDirectoryPage({
         <>
           <DirectoryLastUpdated label={data.lastUpdatedLabel} />
 
+          <DirectoryListingFilters
+            action={PAGE_PATH}
+            mode="full"
+            filters={data.filters}
+            filterOptions={data.filterOptions}
+            unfilteredCount={data.unfilteredCount}
+            totalCount={data.totalCount}
+          />
+
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
             {paginated ? (
               <>
@@ -201,13 +223,23 @@ export default async function FacebookDirectoryPage({
                 <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
                   Listings
                 </h2>
-                <DirectoryBusinessList businesses={data.businesses} showCityState />
+                {data.businesses.length > 0 ? (
+                  <DirectoryBusinessList businesses={data.businesses} showCityState />
+                ) : (
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                    No listings match these filters.
+                  </p>
+                )}
               </>
-            ) : (
+            ) : data.cityGroups.length > 0 ? (
               <DirectoryGroupedByCity
                 cityGroups={data.cityGroups}
                 publishedCitySlugs={publishedCitySlugs}
               />
+            ) : (
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                No listings match these filters.
+              </p>
             )}
           </section>
 
@@ -229,14 +261,15 @@ export default async function FacebookDirectoryPage({
                 href={fullCsvHref}
                 className="inline-flex items-center justify-center rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
               >
-                Download all {data.totalCount.toLocaleString()} as CSV
+                Download all {data.unfilteredCount.toLocaleString()} as CSV
               </a>
             ) : (
               <DownloadCsvButton businesses={data.businesses} pagePath={PAGE_PATH} />
             )}
-            {paginated ? (
+            {paginated || filtersActive ? (
               <p className="text-xs text-zinc-500">
-                CSV includes every listing on this hub, not only this page.
+                CSV includes every listing on this hub, not only this page
+                {filtersActive ? " (unfiltered)" : ""}.
               </p>
             ) : null}
           </div>

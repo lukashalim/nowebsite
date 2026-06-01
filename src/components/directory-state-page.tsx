@@ -6,6 +6,12 @@ import { DirectoryPagination } from "@/components/directory-pagination";
 import { DownloadCsvButton } from "@/components/download-csv-button";
 import { stateHubTitle, ukRegionHubTitle } from "@/lib/directory/labels";
 import { buildDirectoryListJsonLd } from "@/lib/directory/jsonld";
+import { DirectoryListingFilters } from "@/components/directory-listing-filters";
+import {
+  hasActiveDirectoryListingFilters,
+  type DirectoryFilterOptions,
+  type DirectoryListingFilters as DirectoryListingFiltersState,
+} from "@/lib/directory/listing-filters";
 import {
   directoryPageRange,
   statePathWithPage,
@@ -29,9 +35,12 @@ interface DirectoryStatePageProps {
   getCityHref?: (group: DirectoryCityGroup) => string;
   isCityPublished?: (group: DirectoryCityGroup) => boolean;
   totalCount?: number;
+  unfilteredCount?: number;
   page?: number;
   pageSize?: number;
   totalPages?: number;
+  filters?: DirectoryListingFiltersState;
+  filterOptions?: DirectoryFilterOptions;
 }
 
 export function DirectoryStatePage({
@@ -49,9 +58,12 @@ export function DirectoryStatePage({
   getCityHref,
   isCityPublished,
   totalCount: totalCountProp,
+  unfilteredCount: unfilteredCountProp,
   page = 1,
   pageSize = 100,
   totalPages = 1,
+  filters,
+  filterOptions,
 }: DirectoryStatePageProps) {
   const title = isUkRegion ? ukRegionHubTitle(state) : stateHubTitle(state);
   const path = pathPrefix
@@ -64,7 +76,11 @@ export function DirectoryStatePage({
   const totalCount = totalCountProp ?? businesses.length;
   const paginated = totalPages > 1;
   const range = directoryPageRange(page, pageSize, totalCount);
-  const hrefForPage = (p: number) => statePathWithPage(stateSlug, p);
+  const hrefForPage = (p: number) =>
+    isUkRegion ? statePathWithPage(stateSlug, p) : statePathWithPage(stateSlug, p, filters);
+  const showUsFilters = !isUkRegion && filters && filterOptions;
+  const filtersActive = filters ? hasActiveDirectoryListingFilters(filters) : false;
+  const unfilteredCount = unfilteredCountProp ?? totalCount;
   const fullCsvHref = isUkRegion
     ? null
     : `/api/directory-export?slug=${encodeURIComponent(stateSlug)}&type=state`;
@@ -122,6 +138,18 @@ export function DirectoryStatePage({
 
       <DirectoryLastUpdated label={lastUpdatedLabel} />
 
+      {showUsFilters ? (
+        <DirectoryListingFilters
+          action={path}
+          mode="stateFixed"
+          filters={filters}
+          filterOptions={filterOptions}
+          unfilteredCount={unfilteredCount}
+          totalCount={totalCount}
+          fixedStateLabel={displayState}
+        />
+      ) : null}
+
       {paginated ? (
         <DirectoryPagination
           hrefForPage={hrefForPage}
@@ -142,13 +170,17 @@ export function DirectoryStatePage({
             </h2>
             <DirectoryBusinessList businesses={businesses} showCityState />
           </>
-        ) : (
+        ) : cityGroups.length > 0 ? (
           <DirectoryGroupedByCity
             cityGroups={cityGroups}
             publishedCitySlugs={publishedCitySlugs}
             getCityHref={getCityHref}
             isCityPublished={isCityPublished}
           />
+        ) : (
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            No listings match these filters.
+          </p>
         )}
       </section>
 
@@ -177,7 +209,8 @@ export function DirectoryStatePage({
         )}
         {paginated && fullCsvHref ? (
           <p className="text-xs text-zinc-500">
-            CSV includes every listing in this state, not only this page.
+            CSV includes every listing in this state, not only this page
+            {filtersActive ? " (unfiltered)" : ""}.
           </p>
         ) : null}
       </div>

@@ -5,6 +5,7 @@ import { CategoryIcon } from "@/components/category-icon";
 import { DirectoryCategoryPage } from "@/components/directory-category-page";
 import { DirectoryBusinessList } from "@/components/directory-business-list";
 import { DirectoryLastUpdated } from "@/components/directory-last-updated";
+import { DirectoryListingFilters } from "@/components/directory-listing-filters";
 import { DirectoryStatePage } from "@/components/directory-state-page";
 import {
   categoryLinkLabel,
@@ -19,8 +20,11 @@ import {
 import { fetchAllValidSlugParams } from "@/lib/directory/data";
 import { resolveDirectorySlugPage } from "@/lib/directory/resolve-slug-page";
 import { DIRECTORY_MIN_CATEGORY_LISTINGS } from "@/lib/directory/types";
+import { hasActiveDirectoryListingFilters } from "@/lib/directory/listing-filters";
+import { parseDirectoryListingFilters } from "@/lib/directory/listing-filters";
 import {
   categoryPathWithPage,
+  cityPathWithQuery,
   parseDirectoryPageParam,
   statePathWithPage,
 } from "@/lib/directory/pagination";
@@ -32,7 +36,7 @@ export const dynamicParams = true;
 
 interface PageProps {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ page?: string | string[] }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export async function generateStaticParams() {
@@ -48,8 +52,10 @@ export async function generateMetadata({
   searchParams,
 }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const page = parseDirectoryPageParam((await searchParams).page);
-  const resolved = await resolveDirectorySlugPage(slug, page);
+  const raw = await searchParams;
+  const page = parseDirectoryPageParam(raw.page);
+  const filters = parseDirectoryListingFilters(raw);
+  const resolved = await resolveDirectorySlugPage(slug, page, filters);
 
   if (resolved.kind === "redirect") {
     return { title: "Redirecting…" };
@@ -74,7 +80,9 @@ export async function generateMetadata({
               : undefined,
           );
     const slugLower = slug.trim().toLowerCase();
-    const canonicalPath = categoryPathWithPage(slugLower, data.page);
+    const canonicalPath = hasActiveDirectoryListingFilters(filters)
+      ? categoryPathWithPage(slugLower, 1)
+      : categoryPathWithPage(slugLower, data.page, data.filters);
     return {
       title: { absolute: title },
       description,
@@ -83,19 +91,23 @@ export async function generateMetadata({
   }
 
   if (resolved.kind === "city") {
-    const { hub } = resolved;
+    const { hub, cityData } = resolved;
+    const slugLower = slug.trim().toLowerCase();
     const title = cityHubTitle(hub.city, hub.state, hub.country);
     const description = cityHubMetaDescription(
       hub.city,
       hub.state,
-      hub.listingCount,
+      cityData.totalCount,
       hub.lastUpdatedLabel,
       hub.country,
     );
+    const canonicalPath = hasActiveDirectoryListingFilters(filters)
+      ? `/${slugLower}`
+      : cityPathWithQuery(slugLower, cityData.filters);
     return {
       title: { absolute: title },
       description,
-      alternates: { canonical: absoluteUrl(`/${slug.trim().toLowerCase()}`) },
+      alternates: { canonical: absoluteUrl(canonicalPath) },
     };
   }
 
@@ -115,10 +127,13 @@ export async function generateMetadata({
         ? { current: data.page, totalPages: data.totalPages }
         : undefined,
     );
+    const canonicalPath = hasActiveDirectoryListingFilters(filters)
+      ? statePathWithPage(slugLower, 1)
+      : statePathWithPage(slugLower, data.page, data.filters);
     return {
       title: { absolute: title },
       description,
-      alternates: { canonical: absoluteUrl(statePathWithPage(slugLower, data.page)) },
+      alternates: { canonical: absoluteUrl(canonicalPath) },
     };
   }
 
@@ -130,9 +145,11 @@ export default async function SlugDirectoryPage({
   searchParams,
 }: PageProps) {
   const { slug } = await params;
-  const page = parseDirectoryPageParam((await searchParams).page);
+  const raw = await searchParams;
+  const page = parseDirectoryPageParam(raw.page);
+  const filters = parseDirectoryListingFilters(raw);
   const lower = slug.trim().toLowerCase();
-  const resolved = await resolveDirectorySlugPage(slug, page);
+  const resolved = await resolveDirectorySlugPage(slug, page, filters);
 
   if (resolved.kind === "redirect") {
     permanentRedirect(`/${resolved.to}`);
@@ -148,12 +165,15 @@ export default async function SlugDirectoryPage({
         cityGroups={data.cityGroups}
         cityCount={data.cityCount}
         totalCount={data.totalCount}
+        unfilteredCount={data.unfilteredCount}
         page={data.page}
         pageSize={data.pageSize}
         totalPages={data.totalPages}
         lastUpdatedLabel={data.lastUpdatedLabel}
         publishedCitySlugs={data.publishedCitySlugs}
         content={data.content}
+        filters={data.filters}
+        filterOptions={data.filterOptions}
       />
     );
   }
@@ -168,17 +188,20 @@ export default async function SlugDirectoryPage({
         cityGroups={data.cityGroups}
         cityCount={data.cityCount}
         totalCount={data.totalCount}
+        unfilteredCount={data.unfilteredCount}
         page={data.page}
         pageSize={data.pageSize}
         totalPages={data.totalPages}
         lastUpdatedLabel={data.lastUpdatedLabel}
         publishedCitySlugs={data.publishedCitySlugs}
+        filters={data.filters}
+        filterOptions={data.filterOptions}
       />
     );
   }
 
   if (resolved.kind === "city") {
-    const { hub, businesses } = resolved;
+    const { hub, businesses, cityData } = resolved;
     const title = cityHubTitle(hub.city, hub.state, hub.country);
     const publishedSlugs = new Set(
       hub.publishedCategories.map((c) => c.categorySlug),
@@ -205,6 +228,15 @@ export default async function SlugDirectoryPage({
         </header>
 
         <DirectoryLastUpdated label={hub.lastUpdatedLabel} />
+
+        <DirectoryListingFilters
+          action={`/${lower}`}
+          mode="reviewsOnly"
+          filters={cityData.filters}
+          filterOptions={cityData.filterOptions}
+          unfilteredCount={cityData.unfilteredCount}
+          totalCount={cityData.totalCount}
+        />
 
         <section className="space-y-3">
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
@@ -272,7 +304,13 @@ export default async function SlugDirectoryPage({
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
             All listings in {hub.city}
           </h2>
-          <DirectoryBusinessList businesses={businesses} />
+          {businesses.length > 0 ? (
+            <DirectoryBusinessList businesses={businesses} />
+          ) : (
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              No listings match these filters.
+            </p>
+          )}
         </section>
       </div>
     );
