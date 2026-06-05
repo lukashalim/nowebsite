@@ -7,7 +7,7 @@ export interface BusinessLead {
   city: string | null;
   state: string | null;
   postal_code: string | null;
-  country?: "US" | "GB" | null;
+  country?: "US" | "GB" | "AU" | null;
   business_type: string | null;
   main_category: string | null;
   rating: number | null;

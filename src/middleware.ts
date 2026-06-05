@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { parseCitySlug } from "@/lib/directory/slugs";
+import { updateSession } from "@/lib/supabase/middleware";
 
 const RESERVED_FIRST_SEGMENTS = new Set([
   "api",
+  "auth",
   "demo",
   "crm",
   "admin",
@@ -14,7 +16,13 @@ const RESERVED_FIRST_SEGMENTS = new Set([
   "united-kingdom",
 ]);
 
-export function middleware(request: NextRequest) {
+function copyCookies(from: NextResponse, to: NextResponse) {
+  from.cookies.getAll().forEach(({ name, value }) => {
+    to.cookies.set(name, value);
+  });
+}
+
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const host = request.headers.get("host") ?? "";
   const isRingReady = host.includes("ringreadysite.com");
@@ -26,25 +34,36 @@ export function middleware(request: NextRequest) {
     return response;
   };
 
+  let sessionResponse: NextResponse | null = null;
+  if (pathname.startsWith("/crm") || pathname.startsWith("/auth")) {
+    sessionResponse = await updateSession(request);
+  }
+
   const match = /^\/([^/]+)\/([^/]+)\/?$/.exec(pathname);
-  if (!match) return withRobotsHeader(NextResponse.next());
+  if (!match) {
+    return withRobotsHeader(sessionResponse ?? NextResponse.next());
+  }
 
   const [, slug, secondSegment] = match;
   if (RESERVED_FIRST_SEGMENTS.has(slug.toLowerCase())) {
-    return withRobotsHeader(NextResponse.next());
+    return withRobotsHeader(sessionResponse ?? NextResponse.next());
   }
 
   if (!parseCitySlug(slug)) {
-    return withRobotsHeader(NextResponse.next());
+    return withRobotsHeader(sessionResponse ?? NextResponse.next());
   }
 
   if (secondSegment.includes(".")) {
-    return withRobotsHeader(NextResponse.next());
+    return withRobotsHeader(sessionResponse ?? NextResponse.next());
   }
 
   const url = request.nextUrl.clone();
   url.pathname = `/${slug}`;
-  return withRobotsHeader(NextResponse.redirect(url, 308));
+  const redirect = NextResponse.redirect(url, 308);
+  if (sessionResponse) {
+    copyCookies(sessionResponse, redirect);
+  }
+  return withRobotsHeader(redirect);
 }
 
 export const config = {

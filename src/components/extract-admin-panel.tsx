@@ -6,7 +6,7 @@ import type { ExtractRunnerSnapshot } from "@/lib/extract-local-runner-types";
 
 export function ExtractAdminPanel() {
   const [businessType, setBusinessType] = useState("");
-  const [country, setCountry] = useState<"" | "US" | "GB">("");
+  const [country, setCountry] = useState<"" | "US" | "GB" | "AU">("");
   const [locationHint, setLocationHint] = useState("");
   const [dryRun, setDryRun] = useState(false);
   const [keepFiles, setKeepFiles] = useState(false);
@@ -40,8 +40,7 @@ export function ExtractAdminPanel() {
     return () => clearInterval(id);
   }, [refresh]);
 
-  async function handleStart(e: React.FormEvent) {
-    e.preventDefault();
+  async function startIngest(includeTasksForRun: boolean, dryRunForRun = dryRun) {
     setStarting(true);
     setError(null);
     try {
@@ -52,9 +51,9 @@ export function ExtractAdminPanel() {
           businessType: businessType.trim() || undefined,
           country: country || undefined,
           locationHint: locationHint.trim() || undefined,
-          dryRun,
+          dryRun: dryRunForRun,
           keepFiles,
-          includeTasks,
+          includeTasks: includeTasksForRun,
           maxFiles: maxFiles.trim() ? Number.parseInt(maxFiles, 10) : undefined,
         }),
       });
@@ -70,6 +69,11 @@ export function ExtractAdminPanel() {
       setStarting(false);
       void refresh();
     }
+  }
+
+  async function handleStart(e: React.FormEvent) {
+    e.preventDefault();
+    await startIngest(includeTasks);
   }
 
   return (
@@ -132,25 +136,26 @@ export function ExtractAdminPanel() {
           <select
             value={country}
             onChange={(e) =>
-              setCountry(e.target.value as "" | "US" | "GB")
+              setCountry(e.target.value as "" | "US" | "GB" | "AU")
             }
             className="rounded-md border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950"
           >
             <option value="">Detect per row</option>
             <option value="US">US</option>
             <option value="GB">United Kingdom (GB)</option>
+            <option value="AU">Australia (AU)</option>
           </select>
         </label>
 
         <label className="flex flex-col gap-1 text-sm">
           <span className="font-medium text-zinc-800 dark:text-zinc-200">
-            Location hint (US ZIP or UK postcode)
+            Location hint (US ZIP, UK postcode, or AU postcode)
           </span>
           <input
             type="text"
             value={locationHint}
             onChange={(e) => setLocationHint(e.target.value)}
-            placeholder="e.g. 60601 or M1 1AA"
+            placeholder="e.g. 60601, M1 1AA, or 2000"
             className="rounded-md border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-950"
           />
         </label>
@@ -196,17 +201,31 @@ export function ExtractAdminPanel() {
           </label>
         </div>
 
-        <button
-          type="submit"
-          disabled={starting || status?.running}
-          className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
-        >
-          {status?.running
-            ? "Running…"
-            : starting
-              ? "Starting…"
-              : "Run NDJSON ingest"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="submit"
+            disabled={starting || status?.running}
+            className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+          >
+            {status?.running
+              ? "Running…"
+              : starting
+                ? "Starting…"
+                : "Run standard ingest"}
+          </button>
+          <button
+            type="button"
+            disabled={starting || status?.running}
+            onClick={() => void startIngest(true, false)}
+            className="rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+          >
+            {status?.running
+              ? "Running…"
+              : starting
+                ? "Starting…"
+                : "Run recovery ingest (include tasks)"}
+          </button>
+        </div>
       </form>
 
       {error ? (

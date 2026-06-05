@@ -1,4 +1,4 @@
-export type DirectoryCountry = "US" | "GB";
+export type DirectoryCountry = "US" | "GB" | "AU";
 
 export interface DirectoryBusiness {
   name: string | null;

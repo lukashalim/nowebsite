@@ -9,11 +9,12 @@
  * Env:
  *   GOOGLE_MAPS_EXTRACTOR_DIR — app root or .../task_results/cache (default: %APPDATA%/googlemapsextractor on Windows)
  *   SWEET_SPOT_MIN_RATING — default 4 (review min/max band is not applied here; see pipeline.mjs)
- *   SCRAPE_MIN_REVIEWS_IN_CALENDAR_YEAR — default 1 (need this many reviews dated in the filter year; set 2+ to tighten)
- *   SCRAPE_REVIEWS_YEAR_FILTER — calendar year (default: current year, e.g. 2026)
- *   SCRAPE_SKIP_MIN_REVIEWS_IN_CALENDAR_YEAR_FILTER=1 — disable the year review count gate
- *   EXTRACT_LOCAL_COUNTRY — optional US|GB; default per-row detection
- *   EXTRACT_LOCAL_LOCATION_HINT — US 5-digit ZIP or UK postcode when NDJSON lacks locality
+ *   SCRAPE_MIN_RECENT_REVIEWS — default 4 (alias: SCRAPE_MIN_REVIEWS_IN_CALENDAR_YEAR)
+ *   SCRAPE_RECENT_REVIEWS_MONTHS — rolling window, default 6 (proves listing is active)
+ *   SCRAPE_SKIP_MIN_RECENT_REVIEWS_FILTER=1 — disable recent-review count gate
+ *   (Extractor must include review arrays with dates; fetch enough reviews to find 4+ in window.)
+ *   EXTRACT_LOCAL_COUNTRY — optional US|GB|AU; default per-row detection
+ *   EXTRACT_LOCAL_LOCATION_HINT — US ZIP, UK postcode, or AU 4-digit postcode when NDJSON lacks locality
  *   EXTRACT_LOCAL_SCRAPE_ZIP — deprecated alias for EXTRACT_LOCAL_LOCATION_HINT
  *
  * Flags:
@@ -23,14 +24,14 @@
  *   --allow-website            — do not skip rows with a website
  *   --no-sweet-spot            — skip min-rating filter
  *   --format jsonl|csv         — with --dry-run, print matches (default jsonl)
- *   --max-files N              — only read the first N cache files (sorted by name), for testing
+ *   --max-files N              — only read the first N cache files (smallest first), for testing
  *   --keep-files               — do not delete .ndjson after a file is fully read (default: delete to save disk)
  *   --dry-run                  — do not write to Supabase or delete cache files; print matches to stdout
  *
  * By default, matching rows are upserted into Supabase `businesses_nowebsite` (or BUSINESSES_TABLE). Env matches
  * pipeline.mjs: BUSINESSES_TABLE, BUSINESSES_UPSERT_BATCH_SIZE.
  *
- * Payload columns: core `rowToBusiness` fields + `facebook_url` only, unless
+ * Payload columns: core `rowToBusiness` fields (incl. `can_claim`, `is_spending_on_ads`) + `facebook_url` only, unless
  * EXTRACT_LOCAL_INCLUDE_DEMO_SEO_FIELDS=1 (then adds review_highlights, services_offered, hours, open_now).
  *
  * After each file is read to EOF successfully, the script removes that .ndjson. Cache entries under
@@ -53,8 +54,8 @@ import {
   getSupabase,
   rowToBusiness,
   passesSweetSpotRatingFilter,
-  passesMinReviewsInCalendarYear,
-  getMinReviewsInCalendarYearFilterConfig,
+  passesMinRecentReviews,
+  getMinRecentReviewsFilterConfig,
   omitUndefined,
   parseBusinessTypeArg,
 } from "./lib/scrape-pipeline/index.mjs";
@@ -190,6 +191,23 @@ function listNdjson(dir) {
 }
 
 /** @param {string} filePath */
+function ndjsonFileSize(filePath) {
+  try {
+    return fs.statSync(filePath).size;
+  } catch {
+    return Number.MAX_SAFE_INTEGER;
+  }
+}
+
+/** Smallest files first; name breaks ties for stable ordering. @param {string[]} files */
+function sortNdjsonBySizeAsc(files) {
+  return files.sort((a, b) => {
+    const diff = ndjsonFileSize(a) - ndjsonFileSize(b);
+    return diff !== 0 ? diff : a.localeCompare(b);
+  });
+}
+
+/** @param {string} filePath */
 async function* linesOfNdjson(filePath) {
   const stream = fs.createReadStream(filePath, { encoding: "utf8" });
   const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
@@ -215,6 +233,14 @@ const BUSINESSES_UPSERT_BATCH_SIZE = Math.max(
   Number.parseInt(process.env.BUSINESSES_UPSERT_BATCH_SIZE ?? "100", 10) || 100,
 );
 const BUSINESSES_TABLE = process.env.BUSINESSES_TABLE ?? "businesses_nowebsite";
+const FILE_LIST_REFRESH_EVERY = Math.max(
+  10,
+  Number.parseInt(process.env.EXTRACT_LOCAL_FILE_LIST_REFRESH_EVERY ?? "50", 10) || 50,
+);
+const TASKS_RETENTION_DAYS = Math.max(
+  1,
+  Number.parseInt(process.env.EXTRACT_LOCAL_TASKS_RETENTION_DAYS ?? "3", 10) || 3,
+);
 
 const DRY_RUN_COLUMNS = [
   "place_id",
@@ -233,22 +259,56 @@ const DRY_RUN_COLUMNS = [
 function emptyRunStats(filesCount = 0) {
   return {
     files: filesCount,
+    filesMissing: 0,
     lines: 0,
     jsonErrors: 0,
     dupes: 0,
     noPlaceId: 0,
     hasWebsite: 0,
     sweetSpotFail: 0,
-    skippedMinReviewsInYear: 0,
+    skippedMinRecentReviews: 0,
     emitted: 0,
     businessesUpserted: 0,
     upsertBatchErrors: 0,
     filesDeleted: 0,
     filesDeleteFailed: 0,
+    tasksFilesDeleted: 0,
+    tasksFilesDeleteFailed: 0,
     categorySampleTotal: 0,
     categorySampleWithoutWebsite: 0,
     conversionsRecorded: 0,
   };
+}
+
+/**
+ * Delete old NDJSON from task_results/tasks older than retention window.
+ * @param {string} tasksDir
+ * @param {number} retentionDays
+ * @param {ReturnType<typeof emptyRunStats>} stats
+ */
+async function pruneOldTaskNdjson(tasksDir, retentionDays, stats) {
+  if (!fs.existsSync(tasksDir)) {
+    return;
+  }
+  const cutoffMs = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
+  const entries = fs.readdirSync(tasksDir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith(".ndjson")) {
+      continue;
+    }
+    const filePath = path.join(tasksDir, entry.name);
+    try {
+      const st = fs.statSync(filePath);
+      if (st.mtimeMs > cutoffMs) {
+        continue;
+      }
+      await fs.promises.unlink(filePath);
+      stats.tasksFilesDeleted += 1;
+    } catch (err) {
+      stats.tasksFilesDeleteFailed += 1;
+      console.error(`Could not prune old task file ${filePath}: ${err?.message ?? err}`);
+    }
+  }
 }
 
 /**
@@ -310,7 +370,7 @@ async function persistExtractRunLog(p) {
   try {
     const db = getSupabase();
     const duration_ms = Math.max(0, Date.now() - p.startedMs);
-    const yf = getMinReviewsInCalendarYearFilterConfig();
+    const rf = getMinRecentReviewsFilterConfig();
     const filter_snapshot = {
       allowWebsite: p.allowWebsite,
       noSweetSpot: p.noSweetSpot,
@@ -319,9 +379,9 @@ async function persistExtractRunLog(p) {
         : {
             minRating: Number(process.env.SWEET_SPOT_MIN_RATING ?? 4),
           },
-      minReviewsInCalendarYear: {
-        ...yf,
-        skipped: p.stats.skippedMinReviewsInYear ?? 0,
+      minRecentReviews: {
+        ...rf,
+        skipped: p.stats.skippedMinRecentReviews ?? 0,
       },
     };
     const row = {
@@ -337,6 +397,7 @@ async function persistExtractRunLog(p) {
       skipped_duplicate_place: p.stats.dupes,
       skipped_has_website: p.stats.hasWebsite,
       skipped_sweet_spot: p.stats.sweetSpotFail,
+      skipped_min_recent_reviews: p.stats.skippedMinRecentReviews ?? 0,
       matched_leads: p.stats.emitted,
       businesses_upserted: p.stats.businessesUpserted,
       upsert_batch_errors: p.stats.upsertBatchErrors,
@@ -381,20 +442,36 @@ async function main() {
 
   const cacheDir = path.join(root, "task_results", "cache");
   const tasksDir = path.join(root, "task_results", "tasks");
-  let files = [
-    ...listNdjson(cacheDir),
-    ...(includeTasks ? listNdjson(tasksDir) : []),
-  ].sort((a, b) => a.localeCompare(b));
-
   const maxFiles = parseMaxFiles(argv);
-  if (maxFiles != null && files.length > maxFiles) {
-    files = files.slice(0, maxFiles);
-  }
 
   const seenPlace = new Set();
-  const stats = emptyRunStats(files.length);
+  const stats = emptyRunStats(0);
+  const seenFile = new Set();
+  /** @type {string[]} */
+  const pendingFiles = [];
 
-  if (files.length === 0) {
+  function refreshPendingFiles() {
+    const discovered = sortNdjsonBySizeAsc([
+      ...listNdjson(cacheDir),
+      ...(includeTasks ? listNdjson(tasksDir) : []),
+    ]);
+    for (const fp of discovered) {
+      if (seenFile.has(fp)) {
+        continue;
+      }
+      if (maxFiles != null && seenFile.size >= maxFiles) {
+        break;
+      }
+      seenFile.add(fp);
+      pendingFiles.push(fp);
+      stats.files += 1;
+    }
+    sortNdjsonBySizeAsc(pendingFiles);
+  }
+
+  refreshPendingFiles();
+
+  if (pendingFiles.length === 0) {
     const msg = `No .ndjson files under ${cacheDir}${includeTasks ? ` or ${tasksDir}` : ""}. Check GOOGLE_MAPS_EXTRACTOR_DIR / --root.`;
     console.error(msg);
     await persistExtractRunLog({
@@ -412,6 +489,32 @@ async function main() {
       errorMessage: msg,
     });
     process.exit(1);
+  }
+
+  /**
+   * Upsert chunk; on batch json/constraint errors, split and retry so good rows still land.
+   * @param {object[]} chunk
+   */
+  async function upsertChunkRecursive(chunk) {
+    if (chunk.length === 0) {
+      return;
+    }
+    const { error: upErr } = await supabase
+      .from(BUSINESSES_TABLE)
+      .upsert(chunk, { onConflict: "place_id" });
+    if (!upErr) {
+      stats.businessesUpserted += chunk.length;
+      return;
+    }
+    if (chunk.length === 1) {
+      stats.upsertBatchErrors += 1;
+      const placeId = chunk[0]?.place_id ?? "?";
+      console.error(`Upsert failed (${placeId}):`, upErr.message);
+      return;
+    }
+    const mid = Math.floor(chunk.length / 2);
+    await upsertChunkRecursive(chunk.slice(0, mid));
+    await upsertChunkRecursive(chunk.slice(mid));
   }
 
   /**
@@ -449,29 +552,31 @@ async function main() {
           `Conversion tracking (batch): ${trackErr?.message ?? trackErr}`,
         );
       }
-      const { error: upErr } = await supabase
-        .from(BUSINESSES_TABLE)
-        .upsert(chunk, { onConflict: "place_id" });
-      if (upErr) {
-        stats.upsertBatchErrors += 1;
-        console.error(`Batch upsert failed (${chunk.length} rows):`, upErr.message);
-      } else {
-        stats.businessesUpserted += chunk.length;
-      }
+      await upsertChunkRecursive(chunk);
     }
   }
 
-  /** @type {string[]} NDJSON paths to unlink after successful Supabase upserts */
-  const pendingFileDeletes = [];
-
   const norm = (p) => path.normalize(p);
   const isCacheFile = (fp) => norm(path.dirname(fp)) === norm(cacheDir);
+  /** @type {string[]} cache/*.ndjson basenames deleted during this run */
+  const cacheBasenamesDeleted = [];
 
   if (dryRun && format === "csv") {
     console.log(DRY_RUN_COLUMNS.join(","));
   }
 
-  for (const filePath of files) {
+  let processedFiles = 0;
+  for (;;) {
+    if (pendingFiles.length === 0) {
+      refreshPendingFiles();
+      if (pendingFiles.length === 0) {
+        break;
+      }
+    }
+    const filePath = pendingFiles.shift();
+    if (!filePath) {
+      continue;
+    }
     try {
       for await (const line of linesOfNdjson(filePath)) {
         stats.lines += 1;
@@ -550,8 +655,8 @@ async function main() {
           continue;
         }
 
-        if (!passesMinReviewsInCalendarYear(raw)) {
-          stats.skippedMinReviewsInYear += 1;
+        if (!passesMinRecentReviews(raw)) {
+          stats.skippedMinRecentReviews += 1;
           continue;
         }
 
@@ -601,12 +706,35 @@ async function main() {
 
       await flushPayloadBuffer(true);
 
-      if (deleteAfter && !dryRun) {
-        pendingFileDeletes.push(filePath);
+      if (deleteAfter && !dryRun && stats.upsertBatchErrors === 0) {
+        try {
+          await fs.promises.unlink(filePath);
+          stats.filesDeleted += 1;
+          if (isCacheFile(filePath)) {
+            cacheBasenamesDeleted.push(path.basename(filePath));
+          }
+        } catch (unlinkErr) {
+          stats.filesDeleteFailed += 1;
+          console.error(
+            `Could not delete ${filePath}: ${unlinkErr?.message ?? unlinkErr}`,
+          );
+        }
       }
     } catch (fileErr) {
-      console.error(`Stopped on ${filePath} (file not deleted): ${fileErr?.message ?? fileErr}`);
+      // Extractor cache can change while we are reading it; treat missing files as non-fatal.
+      if (fileErr?.code === "ENOENT") {
+        stats.filesMissing += 1;
+        console.error(`Skipped missing file: ${filePath}`);
+        continue;
+      }
+      console.error(
+        `Stopped on ${filePath} (file not deleted): ${fileErr?.message ?? fileErr}`,
+      );
       throw fileErr;
+    }
+    processedFiles += 1;
+    if (processedFiles % FILE_LIST_REFRESH_EVERY === 0) {
+      refreshPendingFiles();
     }
   }
 
@@ -621,7 +749,7 @@ async function main() {
     dryRun,
     businessesTable: dryRun ? null : BUSINESSES_TABLE,
     deleteAfter,
-    pendingCacheDeletes: pendingFileDeletes.length,
+    pendingCacheDeletes: 0,
     categoryContent: categoryContentStats,
     filters: {
       allowWebsite,
@@ -631,71 +759,61 @@ async function main() {
         : {
             minRating: Number(process.env.SWEET_SPOT_MIN_RATING ?? 4),
           },
-      minReviewsInCalendarYear: {
-        ...getMinReviewsInCalendarYearFilterConfig(),
-        skipped: stats.skippedMinReviewsInYear,
+      minRecentReviews: {
+        ...getMinRecentReviewsFilterConfig(),
+        skipped: stats.skippedMinRecentReviews,
       },
     },
   });
 
-  if (deleteAfter && !dryRun && pendingFileDeletes.length > 0) {
-    if (stats.upsertBatchErrors > 0) {
-      console.error(JSON.stringify(buildStatPayload(), null, 2));
-      console.error(
-        `Keeping ${pendingFileDeletes.length} cache file(s): fix Supabase upsert errors (${stats.upsertBatchErrors} batch failures), then re-run.`,
-      );
-      await persistExtractRunLog({
-        startedMs: runStarted,
-        exitCode: 1,
-        root,
-        businessType,
-        dryRun,
-        businessesTable: BUSINESSES_TABLE,
-        deleteAfter,
-        allowWebsite,
-        noSweetSpot,
-        stats,
-        pendingCacheDeletes: pendingFileDeletes.length,
-        errorMessage: `Supabase upsert: ${stats.upsertBatchErrors} batch failure(s); cache files not deleted.`,
-      });
-      process.exit(1);
-    }
-    const cacheBasenamesDeleted = [];
-    for (const fp of pendingFileDeletes) {
-      try {
-        await fs.promises.unlink(fp);
-        stats.filesDeleted += 1;
-        if (isCacheFile(fp)) {
-          cacheBasenamesDeleted.push(path.basename(fp));
-        }
-      } catch (unlinkErr) {
-        stats.filesDeleteFailed += 1;
-        console.error(`Could not delete ${fp}: ${unlinkErr?.message ?? unlinkErr}`);
-      }
-    }
-    if (cacheBasenamesDeleted.length > 0) {
-      const storagePath = path.join(root, "task_results", "cache_storage.json");
-      try {
-        if (fs.existsSync(storagePath)) {
-          const rawJson = fs.readFileSync(storagePath, "utf8");
-          const index = JSON.parse(rawJson);
-          if (index && typeof index === "object" && !Array.isArray(index)) {
-            for (const basename of cacheBasenamesDeleted) {
-              delete index[basename];
-            }
-            fs.writeFileSync(
-              storagePath,
-              `${JSON.stringify(index, null, 4)}\n`,
-              "utf8",
-            );
+  if (deleteAfter && !dryRun && cacheBasenamesDeleted.length > 0) {
+    const storagePath = path.join(root, "task_results", "cache_storage.json");
+    try {
+      if (fs.existsSync(storagePath)) {
+        const rawJson = fs.readFileSync(storagePath, "utf8");
+        const index = JSON.parse(rawJson);
+        if (index && typeof index === "object" && !Array.isArray(index)) {
+          for (const basename of cacheBasenamesDeleted) {
+            delete index[basename];
           }
+          fs.writeFileSync(
+            storagePath,
+            `${JSON.stringify(index, null, 4)}\n`,
+            "utf8",
+          );
         }
-      } catch (idxErr) {
-        console.error(
-          `cache_storage.json prune failed (${path.join(root, "task_results", "cache_storage.json")}): ${idxErr?.message ?? idxErr}`,
-        );
       }
+    } catch (idxErr) {
+      console.error(
+        `cache_storage.json prune failed (${path.join(root, "task_results", "cache_storage.json")}): ${idxErr?.message ?? idxErr}`,
+      );
     }
+  }
+
+  if (deleteAfter && !dryRun && stats.upsertBatchErrors > 0) {
+    console.error(JSON.stringify(buildStatPayload(), null, 2));
+    console.error(
+      `Encountered ${stats.upsertBatchErrors} row upsert failure(s); files processed after first failure are kept for re-run.`,
+    );
+    await persistExtractRunLog({
+      startedMs: runStarted,
+      exitCode: 1,
+      root,
+      businessType,
+      dryRun,
+      businessesTable: BUSINESSES_TABLE,
+      deleteAfter,
+      allowWebsite,
+      noSweetSpot,
+      stats,
+      pendingCacheDeletes: 0,
+      errorMessage: `Supabase upsert: ${stats.upsertBatchErrors} row failure(s); some files kept for re-run.`,
+    });
+    process.exit(1);
+  }
+
+  if (deleteAfter && !dryRun) {
+    await pruneOldTaskNdjson(tasksDir, TASKS_RETENTION_DAYS, stats);
   }
 
   try {
@@ -728,7 +846,7 @@ async function main() {
     allowWebsite,
     noSweetSpot,
     stats,
-    pendingCacheDeletes: pendingFileDeletes.length,
+    pendingCacheDeletes: 0,
     errorMessage: null,
   });
 }

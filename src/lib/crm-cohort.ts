@@ -16,7 +16,7 @@ import { demoPublicPath, isLikelyGooglePlaceId } from "@/lib/demo-slug";
 export type { DemoReviewHighlight } from "@/lib/demo-review-types";
 
 export const CRM_BUSINESS_LIST_COLUMNS =
-  "place_id, demo_slug, name, address, city, state, country, postal_code, business_type, main_category, rating, reviews, phone, google_maps_link, facebook_url, listing_website, crm_contact_surface, contact_count" as const;
+  "place_id, demo_slug, name, address, city, state, country, postal_code, business_type, main_category, rating, reviews, phone, google_maps_link, facebook_url, listing_website, crm_contact_surface" as const;
 
 const DEMO_CORE_COLUMNS =
   "place_id, demo_slug, name, address, city, state, postal_code, business_type, main_category, rating, reviews, phone, google_maps_link, facebook_url, listing_website, crm_contact_surface, contact_enrichment" as const;
@@ -174,7 +174,13 @@ function mapRowToDemoBusiness(
     state: (data.state as string | null) ?? null,
     postal_code: (data.postal_code as string | null) ?? null,
     country:
-      data.country === "GB" ? "GB" : data.country === "US" ? "US" : "US",
+      data.country === "GB"
+        ? "GB"
+        : data.country === "AU"
+          ? "AU"
+          : data.country === "US"
+            ? "US"
+            : "US",
     business_type: (data.business_type as string | null) ?? null,
     main_category: (data.main_category as string | null) ?? null,
     rating: data.rating != null ? Number(data.rating) : null,
@@ -205,11 +211,72 @@ function mapRowToDemoBusiness(
   return b;
 }
 
+interface UserContactRow {
+  place_id: string;
+  contact_count: number;
+}
+
+function applyUserContactFilters<
+  T extends {
+    in: (column: string, values: string[]) => T;
+    not: (column: string, operator: string, value: string) => T;
+  },
+>(q: T, userContacts: UserContactRow[], p: CrmSearchParams): T | null {
+  const { contactMin, contactMax } = p;
+
+  if (contactMin !== undefined && contactMin > 0) {
+    let minPlaceIds = userContacts
+      .filter((c) => c.contact_count >= contactMin)
+      .map((c) => c.place_id);
+    if (contactMax !== undefined) {
+      minPlaceIds = minPlaceIds.filter((id) => {
+        const count =
+          userContacts.find((c) => c.place_id === id)?.contact_count ?? 0;
+        return count <= contactMax;
+      });
+    }
+    if (minPlaceIds.length === 0) {
+      return null;
+    }
+    q = q.in("place_id", minPlaceIds);
+  }
+
+  if (contactMax !== undefined) {
+    const maxExcludePlaceIds = userContacts
+      .filter((c) => c.contact_count > contactMax)
+      .map((c) => c.place_id);
+    if (maxExcludePlaceIds.length > 0) {
+      q = q.not("place_id", "in", `(${maxExcludePlaceIds.join(",")})`);
+    }
+  }
+
+  return q;
+}
+
 export async function fetchCrmBusinessRows(
   p: CrmSearchParams,
+  userId: string,
 ): Promise<{ rows: BusinessLead[]; total: number; error: string | null }> {
   try {
     const supabase = createSupabaseAdmin();
+
+    const { data: userContactsRaw, error: contactsError } = await supabase
+      .from("crm_user_contacts")
+      .select("place_id, contact_count")
+      .eq("user_id", userId);
+
+    if (contactsError) {
+      const hint = /crm_user_contacts|schema cache/i.test(contactsError.message)
+        ? " Run scrape/sql/create-crm-user-contacts.sql in Supabase, then refresh."
+        : "";
+      return { rows: [], total: 0, error: contactsError.message + hint };
+    }
+
+    const userContacts = (userContactsRaw ?? []) as UserContactRow[];
+    const contactMap = new Map(
+      userContacts.map((c) => [c.place_id, c.contact_count]),
+    );
+
     let q = supabase
       .from("businesses_nowebsite")
       .select(CRM_BUSINESS_LIST_COLUMNS, { count: "exact" })
@@ -220,12 +287,11 @@ export async function fetchCrmBusinessRows(
 
     q = applyWebPresenceFilter(q, p.webPresence);
 
-    if (p.contactMin !== undefined) {
-      q = q.gte("contact_count", p.contactMin);
+    const filtered = applyUserContactFilters(q, userContacts, p);
+    if (filtered === null) {
+      return { rows: [], total: 0, error: null };
     }
-    if (p.contactMax !== undefined) {
-      q = q.lte("contact_count", p.contactMax);
-    }
+    q = filtered;
 
     q = applyReviewExcerptsExtractedFilter(q);
 
@@ -243,8 +309,16 @@ export async function fetchCrmBusinessRows(
           : "";
       return { rows: [], total: 0, error: error.message + hint };
     }
+
+    const rows = ((data ?? []) as Omit<BusinessLead, "contact_count">[]).map(
+      (row) => ({
+        ...row,
+        contact_count: contactMap.get(row.place_id) ?? 0,
+      }),
+    ) as BusinessLead[];
+
     return {
-      rows: (data ?? []) as BusinessLead[],
+      rows,
       total: count ?? 0,
       error: null,
     };

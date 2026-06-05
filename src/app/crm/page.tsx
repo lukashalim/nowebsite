@@ -9,6 +9,7 @@ import {
   Star,
 } from "lucide-react";
 import { CrmFilters, CrmPagination } from "@/components/crm-filters";
+import { CrmLogin } from "@/components/crm-login";
 import { ContactCountSelect } from "@/components/contact-count-select";
 import { OutreachSpintaxButton } from "@/components/outreach-spintax-button";
 import type { BusinessLead } from "@/lib/business";
@@ -17,6 +18,7 @@ import { CRM_BASE_PATH } from "@/lib/crm-path";
 import { demoPublicPath } from "@/lib/demo-slug";
 import { tryParseCrmSearchParams } from "@/lib/crm-params";
 import { isEligibleForFacebookListingOutreach } from "@/lib/outreach-spintax";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +62,15 @@ function googleLookupUrl(b: BusinessLead): string | null {
 }
 
 export default async function CrmPage({ searchParams }: PageProps) {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return <CrmLogin />;
+  }
+
   const raw = await searchParams;
   const parsed = tryParseCrmSearchParams(raw);
 
@@ -88,7 +99,7 @@ export default async function CrmPage({ searchParams }: PageProps) {
   }
 
   const p = parsed.data;
-  const { rows, total, error: loadErr } = await fetchCrmBusinessRows(p);
+  const { rows, total, error: loadErr } = await fetchCrmBusinessRows(p, user.id);
   const loadError = loadErr;
 
   return (
@@ -112,11 +123,7 @@ export default async function CrmPage({ searchParams }: PageProps) {
           <span className="font-medium text-zinc-700 dark:text-zinc-300">
             DM spintax
           </span>{" "}
-          uses DeepSeek (
-          <code className="rounded bg-zinc-100 px-1 text-xs dark:bg-zinc-800">
-            DEEPSEEK_API_KEY
-          </code>
-          ) for Facebook-on-GMB leads.
+          is available for Facebook-on-GMB leads (filter Has website → Facebook).
         </p>
       </header>
 
@@ -304,6 +311,9 @@ export default async function CrmPage({ searchParams }: PageProps) {
                         <td className="px-3 py-3 align-top">
                           <OutreachSpintaxButton
                             placeId={b.place_id}
+                            businessName={b.name}
+                            mainCategory={b.main_category}
+                            businessType={b.business_type}
                             eligible={spintaxEligible}
                           />
                         </td>

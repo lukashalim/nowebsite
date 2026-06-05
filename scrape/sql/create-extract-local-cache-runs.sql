@@ -16,6 +16,7 @@ create table if not exists public.extract_local_cache_runs (
   skipped_duplicate_place integer not null default 0,
   skipped_has_website integer not null default 0,
   skipped_sweet_spot integer not null default 0,
+  skipped_min_recent_reviews integer not null default 0,
   matched_leads integer not null default 0,
   businesses_upserted integer not null default 0,
   upsert_batch_errors integer not null default 0,

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { headers } from "next/headers";
+import { CrispChat } from "@/components/crisp-chat";
 import { getSiteOrigin } from "@/lib/site-url";
 import "./globals.css";
 
@@ -42,7 +43,10 @@ export default async function RootLayout({
           <meta name="robots" content="noindex, nofollow" />
         ) : null}
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <CrispChat />
+      </body>
     </html>
   );
 }

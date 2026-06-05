@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { parseDirectoryCountry } from "@/lib/directory/country";
 import { cityNameToSlug, cityStateToSlug } from "@/lib/directory/slugs";
-import { COUNTRY_GB } from "@/lib/directory/country";
+import { COUNTRY_AU, COUNTRY_GB } from "@/lib/directory/country";
 import type { DirectoryBusiness, DirectoryCityGroup } from "@/lib/directory/types";
 import { DIRECTORY_LIST_COLUMNS } from "@/lib/directory/types";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
@@ -127,7 +127,7 @@ export function groupBusinessesByCity(
     let citySlug: string | null;
     let key: string;
 
-    if (b.country === COUNTRY_GB && b.regionCode) {
+    if ((b.country === COUNTRY_GB || b.country === COUNTRY_AU) && b.regionCode) {
       const nested = cityNameToSlug(city);
       if (!nested) continue;
       citySlug = nested;

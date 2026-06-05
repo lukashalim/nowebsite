@@ -10,13 +10,13 @@ function notFound() {
   return new NextResponse(null, { status: 404 });
 }
 
-export async function GET() {
-  if (!isLocalAdminEnabled()) return notFound();
+export async function GET(request: Request) {
+  if (!isLocalAdminEnabled(request.headers.get("host"))) return notFound();
   return NextResponse.json(getExtractRunnerSnapshot());
 }
 
 export async function POST(request: Request) {
-  if (!isLocalAdminEnabled()) return notFound();
+  if (!isLocalAdminEnabled(request.headers.get("host"))) return notFound();
 
   let body: Record<string, unknown> = {};
   try {
@@ -28,8 +28,8 @@ export async function POST(request: Request) {
   const countryRaw =
     typeof body.country === "string" ? body.country.trim().toUpperCase() : "";
   const country =
-    countryRaw === "GB" || countryRaw === "US"
-      ? (countryRaw as "US" | "GB")
+    countryRaw === "GB" || countryRaw === "US" || countryRaw === "AU"
+      ? (countryRaw as "US" | "GB" | "AU")
       : undefined;
 
   const options: ExtractStartOptions = {

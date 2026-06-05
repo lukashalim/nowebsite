@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   fetchExtractLocalCacheRuns,
+  skippedMinRecentReviewsCount,
   type ExtractLocalCacheRunRow,
 } from "@/lib/extract-cache-runs";
 import { isLocalAdminEnabled } from "@/lib/local-admin";
@@ -76,6 +77,9 @@ function RunRow({ r }: { r: ExtractLocalCacheRunRow }) {
       <td className="whitespace-nowrap px-3 py-2 text-right text-sm tabular-nums text-zinc-700 dark:text-zinc-300">
         {r.skipped_sweet_spot}
       </td>
+      <td className="whitespace-nowrap px-3 py-2 text-right text-sm tabular-nums text-zinc-700 dark:text-zinc-300">
+        {skippedMinRecentReviewsCount(r)}
+      </td>
       <td className="whitespace-nowrap px-3 py-2 text-right text-sm tabular-nums font-medium text-zinc-900 dark:text-zinc-100">
         {r.matched_leads}
       </td>
@@ -137,6 +141,14 @@ export default async function ExtractProgressPage() {
           </strong>{" "}
           = skipped because a website was present;{" "}
           <strong className="font-medium text-zinc-800 dark:text-zinc-200">
+            Sweet spot
+          </strong>{" "}
+          = below min star rating;{" "}
+          <strong className="font-medium text-zinc-800 dark:text-zinc-200">
+            Recent reviews
+          </strong>{" "}
+          = fewer than 4 reviews dated in the past 6 months;{" "}
+          <strong className="font-medium text-zinc-800 dark:text-zinc-200">
             Upserted
           </strong>{" "}
           = rows written to Supabase.
@@ -165,7 +177,7 @@ export default async function ExtractProgressPage() {
         </p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-          <table className="w-full min-w-[960px] border-collapse text-left">
+          <table className="w-full min-w-[1080px] border-collapse text-left">
             <thead>
               <tr className="border-b border-zinc-200 bg-zinc-50 text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-400">
                 <th className="px-3 py-2">When</th>
@@ -175,6 +187,7 @@ export default async function ExtractProgressPage() {
                 <th className="px-3 py-2 text-right">Lines</th>
                 <th className="px-3 py-2 text-right">Has website</th>
                 <th className="px-3 py-2 text-right">Sweet spot</th>
+                <th className="px-3 py-2 text-right">Recent reviews</th>
                 <th className="px-3 py-2 text-right">Matched</th>
                 <th className="px-3 py-2 text-right">Upserted</th>
                 <th className="px-3 py-2 text-right">Batch err</th>

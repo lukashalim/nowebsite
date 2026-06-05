@@ -96,6 +96,10 @@ export function loadEnvLocal() {
     ) {
       val = val.slice(1, -1);
     }
+    const hash = val.indexOf(" #");
+    if (hash !== -1) {
+      val = val.slice(0, hash).trim();
+    }
     if (process.env[key] === undefined) {
       process.env[key] = val;
     }
@@ -242,6 +246,16 @@ export function toInt(v) {
   if (v === null || v === undefined || v === "") return null;
   const n = parseInt(String(v), 10);
   return Number.isFinite(n) ? n : null;
+}
+
+/** @param {unknown} v */
+export function toOptionalBoolean(v) {
+  if (v == null || v === "") return null;
+  if (typeof v === "boolean") return v;
+  const s = String(v).trim().toLowerCase();
+  if (s === "true" || s === "1" || s === "yes") return true;
+  if (s === "false" || s === "0" || s === "no") return false;
+  return null;
 }
 
 export function pickDetailedAddress(row) {
@@ -516,69 +530,93 @@ export function parseReviewDateMs(rev, nowMs = Date.now()) {
   return null;
 }
 
+function recentReviewsSkipDisabled() {
+  return (
+    envFlagScrape("SCRAPE_SKIP_MIN_RECENT_REVIEWS_FILTER", false) ||
+    envFlagScrape("SCRAPE_SKIP_MIN_REVIEWS_IN_CALENDAR_YEAR_FILTER", false)
+  );
+}
+
+function recentReviewsMinCount() {
+  const min = Number.parseInt(
+    String(
+      process.env.SCRAPE_MIN_RECENT_REVIEWS ??
+        process.env.SCRAPE_MIN_REVIEWS_IN_CALENDAR_YEAR ??
+        "4",
+    ),
+    10,
+  );
+  return Number.isFinite(min) && min >= 0 ? min : 4;
+}
+
+function recentReviewsWindowMonths() {
+  const m = Number.parseInt(
+    String(process.env.SCRAPE_RECENT_REVIEWS_MONTHS ?? "6"),
+    10,
+  );
+  return Number.isFinite(m) && m > 0 ? m : 6;
+}
+
+/** @param {number} months @param {number} [nowMs] */
+export function monthsAgoMs(months, nowMs = Date.now()) {
+  const d = new Date(nowMs);
+  d.setMonth(d.getMonth() - months);
+  return d.getTime();
+}
+
 /**
- * Count reviews whose date falls in `calendarYear` (local timezone).
+ * Count reviews with a parseable date in [sinceMs, nowMs].
  * @param {Record<string, unknown>} row
- * @param {number} calendarYear e.g. 2026
+ * @param {number} sinceMs
  * @param {number} [nowMs]
  */
-export function countReviewsInCalendarYear(row, calendarYear, nowMs = Date.now()) {
+export function countReviewsSince(row, sinceMs, nowMs = Date.now()) {
   const reviews = pickReviewContainers(row);
   let n = 0;
   for (const rev of reviews) {
     const ms = parseReviewDateMs(rev, nowMs);
     if (ms == null) continue;
-    if (new Date(ms).getFullYear() === calendarYear) n += 1;
+    if (ms >= sinceMs && ms <= nowMs) n += 1;
   }
   return n;
 }
 
 /**
- * Require at least N reviews dated in the filter year (default: current calendar year, min 1).
- * Set SCRAPE_SKIP_MIN_REVIEWS_IN_CALENDAR_YEAR_FILTER=1 to disable.
- * Override year: SCRAPE_REVIEWS_YEAR_FILTER=2026
- * Override min: SCRAPE_MIN_REVIEWS_IN_CALENDAR_YEAR (default 1; use 2+ for stricter gate)
+ * Require at least N reviews dated within the rolling window (default: 4 in past 6 months).
+ * Set SCRAPE_SKIP_MIN_RECENT_REVIEWS_FILTER=1 to disable.
+ * Override min: SCRAPE_MIN_RECENT_REVIEWS (alias: SCRAPE_MIN_REVIEWS_IN_CALENDAR_YEAR)
+ * Override window: SCRAPE_RECENT_REVIEWS_MONTHS (default 6)
  *
  * @param {Record<string, unknown>} rawRow — full extractor row (with review arrays)
  * @param {{ nowMs?: number }} [opts]
  */
-export function passesMinReviewsInCalendarYear(rawRow, opts = {}) {
-  if (envFlagScrape("SCRAPE_SKIP_MIN_REVIEWS_IN_CALENDAR_YEAR_FILTER", false)) {
+export function passesMinRecentReviews(rawRow, opts = {}) {
+  if (recentReviewsSkipDisabled()) {
     return true;
   }
   const nowMs = opts.nowMs ?? Date.now();
-  const yRaw = process.env.SCRAPE_REVIEWS_YEAR_FILTER;
-  const year = yRaw != null && String(yRaw).trim() !== ""
-    ? Number.parseInt(String(yRaw), 10)
-    : new Date(nowMs).getFullYear();
-  if (!Number.isFinite(year)) {
-    return false;
-  }
-  const min = Number.parseInt(
-    String(process.env.SCRAPE_MIN_REVIEWS_IN_CALENDAR_YEAR ?? "1"),
-    10,
-  );
-  const need = Number.isFinite(min) && min >= 0 ? min : 1;
-  return countReviewsInCalendarYear(rawRow, year, nowMs) >= need;
+  const months = recentReviewsWindowMonths();
+  const sinceMs = monthsAgoMs(months, nowMs);
+  const need = recentReviewsMinCount();
+  return countReviewsSince(rawRow, sinceMs, nowMs) >= need;
 }
 
-export function getMinReviewsInCalendarYearFilterConfig(nowMs = Date.now()) {
-  const disabled = envFlagScrape("SCRAPE_SKIP_MIN_REVIEWS_IN_CALENDAR_YEAR_FILTER", false);
-  const yRaw = process.env.SCRAPE_REVIEWS_YEAR_FILTER;
-  const year =
-    yRaw != null && String(yRaw).trim() !== ""
-      ? Number.parseInt(String(yRaw), 10)
-      : new Date(nowMs).getFullYear();
-  const min = Number.parseInt(
-    String(process.env.SCRAPE_MIN_REVIEWS_IN_CALENDAR_YEAR ?? "1"),
-    10,
-  );
+export function getMinRecentReviewsFilterConfig(nowMs = Date.now()) {
+  const months = recentReviewsWindowMonths();
+  const sinceMs = monthsAgoMs(months, nowMs);
   return {
-    disabled,
-    year: Number.isFinite(year) ? year : new Date(nowMs).getFullYear(),
-    min: Number.isFinite(min) && min >= 0 ? min : 1,
+    disabled: recentReviewsSkipDisabled(),
+    min: recentReviewsMinCount(),
+    months,
+    sinceIso: new Date(sinceMs).toISOString(),
   };
 }
+
+/** @deprecated use passesMinRecentReviews */
+export const passesMinReviewsInCalendarYear = passesMinRecentReviews;
+
+/** @deprecated use getMinRecentReviewsFilterConfig */
+export const getMinReviewsInCalendarYearFilterConfig = getMinRecentReviewsFilterConfig;
 
 export function rowToBusiness(row, businessTypeArg) {
   const da = pickDetailedAddress(row);
@@ -601,6 +639,7 @@ export function rowToBusiness(row, businessTypeArg) {
     rating: toNum(pick(row, "rating", "RATING")),
     reviews: toInt(pick(row, "reviews", "REVIEWS")),
     is_spending_on_ads: Boolean(pick(row, "is_spending_on_ads", "IS_SPENDING_ON_ADS")),
+    can_claim: toOptionalBoolean(pick(row, "can_claim", "CAN_CLAIM")),
     has_website:
       Boolean(websiteTrim) &&
       !isFacebookWebsiteField(websiteTrim) &&

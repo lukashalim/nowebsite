@@ -21,6 +21,7 @@ create table if not exists public.businesses_nowebsite (
   rating double precision,
   reviews integer,
   is_spending_on_ads boolean,
+  can_claim boolean,
   has_website boolean not null default false,
 
   phone text,
@@ -62,7 +63,7 @@ create table if not exists public.businesses_nowebsite (
   source_snapshot_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 
-  constraint businesses_nowebsite_country_check check (country in ('US', 'GB')),
+  constraint businesses_nowebsite_country_check check (country in ('US', 'GB', 'AU')),
   constraint businesses_nowebsite_place_id_key unique (place_id),
   constraint businesses_nowebsite_contact_count_check
     check (contact_count >= 0 and contact_count <= 50)

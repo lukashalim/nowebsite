@@ -1,4 +1,5 @@
-const DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions";
+import { formatCategoryDisplayName } from "@/lib/directory/labels";
+import { directoryCategoryLabel } from "@/lib/directory/slugs";
 
 /** Strip legal suffixes; keep up to ~3 words / 28 chars for casual outreach. */
 export function shortenBusinessNameForOutreach(full: string | null): string {
@@ -34,84 +35,56 @@ export function isEligibleForFacebookListingOutreach(row: FacebookOutreachRow): 
   return Boolean(fb);
 }
 
-const SYSTEM_PROMPT = `You write one concise cold-DM line for a local business. Output rules:
-- Return exactly ONE version — a single message. No spintax: do not use the "|" character anywhere. No curly braces, no markdown, no **bold**.
-- Structure: greeting with their name, then 2–3 short sentences separated by ". " (period + space).
-  - Start with "Hey " plus the short name they gave you (plain text).
-  - (1) Note that using Facebook as the website on their Google Business Profile / Google listing hurts local ranking (one clear wording).
-  - (2) You fix that with a simple site (one clear wording).
-  - (3) Ask permission to share a demo (one question).
-- Stay professional, short, and non-spammy. No emojis.
-- Do not wrap in code fences. No explanation before or after the line.
+export const FACEBOOK_LISTING_OUTREACH_SPINTAX_TEMPLATE =
+  "{Hey|Hi|Hello} [Name] {—|-} {noticed|saw|spotted} your Google {listing|profile|business profile} {uses|has|links} Facebook as the {main|primary} website link. Google actually {added|created|set up} a {specific|dedicated|separate} spot just for social links now. When {mobile users|people on their phone|customers on mobile} tap '{Website|the website button}' and land on Facebook instead of a {fast|clean|dedicated} page with your {number|contact info}, {a lot of them|most people|many of them} just {bounce and call|leave and call|move on to} a {competitor|another business}. {Shot|Put together|Made} a quick {45-second|short} video showing how this {leaks customers|costs you customers} on mobile and how to {structure it|fix it|set it up} instead. {Mind if I drop the link here?|Want me to send it over?|OK if I share it here?}";
 
-Good shape (example — use their real name, not this business):
-Hey Arcade Resurrection - having Facebook as your website on Google hurts your local ranking. I fix that with a simple site. Mind if I share a demo?`;
+export const FACEBOOK_LISTING_OUTREACH_AI_SPINTAX_TEMPLATE =
+  "{Hey|Hi|Hello} [Name] - I was {looking you up|checking you out|searching for you} on Google and noticed you're using Facebook as your {website|main website link|web presence}. That's {great|perfect|fine} for people already on Facebook, but more and more people are asking AI to help them find {[category]|a [category]|local [category]} in their area - and AI can't read Facebook pages. {Shot|Put together|Made} a quick {45-second|short} video showing how this {costs you customers|leaks customers|affects your business} and how to {fix it|structure it instead|set it up properly}. {Mind if I drop the link here?|Want me to send it over?|OK if I share it here?}";
 
-function userPrompt(shortName: string, fullName: string): string {
-  return `Address them using this short name after "Hey ": ${shortName}
-Full business name (context only): ${fullName || shortName}
+export type OutreachTemplateVariant = "mobile" | "ai";
 
-Paraphrase this idea into one polished line (remember: no "|" character, single version only):
-"Hey ${shortName} - Having Facebook as your website on your Google listing hurts your ranking. I fix that with a simple site. Mind if I share a demo?"
-
-Output that one line only.`;
+/** Stable 50/50 template assignment per lead. */
+export function outreachTemplateVariant(placeId: string): OutreachTemplateVariant {
+  let h = 0;
+  for (const c of placeId) h = (h + c.charCodeAt(0)) | 0;
+  return (h & 1) === 0 ? "mobile" : "ai";
 }
 
-/**
- * If the model still emits pipe-separated variants, keep the first option per sentence chunk.
- */
-function collapsePipeVariants(line: string): string {
-  const stripped = line
-    .replace(/^```[\w]*\n?|\n?```$/g, "")
-    .trim()
-    .replace(/\s+/g, " ");
-  if (!stripped.includes("|")) return stripped;
-  const chunks = stripped.split(/\.\s+/).map((chunk) => {
-    const c = chunk.trim();
-    if (!c.includes("|")) return c;
-    return c.split("|")[0].trim();
-  });
-  return chunks.filter(Boolean).join(". ").trim();
+export function categoryLabelForOutreach(
+  mainCategory: string | null | undefined,
+  businessType: string | null | undefined,
+): string {
+  const raw = directoryCategoryLabel(mainCategory, businessType);
+  if (!raw) return "local business";
+  return formatCategoryDisplayName(raw).toLowerCase();
 }
 
-export async function generateFacebookListingSpintax(
-  shortName: string,
-  fullName: string,
-): Promise<string> {
-  const apiKey = process.env.DEEPSEEK_API_KEY?.trim();
-  if (!apiKey) {
-    throw new Error("DEEPSEEK_API_KEY is not set");
-  }
-  const model = process.env.DEEPSEEK_MODEL?.trim() || "deepseek-chat";
-
-  const res = await fetch(DEEPSEEK_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0.45,
-      max_tokens: 500,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userPrompt(shortName, fullName) },
-      ],
-    }),
+/** Pick one random option from each `{a|b|c}` group. */
+export function resolveSpintax(template: string): string {
+  return template.replace(/\{([^{}]+)\}/g, (_, group: string) => {
+    const options = group.split("|").map((s) => s.trim()).filter(Boolean);
+    if (options.length === 0) return "";
+    return options[Math.floor(Math.random() * options.length)] ?? "";
   });
+}
 
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(`DeepSeek HTTP ${res.status}: ${t.slice(0, 200)}`);
-  }
+export interface BuildFacebookListingSpintaxOpts {
+  placeId: string;
+  name: string | null;
+  mainCategory?: string | null;
+  businessType?: string | null;
+}
 
-  const json = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const raw = json.choices?.[0]?.message?.content?.trim() ?? "";
-  if (!raw) {
-    throw new Error("Empty response from DeepSeek");
-  }
-  return collapsePipeVariants(raw);
+export function buildFacebookListingSpintax(opts: BuildFacebookListingSpintaxOpts): string {
+  const variant = outreachTemplateVariant(opts.placeId);
+  const template =
+    variant === "ai"
+      ? FACEBOOK_LISTING_OUTREACH_AI_SPINTAX_TEMPLATE
+      : FACEBOOK_LISTING_OUTREACH_SPINTAX_TEMPLATE;
+  const shortName = shortenBusinessNameForOutreach(opts.name);
+  const category = categoryLabelForOutreach(opts.mainCategory, opts.businessType);
+  const withTokens = template
+    .replaceAll("[Name]", shortName)
+    .replaceAll("[category]", category);
+  return resolveSpintax(withTokens);
 }

@@ -1,5 +1,5 @@
 /**
- * Country detection and UK locality normalization for Maps NDJSON rows.
+ * Country detection and locality normalization for Maps NDJSON rows (US, GB, AU).
  */
 
 import { pick } from "./scrape-pipeline/index.mjs";
@@ -33,6 +33,94 @@ function isLikelyUsState(value) {
 
 export const COUNTRY_US = "US";
 export const COUNTRY_GB = "GB";
+export const COUNTRY_AU = "AU";
+
+const AU_STATE_NAME_KEYS = new Set([
+  "new south wales",
+  "victoria",
+  "queensland",
+  "south australia",
+  "western australia",
+  "tasmania",
+  "northern territory",
+  "australian capital territory",
+]);
+
+const AU_STATE_ABBRS = new Set(["nsw", "vic", "qld", "sa", "wa", "tas", "nt", "act"]);
+
+const AU_POSTCODE_RE = /^\d{4}$/;
+
+export const AU_STATE_SLUG_TO_NAME = {
+  nsw: "New South Wales",
+  vic: "Victoria",
+  qld: "Queensland",
+  sa: "South Australia",
+  wa: "Western Australia",
+  tas: "Tasmania",
+  nt: "Northern Territory",
+  act: "Australian Capital Territory",
+};
+
+const AU_STATE_NAME_TO_SLUG = Object.fromEntries(
+  Object.entries(AU_STATE_SLUG_TO_NAME).map(([slug, name]) => [
+    name.toLowerCase(),
+    slug,
+  ]),
+);
+
+function isLikelyAuState(value) {
+  if (value == null) return false;
+  const key = String(value).trim().toLowerCase().replace(/\./g, "");
+  if (!key) return false;
+  if (key.length <= 3 && AU_STATE_ABBRS.has(key)) return true;
+  return AU_STATE_NAME_KEYS.has(key);
+}
+
+/** @param {string|null|undefined} postcode */
+export function looksLikeAuPostcode(postcode) {
+  if (!postcode) return false;
+  const digits = String(postcode).trim().replace(/\s+/g, "");
+  return AU_POSTCODE_RE.test(digits);
+}
+
+/** @param {string|null|undefined} value */
+export function normalizeAuPostcode(value) {
+  if (value == null) return null;
+  const digits = String(value).trim().replace(/\s+/g, "");
+  if (!AU_POSTCODE_RE.test(digits)) return null;
+  return digits;
+}
+
+/** @param {string|null|undefined} value */
+export function normalizeAuStateName(value) {
+  if (value == null) return null;
+  const key = String(value).trim().toLowerCase().replace(/\./g, "");
+  if (!key) return null;
+  if (key.length <= 3 && AU_STATE_ABBRS.has(key)) {
+    return AU_STATE_SLUG_TO_NAME[key] ?? null;
+  }
+  const slug = AU_STATE_NAME_TO_SLUG[key];
+  if (slug) return AU_STATE_SLUG_TO_NAME[slug];
+  if (AU_STATE_NAME_KEYS.has(key)) return titleCaseWords(key);
+  return titleCaseWords(String(value).trim());
+}
+
+/** @param {string} state */
+export function auStateNameToSlug(state) {
+  const key = String(state).trim().toLowerCase();
+  if (AU_STATE_NAME_TO_SLUG[key]) return AU_STATE_NAME_TO_SLUG[key];
+  const normalized = normalizeAuStateName(state);
+  if (!normalized) return null;
+  return AU_STATE_NAME_TO_SLUG[normalized.toLowerCase()] ?? slugifyAuSegment(normalized);
+}
+
+function slugifyAuSegment(value) {
+  return String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
 const UK_POSTCODE_RE = /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i;
 
@@ -163,7 +251,7 @@ export function normalizeUkRegion(value) {
 
 /**
  * @param {string|null|undefined} raw
- * @returns {typeof COUNTRY_US | typeof COUNTRY_GB | null}
+ * @returns {typeof COUNTRY_US | typeof COUNTRY_GB | typeof COUNTRY_AU | null}
  */
 export function parseCountryCode(raw) {
   if (raw == null) return null;
@@ -179,6 +267,7 @@ export function parseCountryCode(raw) {
   ) {
     return COUNTRY_GB;
   }
+  if (s === "AU" || s === "AUS" || s === "AUSTRALIA") return COUNTRY_AU;
   return null;
 }
 
@@ -186,7 +275,7 @@ export function parseCountryCode(raw) {
  * @param {object} row
  * @param {object} base — rowToBusiness result (may lack country)
  * @param {string|null|undefined} [forcedCountry]
- * @returns {typeof COUNTRY_US | typeof COUNTRY_GB}
+ * @returns {typeof COUNTRY_US | typeof COUNTRY_GB | typeof COUNTRY_AU}
  */
 export function detectCountryFromRow(row, base, forcedCountry) {
   const forced = parseCountryCode(forcedCountry);
@@ -206,6 +295,7 @@ export function detectCountryFromRow(row, base, forcedCountry) {
   }
 
   if (looksLikeUkPostcode(base.postal_code)) return COUNTRY_GB;
+  if (looksLikeAuPostcode(base.postal_code)) return COUNTRY_AU;
 
   const st = base.state != null ? String(base.state).trim().toLowerCase() : "";
   if (st && UK_NATION_NAMES.has(st)) return COUNTRY_GB;
@@ -214,9 +304,61 @@ export function detectCountryFromRow(row, base, forcedCountry) {
     if (nation && UK_REGION_NAME_TO_SLUG[nation.toLowerCase()]) return COUNTRY_GB;
   }
 
+  if (base.state && isLikelyAuState(base.state)) return COUNTRY_AU;
+
   if (base.state && isLikelyUsState(base.state)) return COUNTRY_US;
 
   return COUNTRY_US;
+}
+
+/**
+ * @param {string|null|undefined} formatted
+ * @returns {{ city: string|null, state: string|null, postal_code: string|null }}
+ */
+export function parseAuLocalityFromFormattedAddress(formatted) {
+  const out = { city: null, state: null, postal_code: null };
+  if (formatted == null || typeof formatted !== "string") return out;
+
+  const parts = formatted
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length < 2) return out;
+
+  const last = parts[parts.length - 1];
+  if (/^australia$/i.test(last) && parts.length >= 2) {
+    const prev = parts[parts.length - 2];
+    const cityStatePost = /^(.+?)\s+([A-Za-z]{2,3})\s+(\d{4})$/i.exec(prev);
+    if (cityStatePost) {
+      out.city = titleCaseWords(cityStatePost[1]);
+      out.state = normalizeAuStateName(cityStatePost[2]);
+      out.postal_code = normalizeAuPostcode(cityStatePost[3]);
+      return out;
+    }
+  }
+
+  const statePost = /^(.+?)\s+([A-Za-z]{2,3})\s+(\d{4})$/i.exec(last);
+  if (statePost) {
+    out.state = normalizeAuStateName(statePost[2]);
+    out.postal_code = normalizeAuPostcode(statePost[3]);
+    out.city = titleCaseWords(statePost[1]);
+    return out;
+  }
+
+  const postOnly = /^(\d{4})$/i.exec(last);
+  if (postOnly && parts.length >= 2) {
+    out.postal_code = normalizeAuPostcode(postOnly[1]);
+    const prev = parts[parts.length - 2];
+    const st = normalizeAuStateName(prev);
+    if (st) {
+      out.state = st;
+      if (parts.length >= 3) out.city = titleCaseWords(parts[parts.length - 3]);
+    } else {
+      out.city = titleCaseWords(prev);
+    }
+  }
+
+  return out;
 }
 
 /**

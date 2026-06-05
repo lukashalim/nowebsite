@@ -2,6 +2,7 @@ import type { DirectoryCountry } from "@/lib/directory/types";
 
 export const COUNTRY_US: DirectoryCountry = "US";
 export const COUNTRY_GB: DirectoryCountry = "GB";
+export const COUNTRY_AU: DirectoryCountry = "AU";
 
 export const UK_REGION_SLUG_TO_NAME: Record<string, string> = {
   england: "England",
@@ -22,6 +23,7 @@ export function parseDirectoryCountry(
 ): DirectoryCountry {
   const s = raw?.trim().toUpperCase();
   if (s === "GB" || s === "UK") return COUNTRY_GB;
+  if (s === "AU" || s === "AUS" || s === "AUSTRALIA") return COUNTRY_AU;
   return COUNTRY_US;
 }
 

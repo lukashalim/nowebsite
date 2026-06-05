@@ -1,4 +1,4 @@
-import { COUNTRY_GB } from "@/lib/directory/country";
+import { COUNTRY_AU, COUNTRY_GB } from "@/lib/directory/country";
 import { gbCountryPath } from "@/lib/directory/paths";
 import type { DirectoryCountry } from "@/lib/directory/types";
 import { stateAbbrToDisplayName, stateToAbbr } from "@/lib/directory/slugs";
@@ -14,6 +14,10 @@ export function formatLocationLabel(
   region?: string | null,
 ): string {
   if (country === COUNTRY_GB) {
+    const place = region?.trim() || state.trim();
+    return `${city.trim()}, ${place}`;
+  }
+  if (country === COUNTRY_AU) {
     const place = region?.trim() || state.trim();
     return `${city.trim()}, ${place}`;
   }

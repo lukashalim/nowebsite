@@ -11,12 +11,12 @@ begin
   ) then
     alter table public.businesses_nowebsite
       add constraint businesses_nowebsite_country_check
-      check (country in ('US', 'GB'));
+      check (country in ('US', 'GB', 'AU'));
   end if;
 end $$;
 
 comment on column public.businesses_nowebsite.country is
-  'ISO-style market: US (default) or GB (United Kingdom).';
+  'ISO-style market: US (default), GB, or AU.';
 
 create index if not exists idx_businesses_nowebsite_country_has_website
   on public.businesses_nowebsite (country, has_website)

@@ -6,6 +6,10 @@
 import { pick, toNum, omitUndefined } from "./scrape-pipeline/index.mjs";
 import { reverseGeocodeLocalityCensus } from "./location-fallbacks.mjs";
 import { deriveRegionFields } from "./region-fields.mjs";
+import {
+  sanitizeJsonColumn,
+  truncateForJson,
+} from "./json-column-sanitize.mjs";
 
 /**
  * @param {number|string} longitude
@@ -84,7 +88,7 @@ export function extractReviewHighlights(row, max = 5) {
     if (!txt || rating == null) continue;
     const t = String(txt).replace(/\s+/g, " ").trim();
     if (t.length < minLen) continue;
-    const excerpt = t.slice(0, maxLen).trim();
+    const excerpt = truncateForJson(t, maxLen);
     const key = excerpt.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -212,11 +216,13 @@ export function buildBusinessUpsertPayload(raw, base) {
     facebook_url: base.facebook_url ?? undefined,
   });
   const limit = Number(process.env.REVIEW_HIGHLIGHTS_LIMIT ?? 5);
+  const hoursData = extractHoursData(raw);
   return omitUndefined({
     ...core,
-    review_highlights: extractReviewHighlights(raw, limit),
+    review_highlights: sanitizeJsonColumn(extractReviewHighlights(raw, limit)),
     services_offered: extractServicesOffered(raw, base),
-    ...extractHoursData(raw),
+    hours: sanitizeJsonColumn(hoursData.hours),
+    open_now: hoursData.open_now,
     review_highlights_updated_at: new Date().toISOString(),
     last_checked: new Date().toISOString(),
   });

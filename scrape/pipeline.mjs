@@ -22,6 +22,7 @@ import {
   prefetchExistingByPlaceId,
   shouldRecordConversion,
 } from "./lib/conversion-tracking.mjs";
+import { truncateForJson, sanitizeJsonColumn } from "./lib/json-column-sanitize.mjs";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const BUSINESSES_UPSERT_BATCH_SIZE = Math.max(
@@ -467,7 +468,7 @@ function extractReviewHighlights(row, max = 5) {
     if (!txt || rating == null) continue;
     const t = String(txt).replace(/\s+/g, " ").trim();
     if (t.length < minLen) continue;
-    const excerpt = t.slice(0, maxLen).trim();
+    const excerpt = truncateForJson(t, maxLen);
     const key = excerpt.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -738,18 +739,22 @@ async function main() {
           }
 
           const now = new Date();
+          const hoursData = extractHoursData(raw);
           const payload = omitUndefined(
             mergeTrackingIntoPayload(
               {
                 ...base,
                 facebook_url: base.facebook_url ?? undefined,
                 competitive_weakness,
-                review_highlights: extractReviewHighlights(
-                  raw,
-                  Number(process.env.REVIEW_HIGHLIGHTS_LIMIT ?? 5),
+                review_highlights: sanitizeJsonColumn(
+                  extractReviewHighlights(
+                    raw,
+                    Number(process.env.REVIEW_HIGHLIGHTS_LIMIT ?? 5),
+                  ),
                 ),
                 services_offered: extractServicesOffered(raw, base),
-                ...extractHoursData(raw),
+                hours: sanitizeJsonColumn(hoursData.hours),
+                open_now: hoursData.open_now,
                 review_highlights_updated_at: now.toISOString(),
               },
               { existing, now },

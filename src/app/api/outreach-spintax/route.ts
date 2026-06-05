@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import {
-  generateFacebookListingSpintax,
+  buildFacebookListingSpintax,
   isEligibleForFacebookListingOutreach,
   shortenBusinessNameForOutreach,
   type FacebookOutreachRow,
@@ -9,6 +9,11 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+interface OutreachDbRow extends FacebookOutreachRow {
+  main_category: string | null;
+  business_type: string | null;
+}
 
 export async function POST(req: Request) {
   try {
@@ -32,7 +37,9 @@ export async function POST(req: Request) {
     const supabase = createSupabaseAdmin();
     const { data: row, error } = await supabase
       .from("businesses_nowebsite")
-      .select("place_id, name, facebook_url, crm_contact_surface, listing_website")
+      .select(
+        "place_id, name, facebook_url, crm_contact_surface, listing_website, main_category, business_type",
+      )
       .eq("place_id", placeId)
       .maybeSingle();
 
@@ -43,7 +50,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Business not found" }, { status: 404 });
     }
 
-    const outreachRow = row as FacebookOutreachRow;
+    const outreachRow = row as OutreachDbRow;
     if (!isEligibleForFacebookListingOutreach(outreachRow)) {
       return NextResponse.json(
         {
@@ -56,7 +63,12 @@ export async function POST(req: Request) {
 
     const fullName = outreachRow.name?.trim() ?? "";
     const shortName = shortenBusinessNameForOutreach(outreachRow.name);
-    const spintax = await generateFacebookListingSpintax(shortName, fullName);
+    const spintax = buildFacebookListingSpintax({
+      placeId: outreachRow.place_id,
+      name: outreachRow.name,
+      mainCategory: outreachRow.main_category,
+      businessType: outreachRow.business_type,
+    });
 
     return NextResponse.json({
       spintax,
@@ -65,7 +77,6 @@ export async function POST(req: Request) {
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
-    const status = /DEEPSEEK_API_KEY/.test(msg) ? 501 : 500;
-    return NextResponse.json({ error: msg }, { status });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

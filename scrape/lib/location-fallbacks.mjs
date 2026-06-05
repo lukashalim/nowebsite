@@ -4,12 +4,17 @@
 
 import { pick } from "./scrape-pipeline/index.mjs";
 import {
+  COUNTRY_AU,
   COUNTRY_GB,
   COUNTRY_US,
   detectCountryFromRow,
+  looksLikeAuPostcode,
   looksLikeUkPostcode,
+  normalizeAuPostcode,
+  normalizeAuStateName,
   normalizeUkPostcode,
   normalizeUkRegion,
+  parseAuLocalityFromFormattedAddress,
   parseUkLocalityFromFormattedAddress,
 } from "./country.mjs";
 
@@ -313,6 +318,13 @@ function normalizeLocationByCountry(base) {
     }
     return base;
   }
+  if (base.country === COUNTRY_AU) {
+    if (base.state) base.state = normalizeAuStateName(base.state) ?? base.state;
+    if (base.postal_code) {
+      base.postal_code = normalizeAuPostcode(base.postal_code) ?? base.postal_code;
+    }
+    return base;
+  }
   if (base.state) base.state = normalizeUsStateName(base.state);
   if (base.postal_code) {
     const d = String(base.postal_code).replace(/\D/g, "").slice(0, 5);
@@ -359,6 +371,9 @@ export function applyLocationFallbacks(base, row, opts = {}) {
   const preferUk =
     preCountry === COUNTRY_GB ||
     looksLikeUkPostcode(base.postal_code);
+  const preferAu =
+    preCountry === COUNTRY_AU ||
+    looksLikeAuPostcode(base.postal_code);
 
   const formattedCandidates = [
     base.address,
@@ -373,7 +388,9 @@ export function applyLocationFallbacks(base, row, opts = {}) {
     seen.add(s);
     const parsed = preferUk
       ? parseUkLocalityFromFormattedAddress(s)
-      : parseCityStateFromFormattedAddress(s);
+      : preferAu
+        ? parseAuLocalityFromFormattedAddress(s)
+        : parseCityStateFromFormattedAddress(s);
     if (!base.city && parsed.city) base.city = parsed.city;
     if (!base.state && parsed.state) base.state = parsed.state;
     if (!base.postal_code && parsed.postal_code) {
@@ -405,6 +422,14 @@ export async function enrichLocationAsync(base, opts = {}) {
     base.country = COUNTRY_GB;
     if (!base.postal_code && locationHint && looksLikeUkPostcode(locationHint)) {
       base.postal_code = normalizeUkPostcode(locationHint);
+    }
+    return normalizeLocationByCountry(base);
+  }
+
+  if (base.country === COUNTRY_AU || opts.forcedCountry === COUNTRY_AU) {
+    base.country = COUNTRY_AU;
+    if (!base.postal_code && locationHint && looksLikeAuPostcode(locationHint)) {
+      base.postal_code = normalizeAuPostcode(locationHint);
     }
     return normalizeLocationByCountry(base);
   }

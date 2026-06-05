@@ -3,6 +3,8 @@
  * src/lib/directory/slugs.ts stateNameToSlug / stateToAbbr.
  */
 
+import { auStateNameToSlug, normalizeAuStateName } from "./country.mjs";
+
 const STATE_NAME_TO_ABBR = {
   alabama: "al",
   alaska: "ak",
@@ -130,6 +132,12 @@ export function deriveRegionFields(row) {
 
   if (country === "GB" || country === "UK") {
     const { region, regionCode } = resolveGbNation(city, state);
+    return { region, region_code: regionCode };
+  }
+
+  if (country === "AU") {
+    const region = normalizeAuStateName(state) ?? (state || null);
+    const regionCode = region ? auStateNameToSlug(region) : null;
     return { region, region_code: regionCode };
   }
 
