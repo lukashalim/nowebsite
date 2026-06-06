@@ -4,24 +4,35 @@ import {
   SPINTAX_AUDIENCE_VALUES,
   type SpintaxAudience,
 } from "@/lib/spintax-audience";
-import { DEFAULT_SPINTAX_TEMPLATES } from "@/lib/spintax-defaults";
+import {
+  isSpintaxChannel,
+  type SpintaxChannel,
+} from "@/lib/spintax-channel";
+import {
+  DEFAULT_FACEBOOK_SPINTAX_TEMPLATES,
+  DEFAULT_SMS_SPINTAX_TEMPLATES,
+} from "@/lib/spintax-defaults";
 
 export interface SpintaxTemplate {
   id: string;
   name: string;
   template: string;
   audience: SpintaxAudience;
+  channel: SpintaxChannel;
   created_at: string;
 }
 
 function mapRow(row: Record<string, unknown>): SpintaxTemplate {
   const audienceRaw = String(row.audience ?? "facebook");
   const audience = isSpintaxAudience(audienceRaw) ? audienceRaw : "facebook";
+  const channelRaw = String(row.channel ?? "facebook");
+  const channel = isSpintaxChannel(channelRaw) ? channelRaw : "facebook";
   return {
     id: String(row.id),
     name: String(row.name),
     template: String(row.template),
     audience,
+    channel,
     created_at: String(row.created_at),
   };
 }
@@ -32,39 +43,58 @@ export async function ensureDefaultSpintaxTemplates(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const { data: rows, error: fetchError } = await supabase
     .from("spintax_templates")
-    .select("audience")
+    .select("audience, channel")
     .eq("user_id", userId);
 
   if (fetchError) {
-    const hint = /spintax_templates|schema cache|audience/i.test(fetchError.message)
-      ? " Run scrape/sql/add-spintax-template-audience.sql in Supabase."
+    const hint = /spintax_templates|schema cache|audience|channel/i.test(
+      fetchError.message,
+    )
+      ? " Run scrape/sql/add-spintax-template-audience.sql and add-spintax-template-channel.sql in Supabase."
       : "";
     return { ok: false, error: fetchError.message + hint };
   }
 
-  const audiencesPresent = new Set(
-    (rows ?? []).map((row) => {
-      const audience = String((row as { audience?: string }).audience ?? "facebook");
-      return isSpintaxAudience(audience) ? audience : "facebook";
-    }),
-  );
+  const facebookAudiencesPresent = new Set<SpintaxAudience>();
+  let hasSmsTemplates = false;
 
-  const audiencesToSeed = SPINTAX_AUDIENCE_VALUES.filter(
-    (audience) => audience !== "any" && !audiencesPresent.has(audience),
-  );
-
-  if (audiencesToSeed.length === 0) {
-    return { ok: true };
+  for (const row of rows ?? []) {
+    const record = row as { audience?: string; channel?: string };
+    const channelRaw = String(record.channel ?? "facebook");
+    const channel = isSpintaxChannel(channelRaw) ? channelRaw : "facebook";
+    if (channel === "sms") {
+      hasSmsTemplates = true;
+      continue;
+    }
+    const audienceRaw = String(record.audience ?? "facebook");
+    const audience = isSpintaxAudience(audienceRaw) ? audienceRaw : "facebook";
+    facebookAudiencesPresent.add(audience);
   }
 
-  const toInsert = DEFAULT_SPINTAX_TEMPLATES.filter((t) =>
-    audiencesToSeed.includes(t.audience),
-  ).map((t) => ({
-    user_id: userId,
-    name: t.name,
-    template: t.template,
-    audience: t.audience,
-  }));
+  const facebookAudiencesToSeed = SPINTAX_AUDIENCE_VALUES.filter(
+    (audience) => audience !== "any" && !facebookAudiencesPresent.has(audience),
+  );
+
+  const toInsert = [
+    ...DEFAULT_FACEBOOK_SPINTAX_TEMPLATES.filter((t) =>
+      facebookAudiencesToSeed.includes(t.audience),
+    ).map((t) => ({
+      user_id: userId,
+      name: t.name,
+      template: t.template,
+      audience: t.audience,
+      channel: t.channel,
+    })),
+    ...(hasSmsTemplates
+      ? []
+      : DEFAULT_SMS_SPINTAX_TEMPLATES.map((t) => ({
+          user_id: userId,
+          name: t.name,
+          template: t.template,
+          audience: t.audience,
+          channel: t.channel,
+        }))),
+  ];
 
   if (toInsert.length === 0) {
     return { ok: true };
@@ -92,7 +122,7 @@ export async function fetchSpintaxTemplatesForUser(
 
   const { data, error } = await supabase
     .from("spintax_templates")
-    .select("id, name, template, audience, created_at")
+    .select("id, name, template, audience, channel, created_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
 
@@ -110,6 +140,7 @@ export function validateSpintaxTemplateInput(
   name: string,
   template: string,
   audience?: string,
+  channel?: string,
 ): string | null {
   const trimmedName = name.trim();
   if (!trimmedName) return "Name is required";
@@ -118,6 +149,9 @@ export function validateSpintaxTemplateInput(
   if (template.length > 4000) return "Template must be 4000 characters or less";
   if (audience !== undefined && !isSpintaxAudience(audience)) {
     return "Invalid lead type";
+  }
+  if (channel !== undefined && !isSpintaxChannel(channel)) {
+    return "Invalid channel";
   }
   return null;
 }

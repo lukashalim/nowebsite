@@ -34,7 +34,7 @@ export function CrmLogin() {
         <div className="space-y-6 p-8 pb-6">
           <div className="space-y-2 text-center">
             <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-2xl">
-              No Website Business Leads
+              Outreach Engine
             </h1>
             <p className="text-sm font-medium text-[#4A4A4A] dark:text-zinc-300">
               The prospecting tool for web designers

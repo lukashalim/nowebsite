@@ -6,6 +6,10 @@ import {
   type SpintaxAudience,
 } from "@/lib/spintax-audience";
 import {
+  isSpintaxChannel,
+  type SpintaxChannel,
+} from "@/lib/spintax-channel";
+import {
   fetchSpintaxTemplatesForUser,
   validateSpintaxTemplateInput,
   type SpintaxTemplate,
@@ -25,11 +29,16 @@ function mapTemplateRow(data: Record<string, unknown>): SpintaxTemplate {
   const audience: SpintaxAudience = isSpintaxAudience(audienceRaw)
     ? audienceRaw
     : "facebook";
+  const channelRaw = String(data.channel ?? "facebook");
+  const channel: SpintaxChannel = isSpintaxChannel(channelRaw)
+    ? channelRaw
+    : "facebook";
   return {
     id: String(data.id),
     name: String(data.name),
     template: String(data.template),
     audience,
+    channel,
     created_at: String(data.created_at),
   };
 }
@@ -62,12 +71,18 @@ export async function updateSpintaxTemplate(
   name: string,
   template: string,
   audience: SpintaxAudience,
+  channel: SpintaxChannel,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!id || typeof id !== "string") {
     return { ok: false, error: "Invalid template" };
   }
 
-  const validationError = validateSpintaxTemplateInput(name, template, audience);
+  const validationError = validateSpintaxTemplateInput(
+    name,
+    template,
+    audience,
+    channel,
+  );
   if (validationError) {
     return { ok: false, error: validationError };
   }
@@ -87,6 +102,7 @@ export async function updateSpintaxTemplate(
       name: name.trim(),
       template,
       audience,
+      channel,
     })
     .eq("id", id)
     .eq("user_id", user.id);
@@ -103,10 +119,16 @@ export async function createSpintaxTemplate(
   name: string,
   template: string,
   audience: SpintaxAudience = "any",
+  channel: SpintaxChannel = "facebook",
 ): Promise<
   { ok: true; template: SpintaxTemplate } | { ok: false; error: string }
 > {
-  const validationError = validateSpintaxTemplateInput(name, template, audience);
+  const validationError = validateSpintaxTemplateInput(
+    name,
+    template,
+    audience,
+    channel,
+  );
   if (validationError) {
     return { ok: false, error: validationError };
   }
@@ -127,8 +149,9 @@ export async function createSpintaxTemplate(
       name: name.trim(),
       template,
       audience,
+      channel,
     })
-    .select("id, name, template, audience, created_at")
+    .select("id, name, template, audience, channel, created_at")
     .single();
 
   if (error || !data) {

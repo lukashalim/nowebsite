@@ -10,9 +10,12 @@ import {
   type CrmSearchParams,
   type CrmWebPresence,
 } from "@/lib/crm-params";
+import { formatCategoryDisplayName } from "@/lib/directory/labels";
+import { stateAbbrToDisplayName } from "@/lib/directory/slugs";
 import type { DemoReviewHighlight } from "@/lib/demo-review-types";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { demoPublicPath, isLikelyGooglePlaceId } from "@/lib/demo-slug";
+import { cache } from "react";
 
 export type { DemoReviewHighlight } from "@/lib/demo-review-types";
 
@@ -44,6 +47,7 @@ function applyWebPresenceFilter<
   switch (webPresence) {
     case "yes":
       return q.eq("has_website", true);
+    case "all":
     case "no":
       return q.eq("has_website", false);
     case "plain":
@@ -354,6 +358,13 @@ export async function fetchCrmBusinessRows(
     }
     q = stageFiltered;
 
+    if (p.category) {
+      q = q.eq("main_category", p.category);
+    }
+    if (p.state) {
+      q = q.eq("state", p.state);
+    }
+
     q = applyReviewExcerptsExtractedFilter(q);
 
     const from = (p.page - 1) * p.pageSize;
@@ -395,6 +406,72 @@ export async function fetchCrmBusinessRows(
     return { rows: [], total: 0, error: msg };
   }
 }
+
+export interface CrmFilterOption {
+  value: string;
+  label: string;
+}
+
+export interface CrmFilterOptions {
+  categories: CrmFilterOption[];
+  states: CrmFilterOption[];
+}
+
+export const fetchCrmFilterOptions = cache(
+  async (): Promise<CrmFilterOptions> => {
+    const supabase = createSupabaseAdmin();
+    const categorySet = new Set<string>();
+    const stateSet = new Set<string>();
+    let offset = 0;
+
+    for (;;) {
+      let q = supabase
+        .from("businesses_nowebsite")
+        .select("main_category, state")
+        .eq("is_invalid", false);
+      q = applyReviewExcerptsExtractedFilter(q);
+      const { data, error } = await q
+        .order("place_id", { ascending: true })
+        .range(offset, offset + BATCH - 1);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      const rows = data ?? [];
+      for (const row of rows) {
+        const category =
+          typeof row.main_category === "string"
+            ? row.main_category.trim()
+            : "";
+        if (category) categorySet.add(category);
+
+        const state =
+          typeof row.state === "string" ? row.state.trim() : "";
+        if (state) stateSet.add(state);
+      }
+
+      if (rows.length < BATCH) break;
+      offset += BATCH;
+    }
+
+    const categories = [...categorySet]
+      .map((value) => ({
+        value,
+        label: formatCategoryDisplayName(value),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+
+    const states = [...stateSet]
+      .map((value) => ({
+        value,
+        label: stateAbbrToDisplayName(value),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+
+    return { categories, states };
+  },
+);
 
 export interface DemoBusiness
   extends Omit<BusinessLead, "contact_count" | "stage" | "owner_name" | "notes"> {

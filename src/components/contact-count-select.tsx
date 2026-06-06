@@ -1,7 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { updateContactCount } from "@/app/actions/update-contact";
 import {
   crmInlineCellClass,
@@ -13,15 +12,20 @@ const OPTIONS = Array.from({ length: 4 }, (_, i) => i);
 interface ContactCountSelectProps {
   placeId: string;
   value: number;
+  onValueChange?: (next: number) => void;
 }
 
 export function ContactCountSelect({
   placeId,
   value,
+  onValueChange,
 }: ContactCountSelectProps) {
-  const router = useRouter();
   const [pending, setPending] = useState(false);
   const [selected, setSelected] = useState(value);
+
+  useEffect(() => {
+    setSelected(value);
+  }, [value]);
 
   return (
     <div className={crmInlineCellClass}>
@@ -38,7 +42,7 @@ export function ContactCountSelect({
           const res = await updateContactCount(placeId, next);
           setPending(false);
           if (res.ok) {
-            router.refresh();
+            onValueChange?.(next);
           } else {
             setSelected(previous);
             window.alert(res.error);

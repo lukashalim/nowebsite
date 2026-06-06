@@ -3,10 +3,13 @@ import {
   buildCrmQueryString,
   type CrmSearchParams,
 } from "@/lib/crm-params";
+import type { CrmFilterOption } from "@/lib/crm-cohort";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
 
 interface CrmFiltersProps {
   params: CrmSearchParams;
+  categories: CrmFilterOption[];
+  states: CrmFilterOption[];
 }
 
 const fieldClass =
@@ -14,12 +17,12 @@ const fieldClass =
 
 const labelClass = "flex shrink-0 flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400";
 
-export function CrmFilters({ params }: CrmFiltersProps) {
+export function CrmFilters({ params, categories, states }: CrmFiltersProps) {
   return (
     <section className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-3 dark:border-zinc-800 dark:bg-zinc-900/40">
       <form
         method="get"
-        className="flex flex-wrap items-end gap-x-3 gap-y-3 lg:flex-nowrap"
+        className="flex flex-wrap items-end gap-x-3 gap-y-3"
       >
         <label className={labelClass}>
           Reviews
@@ -65,9 +68,10 @@ export function CrmFilters({ params }: CrmFiltersProps) {
             name="webPresence"
             defaultValue={params.webPresence}
             className={`${fieldClass} min-w-[9rem]`}
-            title="No = no standalone site (any FB/WA listing). Facebook / WhatsApp narrow by Maps listing. Yes = real website."
+            title="All = no standalone site (any FB/WA listing). Facebook / WhatsApp narrow by Maps listing. Yes = real website."
           >
-            <option value="no">No (no real site)</option>
+            <option value="all">All</option>
+            <option value="plain">No real site</option>
             <option value="facebook">Facebook</option>
             <option value="whatsapp">WhatsApp</option>
             <option value="yes">Yes</option>
@@ -87,6 +91,38 @@ export function CrmFilters({ params }: CrmFiltersProps) {
             <option value="demo_sent">Demo Sent</option>
             <option value="interested">Interested</option>
             <option value="closed">Closed</option>
+          </select>
+        </label>
+
+        <label className={labelClass}>
+          Category
+          <select
+            name="category"
+            defaultValue={params.category ?? ""}
+            className={`${fieldClass} min-w-[10rem]`}
+          >
+            <option value="">All categories</option>
+            {categories.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className={labelClass}>
+          State
+          <select
+            name="state"
+            defaultValue={params.state ?? ""}
+            className={`${fieldClass} min-w-[8rem]`}
+          >
+            <option value="">All states</option>
+            {states.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
           </select>
         </label>
 

@@ -2,6 +2,10 @@ import {
   isEligibleForFacebookListingOutreach,
   type FacebookOutreachRow,
 } from "@/lib/outreach-spintax";
+import {
+  filterSpintaxTemplatesByChannel,
+  type SpintaxChannel,
+} from "@/lib/spintax-channel";
 import type { SpintaxTemplate } from "@/lib/spintax-templates";
 
 export const SPINTAX_AUDIENCE_VALUES = [
@@ -46,5 +50,16 @@ export function filterSpintaxTemplatesByAudience(
 ): SpintaxTemplate[] {
   return templates.filter((t) =>
     templateMatchesLeadAudience(t.audience, leadAudience),
+  );
+}
+
+export function filterSpintaxTemplatesForLeadChannel(
+  templates: SpintaxTemplate[],
+  channel: SpintaxChannel,
+  leadAudience: SpintaxAudience,
+): SpintaxTemplate[] {
+  return filterSpintaxTemplatesByAudience(
+    filterSpintaxTemplatesByChannel(templates, channel),
+    leadAudience,
   );
 }

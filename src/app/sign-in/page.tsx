@@ -7,9 +7,9 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Sign in",
+  title: "Sign in | Outreach Engine",
   description:
-    "Sign in to No Website Business Leads — the prospecting tool for web designers.",
+    "Sign in to Outreach Engine — the prospecting tool for web designers.",
 };
 
 export default async function SignInPage() {

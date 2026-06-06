@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { incrementContactCount } from "@/app/actions/update-contact";
 import { buildOutreachMessage } from "@/lib/outreach-spintax";
 import {
-  filterSpintaxTemplatesByAudience,
+  filterSpintaxTemplatesForLeadChannel,
   type SpintaxAudience,
 } from "@/lib/spintax-audience";
 import type { SpintaxTemplate } from "@/lib/spintax-templates";
 
 interface OutreachSpintaxButtonProps {
+  placeId: string;
   userId: string;
   businessName: string | null;
   mainCategory: string | null;
@@ -17,6 +19,7 @@ interface OutreachSpintaxButtonProps {
   leadAudience: SpintaxAudience;
   templates: SpintaxTemplate[];
   facebookUrl?: string | null;
+  onContactCountChange?: (next: number) => void;
 }
 
 function lastUsedStorageKey(userId: string, leadAudience: SpintaxAudience): string {
@@ -30,6 +33,7 @@ function normalizeFacebookUrl(url: string): string {
 }
 
 export function OutreachSpintaxButton({
+  placeId,
   userId,
   businessName,
   mainCategory,
@@ -38,13 +42,15 @@ export function OutreachSpintaxButton({
   leadAudience,
   templates,
   facebookUrl,
+  onContactCountChange,
 }: OutreachSpintaxButtonProps) {
   const [copied, setCopied] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
   const [selectedId, setSelectedId] = useState("");
 
   const matchingTemplates = useMemo(
-    () => filterSpintaxTemplatesByAudience(templates, leadAudience),
+    () =>
+      filterSpintaxTemplatesForLeadChannel(templates, "facebook", leadAudience),
     [templates, leadAudience],
   );
 
@@ -94,6 +100,11 @@ export function OutreachSpintaxButton({
     window.open(facebookHref, "_blank", "noopener,noreferrer");
     setToastVisible(true);
     setTimeout(() => setToastVisible(false), 2500);
+
+    const res = await incrementContactCount(placeId);
+    if (res.ok) {
+      onContactCountChange?.(res.contactCount);
+    }
   }
 
   if (facebookHref) {

@@ -39,8 +39,15 @@ const optionalStage = z.preprocess((val) => {
   return undefined;
 }, z.enum(CRM_STAGE_VALUES).optional());
 
-/** `plain` = legacy ?contactSurface=none (no FB/WA bucket only); not shown in the CRM dropdown. */
+const optionalFilterString = z.preprocess((val) => {
+  if (val === undefined || val === "") return undefined;
+  const s = String(val).trim();
+  return s || undefined;
+}, z.string().min(1).optional());
+
+/** `plain` = legacy ?contactSurface=none (no FB/WA bucket only). `no` = legacy URL alias for `all`. */
 export const crmWebPresenceValues = [
+  "all",
   "no",
   "plain",
   "facebook",
@@ -54,13 +61,15 @@ export const crmSearchParamsSchema = z
     minReviews: intInRange(25, 0, 1_000_000),
     maxReviews: intInRange(199, 0, 1_000_000),
     minRating: floatInRange(4, 0, 5),
-    /** No = no standalone website (broad); Facebook / WhatsApp narrow by Maps listing; Yes = has a real site. */
-    webPresence: z.enum(crmWebPresenceValues).default("no"),
+    /** All = broad no-website cohort; Facebook / WhatsApp narrow by Maps listing; Yes = has a real site. */
+    webPresence: z.enum(crmWebPresenceValues).default("all"),
     page: intInRange(1, 1, 1_000_000),
     pageSize: intInRange(50, 1, 100),
     contactMin: optionalInt,
     contactMax: optionalInt,
     stage: optionalStage,
+    category: optionalFilterString,
+    state: optionalFilterString,
   })
   .refine((d) => d.minReviews <= d.maxReviews, {
     message: "minReviews must be <= maxReviews",
@@ -91,7 +100,7 @@ export function defaultCrmDemoCohortFilters(): Pick<
 > {
   const p = defaultCrmSearchParams();
   return {
-    webPresence: p.webPresence,
+    webPresence: "all",
     minReviews: p.minReviews,
     maxReviews: p.maxReviews,
     minRating: p.minRating,
@@ -102,8 +111,10 @@ function normalizeWebPresence(
   raw: Record<string, string | string[] | undefined>,
 ): CrmWebPresence {
   const direct = firstParam(raw.webPresence)?.toLowerCase().trim();
+  if (direct === "no") return "all";
   if (
-    direct === "no" ||
+    direct === "all" ||
+    direct === "plain" ||
     direct === "facebook" ||
     direct === "whatsapp" ||
     direct === "yes"
@@ -118,9 +129,9 @@ function normalizeWebPresence(
   if (cs === "facebook") return "facebook";
   if (cs === "whatsapp") return "whatsapp";
   if (cs === "none") {
-    return "no";
+    return "plain";
   }
-  return "no";
+  return "all";
 }
 
 function rawToFlat(raw: Record<string, string | string[] | undefined>) {
@@ -134,6 +145,8 @@ function rawToFlat(raw: Record<string, string | string[] | undefined>) {
     contactMin: firstParam(raw.contactMin),
     contactMax: firstParam(raw.contactMax),
     stage: firstParam(raw.stage),
+    category: firstParam(raw.category),
+    state: firstParam(raw.state),
   };
 }
 
@@ -158,7 +171,8 @@ export function buildCrmQueryString(params: CrmSearchParams): string {
   if (params.minReviews !== 25) sp.set("minReviews", String(params.minReviews));
   if (params.maxReviews !== 199) sp.set("maxReviews", String(params.maxReviews));
   if (params.minRating !== 4) sp.set("minRating", String(params.minRating));
-  if (params.webPresence !== "no") sp.set("webPresence", params.webPresence);
+  if (params.webPresence !== "all")
+    sp.set("webPresence", params.webPresence);
   if (params.page !== 1) sp.set("page", String(params.page));
   if (params.pageSize !== 50) sp.set("pageSize", String(params.pageSize));
   if (params.contactMin !== undefined)
@@ -166,6 +180,8 @@ export function buildCrmQueryString(params: CrmSearchParams): string {
   if (params.contactMax !== undefined)
     sp.set("contactMax", String(params.contactMax));
   if (params.stage !== undefined) sp.set("stage", params.stage);
+  if (params.category !== undefined) sp.set("category", params.category);
+  if (params.state !== undefined) sp.set("state", params.state);
   const s = sp.toString();
   return s ? `?${s}` : "";
 }

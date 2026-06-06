@@ -58,7 +58,8 @@ export function isEligibleForCrmSpintax(
   row: FacebookOutreachRow,
 ): boolean {
   if (webPresence === "yes") return false;
-  if (webPresence === "no" || webPresence === "plain") return true;
+  if (webPresence === "all" || webPresence === "no" || webPresence === "plain")
+    return true;
   if (webPresence === "facebook" || webPresence === "whatsapp") return true;
   return isEligibleForFacebookListingOutreach(row);
 }

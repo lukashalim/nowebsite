@@ -9,7 +9,7 @@ import {
 } from "@/lib/outreach-spintax";
 import type { CrmWebPresence } from "@/lib/crm-params";
 import {
-  filterSpintaxTemplatesByAudience,
+  filterSpintaxTemplatesForLeadChannel,
   leadSpintaxAudience,
   templateMatchesLeadAudience,
 } from "@/lib/spintax-audience";
@@ -50,12 +50,12 @@ export async function POST(req: Request) {
     const templateOverride =
       typeof record.template === "string" ? record.template : "";
     const webPresenceRaw =
-      typeof record.webPresence === "string" ? record.webPresence.trim() : "no";
+      typeof record.webPresence === "string" ? record.webPresence.trim() : "all";
     const webPresence = (
-      ["no", "plain", "facebook", "whatsapp", "yes"] as const
+      ["all", "no", "plain", "facebook", "whatsapp", "yes"] as const
     ).includes(webPresenceRaw as CrmWebPresence)
       ? (webPresenceRaw as CrmWebPresence)
-      : "no";
+      : "all";
 
     if (!placeId) {
       return NextResponse.json({ error: "placeId is required" }, { status: 400 });
@@ -103,6 +103,12 @@ export async function POST(req: Request) {
       if (!match) {
         return NextResponse.json({ error: "Template not found" }, { status: 404 });
       }
+      if (match.channel !== "facebook") {
+        return NextResponse.json(
+          { error: "Template is not a Facebook DM template" },
+          { status: 400 },
+        );
+      }
       if (!templateMatchesLeadAudience(match.audience, leadAudience)) {
         return NextResponse.json(
           { error: "Template does not match this lead type" },
@@ -121,7 +127,11 @@ export async function POST(req: Request) {
       if (templatesError) {
         return NextResponse.json({ error: templatesError }, { status: 500 });
       }
-      const matching = filterSpintaxTemplatesByAudience(templates, leadAudience);
+      const matching = filterSpintaxTemplatesForLeadChannel(
+        templates,
+        "facebook",
+        leadAudience,
+      );
       templateText = matching[0]?.template ?? "";
     }
 

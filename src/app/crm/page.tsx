@@ -1,37 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  ExternalLink,
-  MapPin,
-  Phone,
-  Star,
-} from "lucide-react";
 import { listSpintaxTemplates } from "@/app/actions/spintax-templates";
 import { CrmFilters, CrmPagination } from "@/components/crm-filters";
+import { CrmLeadsTableBody } from "@/components/crm-leads-table-body";
 import { CrmLogin } from "@/components/crm-login";
 import { CrmNav } from "@/components/crm-nav";
-import { ContactCountSelect } from "@/components/contact-count-select";
-import { MarkInvalidButton } from "@/components/mark-invalid-button";
-import { NotesCell } from "@/components/notes-cell";
-import { OutreachSpintaxButton } from "@/components/outreach-spintax-button";
-import { OwnerNameInput } from "@/components/owner-name-input";
-import { StageSelect } from "@/components/stage-select";
-import { fetchCrmBusinessRows } from "@/lib/crm-cohort";
+import { fetchCrmBusinessRows, fetchCrmFilterOptions } from "@/lib/crm-cohort";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
-import { demoPublicPath } from "@/lib/demo-slug";
 import { tryParseCrmSearchParams } from "@/lib/crm-params";
-import {
-  isEligibleForCrmSpintax,
-  resolveFacebookPageUrl,
-} from "@/lib/outreach-spintax";
-import { leadSpintaxAudience } from "@/lib/spintax-audience";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: "No-website leads | Mini CRM",
+    title: "No-website leads | Outreach Engine",
     description:
       "No-website leads with extracted review excerpts. Filter by reviews, rating, and outreach.",
   };
@@ -79,10 +62,12 @@ export default async function CrmPage({ searchParams }: PageProps) {
   }
 
   const p = parsed.data;
-  const [{ rows, total, error: loadErr }, spintaxResult] = await Promise.all([
-    fetchCrmBusinessRows(p, user.id),
-    listSpintaxTemplates(),
-  ]);
+  const [{ rows, total, error: loadErr }, spintaxResult, filterOptions] =
+    await Promise.all([
+      fetchCrmBusinessRows(p, user.id),
+      listSpintaxTemplates(),
+      fetchCrmFilterOptions(),
+    ]);
   const loadError = loadErr;
   const spintaxTemplates = spintaxResult.ok ? spintaxResult.templates : [];
 
@@ -100,7 +85,11 @@ export default async function CrmPage({ searchParams }: PageProps) {
         </p>
       </header>
 
-      <CrmFilters params={p} />
+      <CrmFilters
+        params={p}
+        categories={filterOptions.categories}
+        states={filterOptions.states}
+      />
 
       {loadError ? (
         <div
@@ -137,148 +126,12 @@ export default async function CrmPage({ searchParams }: PageProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                {rows.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={12}
-                      className="px-3 py-8 text-center text-zinc-500 dark:text-zinc-400"
-                    >
-                      No rows match these filters.
-                    </td>
-                  </tr>
-                ) : (
-                  rows.map((b) => {
-                    const outreachRow = {
-                      place_id: b.place_id,
-                      name: b.name,
-                      facebook_url: b.facebook_url,
-                      crm_contact_surface: b.crm_contact_surface ?? null,
-                      listing_website: b.listing_website,
-                    };
-                    const spintaxEligible = isEligibleForCrmSpintax(
-                      p.webPresence,
-                      outreachRow,
-                    );
-                    const spintaxLeadAudience = leadSpintaxAudience(outreachRow);
-                    return (
-                      <tr
-                        key={b.place_id}
-                        className="align-top hover:bg-zinc-50/80 dark:hover:bg-zinc-900/50"
-                      >
-                        <td className="px-3 py-3 font-medium capitalize text-zinc-900 dark:text-zinc-100">
-                          {b.name ?? "—"}
-                        </td>
-                        <td className="px-3 py-3 text-zinc-600 dark:text-zinc-300">
-                          <span className="inline-flex items-start gap-1.5">
-                            <MapPin
-                              className="mt-0.5 size-3.5 shrink-0 text-zinc-400"
-                              aria-hidden
-                            />
-                            <span>
-                              {[b.city, b.state, b.postal_code]
-                                .filter(Boolean)
-                                .join(", ") || b.address || "—"}
-                            </span>
-                            {b.google_maps_link ? (
-                              <a
-                                href={b.google_maps_link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="mt-0.5 shrink-0 text-zinc-400 transition-colors hover:text-accent"
-                                title="Open in Google Maps"
-                                aria-label="Open in Google Maps"
-                              >
-                                <ExternalLink className="size-3.5" aria-hidden />
-                              </a>
-                            ) : null}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3 tabular-nums text-zinc-800 dark:text-zinc-200">
-                          {b.rating != null ? (
-                            <span className="inline-flex items-center gap-1">
-                              <Star
-                                className="size-3.5 fill-amber-400 text-amber-400"
-                                aria-hidden
-                              />
-                              {Number(b.rating).toFixed(1)}
-                            </span>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-                        <td className="px-3 py-3 tabular-nums text-zinc-800 dark:text-zinc-200">
-                          {b.reviews ?? "—"}
-                        </td>
-                        <td className="px-3 py-3">
-                          {b.phone ? (
-                            <a
-                              href={`tel:${b.phone.replace(/\s/g, "")}`}
-                              className="inline-flex items-center gap-1 text-blue-600 hover:underline dark:text-blue-400"
-                            >
-                              <Phone className="size-3.5" aria-hidden />
-                              {b.phone}
-                            </a>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-                        <td className="px-3 py-3 align-top">
-                          <OutreachSpintaxButton
-                            userId={user.id}
-                            businessName={b.name}
-                            mainCategory={b.main_category}
-                            businessType={b.business_type}
-                            eligible={spintaxEligible}
-                            leadAudience={spintaxLeadAudience}
-                            templates={spintaxTemplates}
-                            facebookUrl={resolveFacebookPageUrl(outreachRow)}
-                          />
-                        </td>
-                        <td className="px-3 py-3">
-                          <a
-                            href={demoPublicPath(b)}
-                            className="text-blue-600 hover:underline dark:text-blue-400"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            Demo
-                          </a>
-                        </td>
-                        <td className="px-3 py-3">
-                          <StageSelect
-                            key={`${b.place_id}-${b.stage}`}
-                            placeId={b.place_id}
-                            value={b.stage}
-                          />
-                        </td>
-                        <td className="px-3 py-3">
-                          <OwnerNameInput
-                            key={`${b.place_id}-owner-${b.owner_name ?? ""}`}
-                            placeId={b.place_id}
-                            value={b.owner_name}
-                          />
-                        </td>
-                        <td className="px-3 py-3">
-                          <NotesCell
-                            key={`${b.place_id}-notes-${b.notes ?? ""}`}
-                            placeId={b.place_id}
-                            value={b.notes}
-                          />
-                        </td>
-                        <td className="px-3 py-3">
-                          <MarkInvalidButton placeId={b.place_id} />
-                        </td>
-                        <td className="px-3 py-3">
-                          <ContactCountSelect
-                            key={`${b.place_id}-${b.contact_count ?? 0}`}
-                            placeId={b.place_id}
-                            value={b.contact_count ?? 0}
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
+                <CrmLeadsTableBody
+                  rows={rows}
+                  userId={user.id}
+                  webPresence={p.webPresence}
+                  spintaxTemplates={spintaxTemplates}
+                />
               </tbody>
             </table>
           </div>

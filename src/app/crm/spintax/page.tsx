@@ -8,8 +8,8 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: "Spintax templates | Mini CRM",
-    description: "Edit saved DM spintax templates for CRM outreach.",
+    title: "Spintax templates | Outreach Engine",
+    description: "Edit saved Facebook DM and SMS spintax templates for CRM outreach.",
   };
 }
 
@@ -30,11 +30,11 @@ export default async function CrmSpintaxPage() {
       <header className="space-y-2">
         <CrmNav active="spintax" />
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          DM Spintax Templates
+          Spintax Templates
         </h1>
         <p className="max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
-          Edit outreach templates by lead type: Facebook listing vs no Facebook.
-          Use {"{a|b|c}"} for variations and [Name] / [category] for lead tokens.
+          Edit Facebook DM and SMS outreach templates by lead type. Use{" "}
+          {"{a|b|c}"} for variations and [Name] / [category] for lead tokens.
         </p>
       </header>
 
