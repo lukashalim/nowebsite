@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+
+const navLinkClass =
+  "text-sm font-medium text-zinc-500 hover:text-accent dark:text-zinc-400 dark:hover:text-accent";
 
 export function PublicNav() {
   return (
@@ -11,43 +13,27 @@ export function PublicNav() {
         >
           No Website Business Leads
         </Link>
-        <nav className="flex flex-wrap items-center justify-end gap-3 sm:gap-5">
-          <Link
-            href="/about"
-            className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-          >
+        <nav className="flex flex-wrap items-center justify-end gap-3 sm:gap-4">
+          <Link href="/about" className={navLinkClass}>
             About
           </Link>
-          <Link
-            href="/united-kingdom"
-            className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-          >
+          <Link href="/united-kingdom" className={navLinkClass}>
             United Kingdom
           </Link>
-          <Link
-            href="/facebook"
-            className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-          >
-            Facebook listings
+          <Link href="/facebook" className={navLinkClass}>
+            Facebook Listings
           </Link>
-          <Link
-            href="/how-it-works"
-            className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-          >
+          <Link href="/how-it-works" className={navLinkClass}>
             How It Works
           </Link>
-          <Link
-            href="/contact"
-            className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-          >
+          <Link href="/contact" className={navLinkClass}>
             Contact
           </Link>
           <Link
-            href="/pro"
-            className="inline-flex items-center gap-1 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            href="/sign-in"
+            className={`${navLinkClass} underline decoration-zinc-300 underline-offset-2 hover:decoration-accent dark:decoration-zinc-600`}
           >
-            For Web Designers
-            <ArrowRight className="size-4" aria-hidden />
+            Sign In
           </Link>
         </nav>
       </div>

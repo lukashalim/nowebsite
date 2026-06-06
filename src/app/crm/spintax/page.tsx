@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { listSpintaxTemplates } from "@/app/actions/spintax-templates";
 import { CrmLogin } from "@/components/crm-login";
+import { CrmNav } from "@/components/crm-nav";
 import { SpintaxTemplateEditor } from "@/components/spintax-template-editor";
-import { CRM_BASE_PATH } from "@/lib/crm-path";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -29,21 +27,14 @@ export default async function CrmSpintaxPage() {
 
   return (
     <div className="mx-auto flex min-h-0 flex-1 flex-col gap-6 p-4 sm:p-6 lg:max-w-[1100px]">
-      <header className="space-y-1">
-        <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-          <Link
-            href={CRM_BASE_PATH}
-            className="text-zinc-700 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
-          >
-            CRM →
-          </Link>
-        </p>
+      <header className="space-y-2">
+        <CrmNav active="spintax" />
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          Spintax templates
+          DM Spintax Templates
         </h1>
         <p className="max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
-          Edit your saved outreach templates. Use {"{a|b|c}"} for variations and
-          [Name] / [category] for lead-specific tokens.
+          Edit outreach templates by lead type: Facebook listing vs no Facebook.
+          Use {"{a|b|c}"} for variations and [Name] / [category] for lead tokens.
         </p>
       </header>
 

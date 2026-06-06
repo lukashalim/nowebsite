@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { X } from "lucide-react";
 import { setLeadInvalid } from "@/app/actions/update-is-invalid";
 
 interface MarkInvalidButtonProps {
@@ -16,10 +17,12 @@ export function MarkInvalidButton({ placeId }: MarkInvalidButtonProps) {
     <button
       type="button"
       disabled={pending}
-      className="rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40"
+      title="Mark as bad lead"
+      aria-label="Mark as bad lead"
+      className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:text-zinc-500 dark:hover:bg-red-950/40 dark:hover:text-red-400"
       onClick={async () => {
         const confirmed = window.confirm(
-          "Mark this listing as invalid? It will be hidden from the CRM list.",
+          "Mark this listing as a bad lead? It will be hidden from the CRM list.",
         );
         if (!confirmed) return;
 
@@ -33,7 +36,7 @@ export function MarkInvalidButton({ placeId }: MarkInvalidButtonProps) {
         }
       }}
     >
-      Mark invalid
+      <X className="size-4" aria-hidden />
     </button>
   );
 }

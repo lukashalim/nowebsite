@@ -3,10 +3,16 @@ import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   buildOutreachMessage,
-  isEligibleForFacebookListingOutreach,
+  isEligibleForCrmSpintax,
   shortenBusinessNameForOutreach,
   type FacebookOutreachRow,
 } from "@/lib/outreach-spintax";
+import type { CrmWebPresence } from "@/lib/crm-params";
+import {
+  filterSpintaxTemplatesByAudience,
+  leadSpintaxAudience,
+  templateMatchesLeadAudience,
+} from "@/lib/spintax-audience";
 import { fetchSpintaxTemplatesForUser } from "@/lib/spintax-templates";
 
 export const runtime = "nodejs";
@@ -15,6 +21,7 @@ export const dynamic = "force-dynamic";
 interface OutreachDbRow extends FacebookOutreachRow {
   main_category: string | null;
   business_type: string | null;
+  has_website: boolean | null;
 }
 
 export async function POST(req: Request) {
@@ -42,6 +49,13 @@ export async function POST(req: Request) {
       typeof record.templateId === "string" ? record.templateId.trim() : "";
     const templateOverride =
       typeof record.template === "string" ? record.template : "";
+    const webPresenceRaw =
+      typeof record.webPresence === "string" ? record.webPresence.trim() : "no";
+    const webPresence = (
+      ["no", "plain", "facebook", "whatsapp", "yes"] as const
+    ).includes(webPresenceRaw as CrmWebPresence)
+      ? (webPresenceRaw as CrmWebPresence)
+      : "no";
 
     if (!placeId) {
       return NextResponse.json({ error: "placeId is required" }, { status: 400 });
@@ -51,7 +65,7 @@ export async function POST(req: Request) {
     const { data: row, error } = await supabase
       .from("businesses_nowebsite")
       .select(
-        "place_id, name, facebook_url, crm_contact_surface, listing_website, main_category, business_type",
+        "place_id, name, facebook_url, crm_contact_surface, listing_website, main_category, business_type, has_website",
       )
       .eq("place_id", placeId)
       .maybeSingle();
@@ -64,15 +78,19 @@ export async function POST(req: Request) {
     }
 
     const outreachRow = row as OutreachDbRow;
-    if (!isEligibleForFacebookListingOutreach(outreachRow)) {
+    const effectiveWebPresence: CrmWebPresence =
+      outreachRow.has_website === true ? "yes" : webPresence;
+    if (!isEligibleForCrmSpintax(effectiveWebPresence, outreachRow)) {
       return NextResponse.json(
         {
           error:
-            "This lead has no Facebook on their Google listing (or is WhatsApp-only). Spintax is only generated for Facebook-surface leads.",
+            "Spintax is only available for no-website leads (Has website = No).",
         },
         { status: 400 },
       );
     }
+
+    const leadAudience = leadSpintaxAudience(outreachRow);
 
     let templateText = templateOverride.trim();
     if (templateId && user) {
@@ -84,6 +102,12 @@ export async function POST(req: Request) {
       const match = templates.find((t) => t.id === templateId);
       if (!match) {
         return NextResponse.json({ error: "Template not found" }, { status: 404 });
+      }
+      if (!templateMatchesLeadAudience(match.audience, leadAudience)) {
+        return NextResponse.json(
+          { error: "Template does not match this lead type" },
+          { status: 400 },
+        );
       }
       templateText = match.template;
     }
@@ -97,7 +121,8 @@ export async function POST(req: Request) {
       if (templatesError) {
         return NextResponse.json({ error: templatesError }, { status: 500 });
       }
-      templateText = templates[0]?.template ?? "";
+      const matching = filterSpintaxTemplatesByAudience(templates, leadAudience);
+      templateText = matching[0]?.template ?? "";
     }
 
     if (!templateText) {

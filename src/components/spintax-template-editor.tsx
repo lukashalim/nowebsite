@@ -5,10 +5,16 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   createSpintaxTemplate,
+  deleteSpintaxTemplate,
   updateSpintaxTemplate,
 } from "@/app/actions/spintax-templates";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
 import { buildSpintaxPreview } from "@/lib/outreach-spintax";
+import {
+  SPINTAX_AUDIENCE_LABELS,
+  SPINTAX_AUDIENCE_VALUES,
+  type SpintaxAudience,
+} from "@/lib/spintax-audience";
 import type { SpintaxTemplate } from "@/lib/spintax-templates";
 
 interface SpintaxTemplateEditorProps {
@@ -23,6 +29,9 @@ export function SpintaxTemplateEditor({
   const [selectedId, setSelectedId] = useState(initialTemplates[0]?.id ?? "");
   const [name, setName] = useState(initialTemplates[0]?.name ?? "");
   const [template, setTemplate] = useState(initialTemplates[0]?.template ?? "");
+  const [audience, setAudience] = useState<SpintaxAudience>(
+    initialTemplates[0]?.audience ?? "facebook",
+  );
   const [preview, setPreview] = useState("");
   const [previewSeed, setPreviewSeed] = useState(0);
   const [pending, setPending] = useState(false);
@@ -34,10 +43,23 @@ export function SpintaxTemplateEditor({
     [templates, selectedId],
   );
 
+  const groupedTemplates = useMemo(() => {
+    const groups: Record<SpintaxAudience, SpintaxTemplate[]> = {
+      facebook: [],
+      no_facebook: [],
+      any: [],
+    };
+    for (const t of templates) {
+      groups[t.audience].push(t);
+    }
+    return groups;
+  }, [templates]);
+
   useEffect(() => {
     if (!selectedTemplate) return;
     setName(selectedTemplate.name);
     setTemplate(selectedTemplate.template);
+    setAudience(selectedTemplate.audience);
   }, [selectedTemplate]);
 
   useEffect(() => {
@@ -47,12 +69,11 @@ export function SpintaxTemplateEditor({
     return () => window.clearTimeout(timer);
   }, [template, previewSeed]);
 
-  function selectTemplate(id: string) {
-    const next = templates.find((t) => t.id === id);
-    if (!next) return;
-    setSelectedId(id);
+  function selectTemplate(next: SpintaxTemplate) {
+    setSelectedId(next.id);
     setName(next.name);
     setTemplate(next.template);
+    setAudience(next.audience);
     setMessage(null);
     setError(null);
   }
@@ -62,7 +83,7 @@ export function SpintaxTemplateEditor({
     setPending(true);
     setMessage(null);
     setError(null);
-    const res = await updateSpintaxTemplate(selectedId, name, template);
+    const res = await updateSpintaxTemplate(selectedId, name, template, audience);
     setPending(false);
     if (!res.ok) {
       setError(res.error);
@@ -70,7 +91,9 @@ export function SpintaxTemplateEditor({
     }
     setTemplates((prev) =>
       prev.map((t) =>
-        t.id === selectedId ? { ...t, name: name.trim(), template } : t,
+        t.id === selectedId
+          ? { ...t, name: name.trim(), template, audience }
+          : t,
       ),
     );
     setMessage("Saved");
@@ -84,6 +107,7 @@ export function SpintaxTemplateEditor({
     const res = await createSpintaxTemplate(
       "New template",
       "{Hey|Hi} [Name] - {your message here}.",
+      audience,
     );
     setPending(false);
     if (!res.ok) {
@@ -91,22 +115,64 @@ export function SpintaxTemplateEditor({
       return;
     }
     setTemplates((prev) => [...prev, res.template]);
-    setSelectedId(res.template.id);
-    setName(res.template.name);
-    setTemplate(res.template.template);
+    selectTemplate(res.template);
+    router.refresh();
+  }
+
+  async function removeTemplate() {
+    if (!selectedId || !selectedTemplate) return;
+    const confirmed = window.confirm(
+      `Delete "${selectedTemplate.name}"? This cannot be undone.`,
+    );
+    if (!confirmed) return;
+
+    setPending(true);
+    setMessage(null);
+    setError(null);
+    const res = await deleteSpintaxTemplate(selectedId);
+    setPending(false);
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+
+    const remaining = templates.filter((t) => t.id !== selectedId);
+    setTemplates(remaining);
+    if (remaining.length > 0) {
+      selectTemplate(remaining[0]);
+    } else {
+      setSelectedId("");
+      setName("");
+      setTemplate("");
+      setAudience("facebook");
+    }
+    setMessage("Deleted");
     router.refresh();
   }
 
   if (templates.length === 0) {
     return (
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">
-        No templates yet.
-      </p>
+      <div className="space-y-4">
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          No templates yet.
+        </p>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={addTemplate}
+          className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+        >
+          Add template
+        </button>
+        {error ? (
+          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        ) : null}
+      </div>
     );
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+    <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
       <aside className="space-y-3">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
@@ -121,23 +187,36 @@ export function SpintaxTemplateEditor({
             Add
           </button>
         </div>
-        <ul className="space-y-1">
-          {templates.map((t) => (
-            <li key={t.id}>
-              <button
-                type="button"
-                onClick={() => selectTemplate(t.id)}
-                className={`w-full rounded-md px-3 py-2 text-left text-sm ${
-                  t.id === selectedId
-                    ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                    : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                }`}
-              >
-                {t.name}
-              </button>
-            </li>
-          ))}
-        </ul>
+        <div className="space-y-4">
+          {SPINTAX_AUDIENCE_VALUES.map((groupAudience) => {
+            const items = groupedTemplates[groupAudience];
+            if (items.length === 0) return null;
+            return (
+              <div key={groupAudience} className="space-y-1">
+                <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  {SPINTAX_AUDIENCE_LABELS[groupAudience]}
+                </p>
+                <ul className="space-y-1">
+                  {items.map((t) => (
+                    <li key={t.id}>
+                      <button
+                        type="button"
+                        onClick={() => selectTemplate(t)}
+                        className={`w-full rounded-md px-3 py-2 text-left text-sm ${
+                          t.id === selectedId
+                            ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                            : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                        }`}
+                      >
+                        {t.name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
         <Link
           href={CRM_BASE_PATH}
           className="inline-block text-sm font-medium text-zinc-600 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
@@ -147,6 +226,28 @@ export function SpintaxTemplateEditor({
       </aside>
 
       <div className="space-y-4">
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-medium text-zinc-800 dark:text-zinc-200">
+            Lead type
+          </span>
+          <select
+            value={audience}
+            disabled={pending}
+            onChange={(e) => setAudience(e.target.value as SpintaxAudience)}
+            className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+          >
+            {SPINTAX_AUDIENCE_VALUES.map((value) => (
+              <option key={value} value={value}>
+                {SPINTAX_AUDIENCE_LABELS[value]}
+              </option>
+            ))}
+          </select>
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">
+            Facebook listing templates show for leads using Facebook as their
+            website. No Facebook templates show for plain no-website leads.
+          </span>
+        </label>
+
         <label className="flex flex-col gap-1 text-sm">
           <span className="font-medium text-zinc-800 dark:text-zinc-200">Name</span>
           <input
@@ -204,6 +305,14 @@ export function SpintaxTemplateEditor({
             className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
           >
             Save
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={removeTemplate}
+            className="rounded-md border border-red-200 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40"
+          >
+            Delete
           </button>
           {message ? (
             <span className="text-sm text-emerald-700 dark:text-emerald-400">

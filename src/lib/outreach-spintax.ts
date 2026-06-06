@@ -1,5 +1,6 @@
 import { formatCategoryDisplayName } from "@/lib/directory/labels";
 import { directoryCategoryLabel } from "@/lib/directory/slugs";
+import type { CrmWebPresence } from "@/lib/crm-params";
 
 /** Strip legal suffixes; keep up to ~3 words / 28 chars for casual outreach. */
 export function shortenBusinessNameForOutreach(full: string | null): string {
@@ -38,6 +39,28 @@ export function isEligibleForFacebookListingOutreach(
   if (row.crm_contact_surface === "facebook") return true;
   if (listingIsFb) return true;
   return Boolean(fb);
+}
+
+/** Best Facebook page URL for opening Messenger / page (facebook_url or FB listing_website). */
+export function resolveFacebookPageUrl(row: FacebookOutreachRow): string | null {
+  const fb = row.facebook_url?.trim();
+  if (fb) return fb;
+  const listing = row.listing_website?.trim() ?? "";
+  if (/facebook\.com|fb\.com|fb\.me/i.test(listing)) {
+    return listing;
+  }
+  return null;
+}
+
+/** CRM spintax: enabled for no-website cohorts (Has website = No and sub-filters). */
+export function isEligibleForCrmSpintax(
+  webPresence: CrmWebPresence,
+  row: FacebookOutreachRow,
+): boolean {
+  if (webPresence === "yes") return false;
+  if (webPresence === "no" || webPresence === "plain") return true;
+  if (webPresence === "facebook" || webPresence === "whatsapp") return true;
+  return isEligibleForFacebookListingOutreach(row);
 }
 
 export const SPINTAX_PREVIEW_SAMPLE_NAME = "Joe's Pizza";

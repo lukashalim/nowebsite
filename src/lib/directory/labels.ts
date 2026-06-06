@@ -28,6 +28,37 @@ export function formatLocationLabel(
   return `${city.trim()}, ${state.trim()}`;
 }
 
+/** Known technical acronyms in category labels (e.g. HVAC, BBQ). */
+const CATEGORY_WORD_ACRONYMS = new Set([
+  "ac",
+  "atm",
+  "bbq",
+  "dj",
+  "diy",
+  "gp",
+  "hd",
+  "hvac",
+  "it",
+  "pa",
+  "pc",
+  "rv",
+  "seo",
+  "tv",
+  "uv",
+]);
+
+function formatCategoryWord(word: string): string {
+  if (!word) return word;
+  const lower = word.toLowerCase();
+  if (CATEGORY_WORD_ACRONYMS.has(lower)) {
+    return lower.toUpperCase();
+  }
+  if (word.length <= 2 && /^[a-z]+$/i.test(word)) {
+    return word.toUpperCase();
+  }
+  return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+}
+
 /** Turn DB/scraper values like `event_services` or `painter` into "Event Services", "Painter". */
 export function formatCategoryDisplayName(raw: string): string {
   const t = raw
@@ -35,17 +66,7 @@ export function formatCategoryDisplayName(raw: string): string {
     .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ");
   if (!t) return "Business";
-  return t
-    .split(" ")
-    .map((word) => {
-      if (!word) return word;
-      // Only force uppercase for 1–2 letter tokens (e.g. "IT"); keep words like "spa" → "Spa".
-      if (word.length <= 2 && /^[a-z]+$/i.test(word)) {
-        return word.toUpperCase();
-      }
-      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-    })
-    .join(" ");
+  return t.split(" ").map(formatCategoryWord).join(" ");
 }
 
 export function pluralCategoryForTitle(label: string): string {

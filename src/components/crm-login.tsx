@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
@@ -27,32 +28,50 @@ export function CrmLogin() {
   }
 
   return (
-    <div className="flex min-h-full flex-1 items-center justify-center p-6">
-      <div className="w-full max-w-sm space-y-6 rounded-xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-        <div className="space-y-1 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Mini CRM
-          </h1>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Sign in to access no-website leads
-          </p>
+    <div className="flex min-h-screen flex-col items-center bg-zinc-100 px-4 pt-[14vh] pb-10 dark:bg-zinc-900">
+      <div className="w-full max-w-sm overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+        <div className="h-1 bg-accent" aria-hidden />
+        <div className="space-y-6 p-8 pb-6">
+          <div className="space-y-2 text-center">
+            <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-2xl">
+              No Website Business Leads
+            </h1>
+            <p className="text-sm font-medium text-[#4A4A4A] dark:text-zinc-300">
+              The prospecting tool for web designers
+            </p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              Sign in to access no-website leads
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void signInWithGoogle()}
+            disabled={pending}
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-900 shadow-sm transition hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+          >
+            <GoogleIcon />
+            {pending ? "Redirecting…" : "Sign in with Google"}
+          </button>
+
+          {error ? (
+            <p
+              className="text-center text-sm text-red-600 dark:text-red-400"
+              role="alert"
+            >
+              {error}
+            </p>
+          ) : null}
         </div>
 
-        <button
-          type="button"
-          onClick={() => void signInWithGoogle()}
-          disabled={pending}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-900 shadow-sm transition hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
-        >
-          <GoogleIcon />
-          {pending ? "Redirecting…" : "Sign in with Google"}
-        </button>
-
-        {error ? (
-          <p className="text-center text-sm text-red-600 dark:text-red-400" role="alert">
-            {error}
-          </p>
-        ) : null}
+        <div className="border-t border-zinc-100 px-8 py-4 text-center dark:border-zinc-800">
+          <Link
+            href="/"
+            className="text-sm font-medium text-zinc-500 transition-colors hover:text-accent dark:text-zinc-400 dark:hover:text-accent"
+          >
+            ← Back to homepage
+          </Link>
+        </div>
       </div>
     </div>
   );

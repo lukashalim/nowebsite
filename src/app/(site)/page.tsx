@@ -20,10 +20,15 @@ import {
 } from "@/lib/directory/types";
 import { absoluteUrl } from "@/lib/site-url";
 
+const SIGN_IN_PATH = "/sign-in";
+
+const RING_READY_SITE_URL = "https://ringreadysite.com";
+
 const HOME_FEATURES = [
   {
     icon: Search,
     title: "Find Leads",
+    highlighted: false,
     description: (listingCount: number | null) =>
       listingCount !== null
         ? `Browse ${listingCount.toLocaleString()} verified no-website businesses by city, state, and category`
@@ -32,12 +37,15 @@ const HOME_FEATURES = [
   {
     icon: Workflow,
     title: "Track Outreach",
+    highlighted: false,
     description: () =>
       "CRM with contact staging, owner notes, and follow-up tracking",
   },
   {
     icon: LayoutTemplate,
     title: "Generate Demos",
+    highlighted: true,
+    href: RING_READY_SITE_URL,
     description: () =>
       "One-click demo site builder to show prospects what their site could look like",
   },
@@ -106,17 +114,14 @@ export default async function HomePage() {
         <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-4xl">
           The Prospecting Tool for Web Designers
         </h1>
-        <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
+        <p className="max-w-2xl text-[17px] leading-relaxed text-[#4A4A4A] dark:text-zinc-300">
           {listingCount !== null
-            ? `${listingCount.toLocaleString()} verified local businesses with no website — browse free, track leads, and close clients faster.`
-            : "Verified local businesses with no website — browse free, track leads, and close clients faster."}
-          {summary?.lastUpdatedLabel
-            ? ` Last updated ${summary.lastUpdatedLabel}.`
-            : null}
+            ? `Access ${listingCount.toLocaleString()} verified local leads lacking a website. Instantly sort by intent, track your outreach, and close clients faster.`
+            : "Access verified local leads lacking a website. Instantly sort by intent, track your outreach, and close clients faster."}
         </p>
         <Link
-          href="/pro"
-          className="inline-flex rounded-md bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+          href={SIGN_IN_PATH}
+          className="inline-flex rounded-md bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-accent-hover"
         >
           Start Prospecting Free
         </Link>
@@ -124,20 +129,58 @@ export default async function HomePage() {
 
       <section aria-label="Product features">
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {HOME_FEATURES.map((feature) => (
-            <li
-              key={feature.title}
-              className="rounded-xl border border-zinc-200 p-5 dark:border-zinc-800"
-            >
-              <feature.icon className="size-5 text-zinc-500" aria-hidden />
-              <h2 className="mt-3 font-semibold text-zinc-900 dark:text-zinc-100">
-                {feature.title}
-              </h2>
-              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                {feature.description(listingCount)}
-              </p>
-            </li>
-          ))}
+          {HOME_FEATURES.map((feature) => {
+            const cardBody = (
+              <>
+                {feature.highlighted ? (
+                  <span className="absolute left-5 top-0 -translate-y-1/2 rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                    Key Feature
+                  </span>
+                ) : null}
+                <feature.icon
+                  className={`size-6 ${
+                    feature.highlighted
+                      ? "text-accent"
+                      : "text-zinc-700 dark:text-zinc-300"
+                  }`}
+                  strokeWidth={2.5}
+                  fill="currentColor"
+                  fillOpacity={0.15}
+                  aria-hidden
+                />
+                <h2 className="mt-3 font-semibold text-zinc-900 dark:text-zinc-100">
+                  {feature.title}
+                </h2>
+                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                  {feature.description(listingCount)}
+                </p>
+              </>
+            );
+
+            return (
+              <li
+                key={feature.title}
+                className={`relative rounded-xl border px-5 pb-5 pt-5 ${
+                  feature.highlighted
+                    ? "border-accent bg-accent-muted/60 dark:bg-amber-950/20"
+                    : "border-zinc-200 dark:border-zinc-800"
+                }`}
+              >
+                {"href" in feature && feature.href ? (
+                  <a
+                    href={feature.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  >
+                    {cardBody}
+                  </a>
+                ) : (
+                  cardBody
+                )}
+              </li>
+            );
+          })}
         </ul>
       </section>
 
@@ -148,37 +191,23 @@ export default async function HomePage() {
       ) : (
         <>
           {facebookCount !== null && facebookCount > 0 ? (
-            <section className="space-y-4">
-              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-                {facebookCount.toLocaleString()} High-Intent Leads — Businesses Using
-                Facebook as Their Website
-              </h2>
-              <Link
-                href="/facebook"
-                className="block rounded-lg border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/50"
-              >
-                <span className="block text-sm text-zinc-600 dark:text-zinc-400">
-                  These businesses are actively violating Google&apos;s guidelines — the
-                  easiest cold outreach targets for web designers.
-                </span>
-              </Link>
-            </section>
+            <Link
+              href="/facebook"
+              className="group block rounded-l-lg border-l-4 border-accent bg-accent-muted/80 px-3 py-3 transition-colors hover:bg-amber-100/80 dark:bg-amber-950/30 dark:hover:bg-amber-950/45"
+            >
+              <p className="text-[11px] font-bold uppercase tracking-widest text-amber-800 dark:text-amber-300">
+                Why this matters
+              </p>
+              <p className="mt-1 text-base font-semibold leading-snug text-zinc-900 group-hover:text-amber-950 dark:text-zinc-50">
+                {`${facebookCount.toLocaleString()} high-intent leads use Facebook as their website, actively violating Google's guidelines and making them prime outreach targets.`}
+              </p>
+            </Link>
           ) : null}
 
           <section className="space-y-4">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-                Categories
-              </h2>
-              {totalCategoryCount > 0 ? (
-                <Link
-                  href="/categories"
-                  className="text-sm font-medium text-zinc-600 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-                >
-                  View all {totalCategoryCount.toLocaleString()} categories
-                </Link>
-              ) : null}
-            </div>
+            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+              Categories
+            </h2>
             {topCategories.length === 0 ? (
               <p className="text-sm text-zinc-500">
                 No category pages yet (need {DIRECTORY_MIN_CATEGORY_LISTINGS}+
@@ -190,7 +219,7 @@ export default async function HomePage() {
                   <li key={cat.categorySlug}>
                     <Link
                       href={cat.href}
-                      className="flex items-start gap-3 rounded-lg border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/50"
+                      className="flex items-start gap-3 rounded-lg border border-zinc-200 p-4 transition-colors hover:border-accent hover:bg-accent-muted/50 dark:border-zinc-800 dark:hover:border-amber-600/50 dark:hover:bg-amber-950/20"
                     >
                       <CategoryIcon
                         categoryLabel={cat.categoryLabel}
@@ -209,6 +238,16 @@ export default async function HomePage() {
                 ))}
               </ul>
             )}
+            {totalCategoryCount > 0 ? (
+              <div className="flex justify-center pt-2">
+                <Link
+                  href="/categories"
+                  className="inline-flex rounded-md border border-accent bg-transparent px-5 py-2.5 text-sm font-semibold text-accent transition-colors hover:bg-accent-muted dark:hover:bg-amber-950/30"
+                >
+                  Browse All {totalCategoryCount.toLocaleString()} Categories →
+                </Link>
+              </div>
+            ) : null}
           </section>
 
           {ukCount !== null && ukCount > 0 ? (

@@ -4,25 +4,27 @@ import {
   ExternalLink,
   MapPin,
   Phone,
-  Search,
-  Share2,
   Star,
 } from "lucide-react";
 import { listSpintaxTemplates } from "@/app/actions/spintax-templates";
 import { CrmFilters, CrmPagination } from "@/components/crm-filters";
 import { CrmLogin } from "@/components/crm-login";
+import { CrmNav } from "@/components/crm-nav";
 import { ContactCountSelect } from "@/components/contact-count-select";
 import { MarkInvalidButton } from "@/components/mark-invalid-button";
 import { NotesCell } from "@/components/notes-cell";
 import { OutreachSpintaxButton } from "@/components/outreach-spintax-button";
 import { OwnerNameInput } from "@/components/owner-name-input";
 import { StageSelect } from "@/components/stage-select";
-import type { BusinessLead } from "@/lib/business";
 import { fetchCrmBusinessRows } from "@/lib/crm-cohort";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
 import { demoPublicPath } from "@/lib/demo-slug";
 import { tryParseCrmSearchParams } from "@/lib/crm-params";
-import { isEligibleForFacebookListingOutreach } from "@/lib/outreach-spintax";
+import {
+  isEligibleForCrmSpintax,
+  resolveFacebookPageUrl,
+} from "@/lib/outreach-spintax";
+import { leadSpintaxAudience } from "@/lib/spintax-audience";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -37,33 +39,6 @@ export async function generateMetadata(): Promise<Metadata> {
 
 interface PageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}
-
-function isWhatsAppListingUrl(href: string | null | undefined): boolean {
-  if (!href || typeof href !== "string") return false;
-  return /wa\.me|whatsapp\.com/i.test(href);
-}
-
-function phoneForGoogleQuery(phone: string | null | undefined): string | null {
-  const raw = phone?.trim();
-  if (!raw) return null;
-  const digits = raw.replace(/\D/g, "");
-  if (digits.length < 7) return null;
-  return raw;
-}
-
-function googleLookupUrl(b: BusinessLead): string | null {
-  const name = b.name?.trim() || b.business_type?.trim();
-  const phoneQ = phoneForGoogleQuery(b.phone);
-  const loc =
-    [b.city, b.state].filter(Boolean).join(" ").trim() ||
-    b.address?.trim() ||
-    "";
-  if (!name && !phoneQ && !loc) return null;
-  const q = [name, phoneQ, loc, "facebook"]
-    .filter((s): s is string => typeof s === "string" && s.length > 0)
-    .join(" ");
-  return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
 }
 
 export default async function CrmPage({ searchParams }: PageProps) {
@@ -113,33 +88,15 @@ export default async function CrmPage({ searchParams }: PageProps) {
 
   return (
     <div className="mx-auto flex min-h-0 flex-1 flex-col gap-6 p-4 sm:p-6 lg:max-w-[1400px]">
-      <header className="space-y-1">
-        <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-          <Link
-            href="/scrape-progress"
-            className="text-zinc-700 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
-          >
-            Scrape queue →
-          </Link>
-          <span className="mx-2 text-zinc-300 dark:text-zinc-600">·</span>
-          <Link
-            href={`${CRM_BASE_PATH}/spintax`}
-            className="text-zinc-700 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
-          >
-            Spintax templates →
-          </Link>
-        </p>
+      <header className="space-y-2">
+        <CrmNav active="leads" />
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
           No-website leads
         </h1>
         <p className="max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
-          Only listings with review excerpts saved from Maps (for demos). Default:
-          no standalone website (25–199 reviews, 4+ stars). Use Has website to narrow
-          to Facebook / WhatsApp listing URLs or businesses with a real site.{" "}
-          <span className="font-medium text-zinc-700 dark:text-zinc-300">
-            DM spintax
-          </span>{" "}
-          is available for Facebook-on-GMB leads (filter Has website → Facebook).
+          Browse verified local businesses without websites. Filter by category,
+          rating, and outreach stage. Use the DM Spintax button to copy a
+          personalized cold outreach message.
         </p>
       </header>
 
@@ -162,22 +119,20 @@ export default async function CrmPage({ searchParams }: PageProps) {
       ) : (
         <>
           <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-            <table className="w-full min-w-[1280px] border-collapse text-left text-sm">
+            <table className="w-full min-w-[1080px] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-zinc-200 bg-zinc-50 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
                   <th className="px-3 py-3">Business</th>
                   <th className="px-3 py-3">Location</th>
-                  <th className="px-3 py-3">Type</th>
                   <th className="px-3 py-3">Rating</th>
                   <th className="px-3 py-3">Reviews</th>
                   <th className="px-3 py-3">Phone</th>
-                  <th className="px-3 py-3">Links</th>
-                  <th className="px-3 py-3">DM spintax</th>
+                  <th className="px-3 py-3">DM Spintax</th>
                   <th className="px-3 py-3">Demo</th>
                   <th className="px-3 py-3">Stage</th>
                   <th className="px-3 py-3">Owner</th>
                   <th className="px-3 py-3">Notes</th>
-                  <th className="px-3 py-3">Invalid</th>
+                  <th className="px-3 py-3">Bad Lead</th>
                   <th className="px-3 py-3">Contacted</th>
                 </tr>
               </thead>
@@ -185,7 +140,7 @@ export default async function CrmPage({ searchParams }: PageProps) {
                 {rows.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={14}
+                      colSpan={12}
                       className="px-3 py-8 text-center text-zinc-500 dark:text-zinc-400"
                     >
                       No rows match these filters.
@@ -193,24 +148,28 @@ export default async function CrmPage({ searchParams }: PageProps) {
                   </tr>
                 ) : (
                   rows.map((b) => {
-                    const googleLook = googleLookupUrl(b);
-                    const spintaxEligible = isEligibleForFacebookListingOutreach({
+                    const outreachRow = {
                       place_id: b.place_id,
                       name: b.name,
                       facebook_url: b.facebook_url,
                       crm_contact_surface: b.crm_contact_surface ?? null,
                       listing_website: b.listing_website,
-                    });
+                    };
+                    const spintaxEligible = isEligibleForCrmSpintax(
+                      p.webPresence,
+                      outreachRow,
+                    );
+                    const spintaxLeadAudience = leadSpintaxAudience(outreachRow);
                     return (
                       <tr
                         key={b.place_id}
                         className="align-top hover:bg-zinc-50/80 dark:hover:bg-zinc-900/50"
                       >
-                        <td className="px-3 py-3 font-medium text-zinc-900 dark:text-zinc-100">
+                        <td className="px-3 py-3 font-medium capitalize text-zinc-900 dark:text-zinc-100">
                           {b.name ?? "—"}
                         </td>
                         <td className="px-3 py-3 text-zinc-600 dark:text-zinc-300">
-                          <span className="inline-flex items-start gap-1">
+                          <span className="inline-flex items-start gap-1.5">
                             <MapPin
                               className="mt-0.5 size-3.5 shrink-0 text-zinc-400"
                               aria-hidden
@@ -220,10 +179,19 @@ export default async function CrmPage({ searchParams }: PageProps) {
                                 .filter(Boolean)
                                 .join(", ") || b.address || "—"}
                             </span>
+                            {b.google_maps_link ? (
+                              <a
+                                href={b.google_maps_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-0.5 shrink-0 text-zinc-400 transition-colors hover:text-accent"
+                                title="Open in Google Maps"
+                                aria-label="Open in Google Maps"
+                              >
+                                <ExternalLink className="size-3.5" aria-hidden />
+                              </a>
+                            ) : null}
                           </span>
-                        </td>
-                        <td className="max-w-[140px] truncate px-3 py-3 text-zinc-600 dark:text-zinc-300">
-                          {b.business_type ?? b.main_category ?? "—"}
                         </td>
                         <td className="px-3 py-3 tabular-nums text-zinc-800 dark:text-zinc-200">
                           {b.rating != null ? (
@@ -254,80 +222,6 @@ export default async function CrmPage({ searchParams }: PageProps) {
                             "—"
                           )}
                         </td>
-                        <td className="px-3 py-3">
-                          <div className="flex flex-wrap gap-2">
-                            {googleLook ? (
-                              <a
-                                href={googleLook}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-0.5 text-blue-600 hover:underline dark:text-blue-400"
-                                title="Google: business name, location, and Facebook"
-                              >
-                                <Search className="size-3.5" aria-hidden />
-                                Google
-                              </a>
-                            ) : null}
-                            {b.google_maps_link ? (
-                              <a
-                                href={b.google_maps_link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-0.5 text-blue-600 hover:underline dark:text-blue-400"
-                                title="Google Maps"
-                              >
-                                <ExternalLink className="size-3.5" aria-hidden />
-                                Maps
-                              </a>
-                            ) : null}
-                            {b.facebook_url ? (
-                              <a
-                                href={b.facebook_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-0.5 text-blue-600 hover:underline dark:text-blue-400"
-                                title="Facebook"
-                              >
-                                <Share2 className="size-3.5" aria-hidden />
-                                FB
-                              </a>
-                            ) : null}
-                            {b.listing_website &&
-                            isWhatsAppListingUrl(b.listing_website) ? (
-                              <a
-                                href={
-                                  b.listing_website.startsWith("http")
-                                    ? b.listing_website
-                                    : `https://${b.listing_website}`
-                                }
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-0.5 text-emerald-700 hover:underline dark:text-emerald-400"
-                                title="WhatsApp (Maps listing website)"
-                              >
-                                WA
-                              </a>
-                            ) : null}
-                            {b.crm_contact_surface === "facebook" ||
-                            b.crm_contact_surface === "whatsapp" ? (
-                              <span
-                                className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-                                title="Contact surface (generated)"
-                              >
-                                {b.crm_contact_surface}
-                              </span>
-                            ) : null}
-                            {!googleLook &&
-                            !b.google_maps_link &&
-                            !b.facebook_url &&
-                            !(
-                              b.listing_website &&
-                              isWhatsAppListingUrl(b.listing_website)
-                            )
-                              ? "—"
-                              : null}
-                          </div>
-                        </td>
                         <td className="px-3 py-3 align-top">
                           <OutreachSpintaxButton
                             userId={user.id}
@@ -335,7 +229,9 @@ export default async function CrmPage({ searchParams }: PageProps) {
                             mainCategory={b.main_category}
                             businessType={b.business_type}
                             eligible={spintaxEligible}
+                            leadAudience={spintaxLeadAudience}
                             templates={spintaxTemplates}
+                            facebookUrl={resolveFacebookPageUrl(outreachRow)}
                           />
                         </td>
                         <td className="px-3 py-3">

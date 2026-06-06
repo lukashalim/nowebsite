@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Copy, Check } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { buildOutreachMessage } from "@/lib/outreach-spintax";
+import {
+  filterSpintaxTemplatesByAudience,
+  type SpintaxAudience,
+} from "@/lib/spintax-audience";
 import type { SpintaxTemplate } from "@/lib/spintax-templates";
 
 interface OutreachSpintaxButtonProps {
@@ -11,11 +14,19 @@ interface OutreachSpintaxButtonProps {
   mainCategory: string | null;
   businessType: string | null;
   eligible: boolean;
+  leadAudience: SpintaxAudience;
   templates: SpintaxTemplate[];
+  facebookUrl?: string | null;
 }
 
-function lastUsedStorageKey(userId: string): string {
-  return `crm:lastSpintaxTemplateId:${userId}`;
+function lastUsedStorageKey(userId: string, leadAudience: SpintaxAudience): string {
+  return `crm:lastSpintaxTemplateId:${userId}:${leadAudience}`;
+}
+
+function normalizeFacebookUrl(url: string): string {
+  const trimmed = url.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
 }
 
 export function OutreachSpintaxButton({
@@ -24,33 +35,41 @@ export function OutreachSpintaxButton({
   mainCategory,
   businessType,
   eligible,
+  leadAudience,
   templates,
+  facebookUrl,
 }: OutreachSpintaxButtonProps) {
   const [copied, setCopied] = useState(false);
-  const [selectedId, setSelectedId] = useState(templates[0]?.id ?? "");
+  const [toastVisible, setToastVisible] = useState(false);
+  const [selectedId, setSelectedId] = useState("");
+
+  const matchingTemplates = useMemo(
+    () => filterSpintaxTemplatesByAudience(templates, leadAudience),
+    [templates, leadAudience],
+  );
+
+  const facebookHref = facebookUrl?.trim() ? normalizeFacebookUrl(facebookUrl) : null;
 
   useEffect(() => {
-    if (templates.length === 0) return;
-    const stored = window.localStorage.getItem(lastUsedStorageKey(userId));
-    if (stored && templates.some((t) => t.id === stored)) {
+    if (matchingTemplates.length === 0) return;
+    const stored = window.localStorage.getItem(
+      lastUsedStorageKey(userId, leadAudience),
+    );
+    if (stored && matchingTemplates.some((t) => t.id === stored)) {
       setSelectedId(stored);
       return;
     }
-    setSelectedId(templates[0].id);
-  }, [templates, userId]);
+    setSelectedId(matchingTemplates[0].id);
+  }, [matchingTemplates, userId, leadAudience]);
 
-  if (!eligible) {
+  if (!eligible || matchingTemplates.length === 0) {
     return <span className="text-zinc-400">—</span>;
   }
 
-  if (templates.length === 0) {
-    return <span className="text-xs text-zinc-500">No templates</span>;
-  }
-
   const selectedTemplate =
-    templates.find((t) => t.id === selectedId) ?? templates[0];
+    matchingTemplates.find((t) => t.id === selectedId) ?? matchingTemplates[0];
 
-  async function copy() {
+  async function copyDm() {
     const message = buildOutreachMessage(selectedTemplate.template, {
       name: businessName,
       mainCategory,
@@ -58,39 +77,55 @@ export function OutreachSpintaxButton({
     });
     await navigator.clipboard.writeText(message);
     window.localStorage.setItem(
-      lastUsedStorageKey(userId),
+      lastUsedStorageKey(userId, leadAudience),
       selectedTemplate.id,
     );
+  }
+
+  async function copyOnly() {
+    await copyDm();
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
+  async function copyAndOpenFacebook() {
+    if (!facebookHref) return;
+    await copyDm();
+    window.open(facebookHref, "_blank", "noopener,noreferrer");
+    setToastVisible(true);
+    setTimeout(() => setToastVisible(false), 2500);
+  }
+
+  if (facebookHref) {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => void copyAndOpenFacebook()}
+          className="inline-flex whitespace-nowrap rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-accent-hover"
+        >
+          DM on Facebook
+        </button>
+        {toastVisible ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white shadow-lg dark:bg-zinc-100 dark:text-zinc-900"
+          >
+            DM copied — Facebook opened
+          </div>
+        ) : null}
+      </>
+    );
+  }
+
   return (
-    <div className="flex min-w-[9rem] flex-col gap-1.5">
-      <select
-        className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-        value={selectedTemplate.id}
-        aria-label="Spintax template"
-        onChange={(e) => setSelectedId(e.target.value)}
-      >
-        {templates.map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.name}
-          </option>
-        ))}
-      </select>
-      <button
-        type="button"
-        onClick={copy}
-        className="inline-flex items-center justify-center gap-1 rounded-md border border-violet-300 bg-violet-50 px-2 py-1 text-xs font-medium text-violet-900 hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-950/50 dark:text-violet-100 dark:hover:bg-violet-900/50"
-      >
-        {copied ? (
-          <Check className="size-3.5" aria-hidden />
-        ) : (
-          <Copy className="size-3.5" aria-hidden />
-        )}
-        {copied ? "Copied" : "Copy"}
-      </button>
-    </div>
+    <button
+      type="button"
+      onClick={() => void copyOnly()}
+      className="text-sm font-medium text-accent transition-colors hover:text-accent-hover"
+    >
+      {copied ? "Copied" : "Copy DM"}
+    </button>
   );
 }

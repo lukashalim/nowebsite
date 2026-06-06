@@ -3,6 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { updateOwnerName } from "@/app/actions/update-owner-name";
+import {
+  crmInlineCellClass,
+  crmInlineInputClass,
+} from "@/components/crm-inline-field-styles";
 
 interface OwnerNameInputProps {
   placeId: string;
@@ -15,35 +19,37 @@ export function OwnerNameInput({ placeId, value }: OwnerNameInputProps) {
   const [draft, setDraft] = useState(value ?? "");
 
   return (
-    <input
-      type="text"
-      maxLength={100}
-      disabled={pending}
-      value={draft}
-      placeholder="Owner name"
-      aria-label="Owner name"
-      className="w-full min-w-[7rem] rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 shadow-sm disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={async () => {
-        const trimmed = draft.trim();
-        const previous = (value ?? "").trim();
-        if (trimmed === previous) return;
+    <div className={crmInlineCellClass}>
+      <input
+        type="text"
+        maxLength={100}
+        disabled={pending}
+        value={draft}
+        placeholder="—"
+        aria-label="Owner name"
+        className={`${crmInlineInputClass} min-w-[7rem] placeholder:text-zinc-400`}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={async () => {
+          const trimmed = draft.trim();
+          const previous = (value ?? "").trim();
+          if (trimmed === previous) return;
 
-        setPending(true);
-        const res = await updateOwnerName(placeId, trimmed || null);
-        setPending(false);
-        if (res.ok) {
-          router.refresh();
-        } else {
-          setDraft(value ?? "");
-          window.alert(res.error);
-        }
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          e.currentTarget.blur();
-        }
-      }}
-    />
+          setPending(true);
+          const res = await updateOwnerName(placeId, trimmed || null);
+          setPending(false);
+          if (res.ok) {
+            router.refresh();
+          } else {
+            setDraft(value ?? "");
+            window.alert(res.error);
+          }
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.currentTarget.blur();
+          }
+        }}
+      />
+    </div>
   );
 }

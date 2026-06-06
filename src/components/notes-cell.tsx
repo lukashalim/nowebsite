@@ -31,14 +31,14 @@ export function NotesCell({ placeId, value }: NotesCellProps) {
     <>
       <button
         type="button"
-        className="max-w-[9rem] truncate text-left text-sm text-zinc-700 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+        className="max-w-[9rem] truncate rounded-md border border-transparent px-1.5 py-1 text-left text-sm text-zinc-700 transition-colors hover:border-zinc-300 hover:bg-white focus:border-zinc-300 focus:bg-white focus:outline-none dark:text-zinc-300 dark:hover:border-zinc-600 dark:hover:bg-zinc-900 dark:focus:border-zinc-600 dark:focus:bg-zinc-900"
         title={value?.trim() || "Add notes"}
         onClick={() => {
           setDraft(value ?? "");
           dialogRef.current?.showModal();
         }}
       >
-        {preview || "Add notes"}
+        {preview || <span className="text-zinc-400">—</span>}
       </button>
 
       <dialog

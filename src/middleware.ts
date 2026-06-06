@@ -6,6 +6,7 @@ import { updateSession } from "@/lib/supabase/middleware";
 const RESERVED_FIRST_SEGMENTS = new Set([
   "api",
   "auth",
+  "sign-in",
   "demo",
   "crm",
   "admin",
@@ -35,7 +36,7 @@ export async function middleware(request: NextRequest) {
   };
 
   let sessionResponse: NextResponse | null = null;
-  if (pathname.startsWith("/crm") || pathname.startsWith("/auth")) {
+  if (pathname.startsWith("/crm") || pathname.startsWith("/auth") || pathname.startsWith("/sign-in")) {
     sessionResponse = await updateSession(request);
   }
 

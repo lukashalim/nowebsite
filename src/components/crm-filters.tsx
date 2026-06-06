@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Filter } from "lucide-react";
 import {
   buildCrmQueryString,
   type CrmSearchParams,
@@ -10,35 +9,44 @@ interface CrmFiltersProps {
   params: CrmSearchParams;
 }
 
+const fieldClass =
+  "rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100";
+
+const labelClass = "flex shrink-0 flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400";
+
 export function CrmFilters({ params }: CrmFiltersProps) {
   return (
-    <section className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/40">
-      <div className="mb-3 flex items-center gap-2 text-sm font-medium text-zinc-800 dark:text-zinc-200">
-        <Filter className="size-4" aria-hidden />
-        Filters
-      </div>
-      <form method="get" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-        <label className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
-          Min reviews
-          <input
-            type="number"
-            name="minReviews"
-            min={0}
-            defaultValue={params.minReviews}
-            className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-          />
+    <section className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-3 dark:border-zinc-800 dark:bg-zinc-900/40">
+      <form
+        method="get"
+        className="flex flex-wrap items-end gap-x-3 gap-y-3 lg:flex-nowrap"
+      >
+        <label className={labelClass}>
+          Reviews
+          <span className="flex items-center gap-1.5">
+            <input
+              type="number"
+              name="minReviews"
+              min={0}
+              defaultValue={params.minReviews}
+              aria-label="Minimum reviews"
+              className={`${fieldClass} w-[4.5rem]`}
+            />
+            <span className="text-zinc-400" aria-hidden>
+              –
+            </span>
+            <input
+              type="number"
+              name="maxReviews"
+              min={0}
+              defaultValue={params.maxReviews}
+              aria-label="Maximum reviews"
+              className={`${fieldClass} w-[4.5rem]`}
+            />
+          </span>
         </label>
-        <label className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
-          Max reviews
-          <input
-            type="number"
-            name="maxReviews"
-            min={0}
-            defaultValue={params.maxReviews}
-            className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
+
+        <label className={labelClass}>
           Min rating
           <input
             type="number"
@@ -47,15 +55,16 @@ export function CrmFilters({ params }: CrmFiltersProps) {
             max={5}
             step={0.1}
             defaultValue={params.minRating}
-            className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+            className={`${fieldClass} w-[4.5rem]`}
           />
         </label>
-        <label className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
-          Has website
+
+        <label className={labelClass}>
+          Web Presence
           <select
             name="webPresence"
             defaultValue={params.webPresence}
-            className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+            className={`${fieldClass} min-w-[9rem]`}
             title="No = no standalone site (any FB/WA listing). Facebook / WhatsApp narrow by Maps listing. Yes = real website."
           >
             <option value="no">No (no real site)</option>
@@ -64,12 +73,13 @@ export function CrmFilters({ params }: CrmFiltersProps) {
             <option value="yes">Yes</option>
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
-          Stage (optional)
+
+        <label className={labelClass}>
+          Stage
           <select
             name="stage"
             defaultValue={params.stage ?? ""}
-            className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+            className={`${fieldClass} min-w-[8rem]`}
           >
             <option value="">All stages</option>
             <option value="new">New</option>
@@ -79,42 +89,37 @@ export function CrmFilters({ params }: CrmFiltersProps) {
             <option value="closed">Closed</option>
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
-          Contact min (optional)
-          <input
-            type="number"
-            name="contactMin"
-            min={0}
-            max={3}
-            defaultValue={params.contactMin ?? ""}
-            placeholder="—"
-            className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-          />
+
+        <label className={labelClass}>
+          Times Contacted
+          <span className="flex items-center gap-1.5">
+            <input
+              type="number"
+              name="contactMin"
+              min={0}
+              max={3}
+              defaultValue={params.contactMin ?? ""}
+              placeholder="—"
+              aria-label="Minimum times contacted"
+              className={`${fieldClass} w-[3.25rem]`}
+            />
+            <span className="text-zinc-400" aria-hidden>
+              –
+            </span>
+            <input
+              type="number"
+              name="contactMax"
+              min={0}
+              max={3}
+              defaultValue={params.contactMax ?? ""}
+              placeholder="—"
+              aria-label="Maximum times contacted"
+              className={`${fieldClass} w-[3.25rem]`}
+            />
+          </span>
         </label>
-        <label className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
-          Contact max (optional)
-          <input
-            type="number"
-            name="contactMax"
-            min={0}
-            max={3}
-            defaultValue={params.contactMax ?? ""}
-            placeholder="—"
-            className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
-          Page size
-          <input
-            type="number"
-            name="pageSize"
-            min={1}
-            max={100}
-            defaultValue={params.pageSize}
-            className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-          />
-        </label>
-        <div className="flex items-end gap-2 sm:col-span-2">
+
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           <button
             type="submit"
             className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
@@ -156,6 +161,8 @@ export function CrmPagination({ params, total }: CrmPaginationProps) {
         Page {page} of {totalPages}
         <span className="mx-2 text-zinc-400">·</span>
         {total.toLocaleString()} matching
+        <span className="mx-2 text-zinc-400">·</span>
+        {params.pageSize} per page
       </p>
       <div className="flex gap-2">
         {prevPage ? (
