@@ -1,3 +1,5 @@
+import type { CrmStage } from "@/lib/crm-stage";
+
 export interface BusinessLead {
   place_id: string;
   /** Pretty `/demo/{slug}` segment when set (see scrape `demo_slug`). */
@@ -20,4 +22,7 @@ export interface BusinessLead {
   /** Populated when DB has generated column `crm_contact_surface`. */
   crm_contact_surface?: "facebook" | "whatsapp" | "none" | null;
   contact_count: number;
+  stage: CrmStage;
+  owner_name: string | null;
+  notes: string | null;
 }

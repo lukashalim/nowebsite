@@ -96,6 +96,12 @@ export function stateToAbbr(state: string): string | null {
   return STATE_NAME_TO_ABBR[raw] ?? null;
 }
 
+/** True for the 50 US states (excludes DC from state hub counts and indexes). */
+export function isUsStateForDirectory(state: string): boolean {
+  const abbr = stateToAbbr(state);
+  return abbr !== null && abbr !== "dc";
+}
+
 export function stateAbbrToDisplayName(abbr: string): string {
   const key = abbr.trim().toLowerCase();
   const name = STATE_ABBR_TO_NAME[key];

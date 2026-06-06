@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { LayoutTemplate, Search, Workflow } from "lucide-react";
 import { CategoryIcon } from "@/components/category-icon";
 import { categoryGridLabel, cityPath, statePath } from "@/lib/directory/labels";
 import { stateAbbrToDisplayName, stateToAbbr } from "@/lib/directory/slugs";
@@ -18,6 +19,29 @@ import {
   DIRECTORY_MIN_STATE_LISTINGS,
 } from "@/lib/directory/types";
 import { absoluteUrl } from "@/lib/site-url";
+
+const HOME_FEATURES = [
+  {
+    icon: Search,
+    title: "Find Leads",
+    description: (listingCount: number | null) =>
+      listingCount !== null
+        ? `Browse ${listingCount.toLocaleString()} verified no-website businesses by city, state, and category`
+        : "Browse verified no-website businesses by city, state, and category",
+  },
+  {
+    icon: Workflow,
+    title: "Track Outreach",
+    description: () =>
+      "CRM with contact staging, owner notes, and follow-up tracking",
+  },
+  {
+    icon: LayoutTemplate,
+    title: "Generate Demos",
+    description: () =>
+      "One-click demo site builder to show prospects what their site could look like",
+  },
+] as const;
 
 const HOME_TOP_CATEGORIES = 30;
 const HOME_TOP_STATES = 8;
@@ -74,23 +98,47 @@ export default async function HomePage() {
     summary?.categoryPageCount ?? publishedCategories.length;
   const totalCityCount = summary?.cityHubCount ?? cities.length;
   const totalStateCount = summary?.statePageCount ?? topStates.length;
+  const listingCount = summary?.totalListings ?? null;
 
   return (
     <div className="space-y-12">
       <section className="space-y-4">
         <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-4xl">
-          Local Businesses Without a Website
+          The Prospecting Tool for Web Designers
         </h1>
         <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
-          A free directory of small businesses without websites across the US — Google
-          businesses without a website, sourced directly from Google Maps. Browse by
-          city, state, or category; each listing includes ratings, review counts, phone
-          numbers, and Google Maps links. Every listing is a real Google business
-          profile verified to have no website.
+          {listingCount !== null
+            ? `${listingCount.toLocaleString()} verified local businesses with no website — browse free, track leads, and close clients faster.`
+            : "Verified local businesses with no website — browse free, track leads, and close clients faster."}
           {summary?.lastUpdatedLabel
             ? ` Last updated ${summary.lastUpdatedLabel}.`
             : null}
         </p>
+        <Link
+          href="/pro"
+          className="inline-flex rounded-md bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+        >
+          Start Prospecting Free
+        </Link>
+      </section>
+
+      <section aria-label="Product features">
+        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {HOME_FEATURES.map((feature) => (
+            <li
+              key={feature.title}
+              className="rounded-xl border border-zinc-200 p-5 dark:border-zinc-800"
+            >
+              <feature.icon className="size-5 text-zinc-500" aria-hidden />
+              <h2 className="mt-3 font-semibold text-zinc-900 dark:text-zinc-100">
+                {feature.title}
+              </h2>
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                {feature.description(listingCount)}
+              </p>
+            </li>
+          ))}
+        </ul>
       </section>
 
       {loadError ? (
@@ -99,6 +147,24 @@ export default async function HomePage() {
         </p>
       ) : (
         <>
+          {facebookCount !== null && facebookCount > 0 ? (
+            <section className="space-y-4">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                {facebookCount.toLocaleString()} High-Intent Leads — Businesses Using
+                Facebook as Their Website
+              </h2>
+              <Link
+                href="/facebook"
+                className="block rounded-lg border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/50"
+              >
+                <span className="block text-sm text-zinc-600 dark:text-zinc-400">
+                  These businesses are actively violating Google&apos;s guidelines — the
+                  easiest cold outreach targets for web designers.
+                </span>
+              </Link>
+            </section>
+          ) : null}
+
           <section className="space-y-4">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
@@ -159,27 +225,6 @@ export default async function HomePage() {
                 className="mt-4 inline-block text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
               >
                 Open UK directory
-              </Link>
-            </section>
-          ) : null}
-
-          {facebookCount !== null && facebookCount > 0 ? (
-            <section className="space-y-4">
-              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-                Facebook as Google website
-              </h2>
-              <Link
-                href="/facebook"
-                className="block rounded-lg border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/50"
-              >
-                <span className="block font-medium text-zinc-900 dark:text-zinc-100">
-                  Businesses using Facebook on Google Maps
-                </span>
-                <span className="mt-1 block text-sm text-zinc-600 dark:text-zinc-400">
-                  {facebookCount.toLocaleString()} listings where Facebook appears as
-                  the website — often against Google guidelines and bad for local
-                  rankings. High-intent leads for web designers.
-                </span>
               </Link>
             </section>
           ) : null}

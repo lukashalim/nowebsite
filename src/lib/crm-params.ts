@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CRM_STAGE_VALUES, type CrmStage } from "@/lib/crm-stage";
 
 function firstParam(
   value: string | string[] | undefined,
@@ -27,7 +28,16 @@ const optionalInt = z.preprocess((val) => {
   if (val === undefined || val === "") return undefined;
   const n = Number.parseInt(String(val), 10);
   return Number.isFinite(n) ? n : undefined;
-}, z.number().int().min(0).max(50).optional());
+}, z.number().int().min(0).max(3).optional());
+
+const optionalStage = z.preprocess((val) => {
+  if (val === undefined || val === "") return undefined;
+  const s = String(val).trim();
+  if ((CRM_STAGE_VALUES as readonly string[]).includes(s)) {
+    return s as CrmStage;
+  }
+  return undefined;
+}, z.enum(CRM_STAGE_VALUES).optional());
 
 /** `plain` = legacy ?contactSurface=none (no FB/WA bucket only); not shown in the CRM dropdown. */
 export const crmWebPresenceValues = [
@@ -50,6 +60,7 @@ export const crmSearchParamsSchema = z
     pageSize: intInRange(50, 1, 100),
     contactMin: optionalInt,
     contactMax: optionalInt,
+    stage: optionalStage,
   })
   .refine((d) => d.minReviews <= d.maxReviews, {
     message: "minReviews must be <= maxReviews",
@@ -122,6 +133,7 @@ function rawToFlat(raw: Record<string, string | string[] | undefined>) {
     pageSize: firstParam(raw.pageSize),
     contactMin: firstParam(raw.contactMin),
     contactMax: firstParam(raw.contactMax),
+    stage: firstParam(raw.stage),
   };
 }
 
@@ -153,6 +165,7 @@ export function buildCrmQueryString(params: CrmSearchParams): string {
     sp.set("contactMin", String(params.contactMin));
   if (params.contactMax !== undefined)
     sp.set("contactMax", String(params.contactMax));
+  if (params.stage !== undefined) sp.set("stage", params.stage);
   const s = sp.toString();
   return s ? `?${s}` : "";
 }

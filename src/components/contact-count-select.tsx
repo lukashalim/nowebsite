@@ -40,7 +40,6 @@ export function ContactCountSelect({
         }
       }}
     >
-      <option value={-1}>dead</option>
       {OPTIONS.map((n) => (
         <option key={n} value={n}>
           {n}

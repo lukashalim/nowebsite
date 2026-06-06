@@ -5,19 +5,21 @@ import { upsertCrmUserContact } from "@/app/actions/crm-user-contact";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export async function updateContactCount(
+export async function updateOwnerName(
   placeId: string,
-  contactCount: number,
+  ownerName: string | null,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!placeId || typeof placeId !== "string") {
     return { ok: false, error: "Invalid place" };
   }
-  if (
-    !Number.isInteger(contactCount) ||
-    contactCount < 0 ||
-    contactCount > 3
-  ) {
-    return { ok: false, error: "Invalid contact count" };
+  if (ownerName !== null) {
+    if (typeof ownerName !== "string") {
+      return { ok: false, error: "Invalid owner name" };
+    }
+    const trimmed = ownerName.trim();
+    if (trimmed.length > 100) {
+      return { ok: false, error: "Owner name must be 100 characters or less" };
+    }
   }
 
   const supabase = await createSupabaseServerClient();
@@ -30,8 +32,12 @@ export async function updateContactCount(
   }
 
   try {
+    const normalized =
+      ownerName === null || ownerName.trim() === ""
+        ? null
+        : ownerName.trim();
     const res = await upsertCrmUserContact(supabase, user.id, placeId, {
-      contact_count: contactCount,
+      owner_name: normalized,
     });
     if (!res.ok) return res;
 

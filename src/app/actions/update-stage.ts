@@ -3,21 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { upsertCrmUserContact } from "@/app/actions/crm-user-contact";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
+import { isCrmStage, type CrmStage } from "@/lib/crm-stage";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export async function updateContactCount(
+export async function updateLeadStage(
   placeId: string,
-  contactCount: number,
+  stage: CrmStage,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!placeId || typeof placeId !== "string") {
     return { ok: false, error: "Invalid place" };
   }
-  if (
-    !Number.isInteger(contactCount) ||
-    contactCount < 0 ||
-    contactCount > 3
-  ) {
-    return { ok: false, error: "Invalid contact count" };
+  if (!isCrmStage(stage)) {
+    return { ok: false, error: "Invalid stage" };
   }
 
   const supabase = await createSupabaseServerClient();
@@ -31,7 +28,7 @@ export async function updateContactCount(
 
   try {
     const res = await upsertCrmUserContact(supabase, user.id, placeId, {
-      contact_count: contactCount,
+      stage,
     });
     if (!res.ok) return res;
 

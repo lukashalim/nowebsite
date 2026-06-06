@@ -1,4 +1,5 @@
--- Per-user CRM contacted counts (0–3). Global "dead" (-1) stays on businesses_nowebsite.contact_count.
+-- Per-user CRM contacted counts (0–3) and pipeline stage.
+-- Global invalid listings use businesses_nowebsite.is_invalid (see add-crm-stage-and-is-invalid.sql).
 
 create table if not exists public.crm_user_contacts (
   user_id uuid not null references auth.users(id) on delete cascade,

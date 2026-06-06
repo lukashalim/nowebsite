@@ -1,23 +1,19 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { upsertCrmUserContact } from "@/app/actions/crm-user-contact";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
+import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export async function updateContactCount(
+export async function setLeadInvalid(
   placeId: string,
-  contactCount: number,
+  isInvalid: boolean,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!placeId || typeof placeId !== "string") {
     return { ok: false, error: "Invalid place" };
   }
-  if (
-    !Number.isInteger(contactCount) ||
-    contactCount < 0 ||
-    contactCount > 3
-  ) {
-    return { ok: false, error: "Invalid contact count" };
+  if (typeof isInvalid !== "boolean") {
+    return { ok: false, error: "Invalid flag" };
   }
 
   const supabase = await createSupabaseServerClient();
@@ -30,10 +26,18 @@ export async function updateContactCount(
   }
 
   try {
-    const res = await upsertCrmUserContact(supabase, user.id, placeId, {
-      contact_count: contactCount,
-    });
-    if (!res.ok) return res;
+    const admin = createSupabaseAdmin();
+    const { error } = await admin
+      .from("businesses_nowebsite")
+      .update({ is_invalid: isInvalid })
+      .eq("place_id", placeId);
+
+    if (error) {
+      const hint = /is_invalid|schema cache/i.test(error.message)
+        ? " Run scrape/sql/add-crm-stage-and-is-invalid.sql in Supabase."
+        : "";
+      return { ok: false, error: error.message + hint };
+    }
 
     revalidatePath(CRM_BASE_PATH);
     return { ok: true };

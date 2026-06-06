@@ -2,6 +2,7 @@ import { COUNTRY_US } from "@/lib/directory/country";
 import type { DirectoryBusiness } from "@/lib/directory/types";
 import {
   cityStateToSlug,
+  isUsStateForDirectory,
   parseStateSlug,
   stateAbbrToDisplayName,
   stateNameToSlug,
@@ -103,7 +104,7 @@ export function buildDirectoryFilterOptions(
     if (!city || !state) continue;
 
     const stateSlug = stateNameToSlug(state);
-    if (!stateSlug) continue;
+    if (!stateSlug || !isUsStateForDirectory(state)) continue;
 
     const citySlug = cityStateToSlug(city, state, b.country);
     if (!citySlug) continue;

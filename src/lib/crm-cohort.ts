@@ -4,6 +4,7 @@ import {
   type ContactEnrichment,
 } from "@/lib/contact-enrichment-schema";
 import { toFiniteNumber } from "@/lib/demo-enrichment";
+import { isCrmStage, type CrmStage } from "@/lib/crm-stage";
 import {
   defaultCrmDemoCohortFilters,
   type CrmSearchParams,
@@ -214,6 +215,45 @@ function mapRowToDemoBusiness(
 interface UserContactRow {
   place_id: string;
   contact_count: number;
+  stage: CrmStage;
+  owner_name: string | null;
+  notes: string | null;
+}
+
+function parseUserContactStage(raw: unknown): CrmStage {
+  if (typeof raw === "string" && isCrmStage(raw)) {
+    return raw;
+  }
+  return "new";
+}
+
+function applyStageFilter<
+  T extends {
+    in: (column: string, values: string[]) => T;
+    not: (column: string, operator: string, value: string) => T;
+  },
+>(q: T, userContacts: UserContactRow[], stage: CrmStage | undefined): T | null {
+  if (stage === undefined) {
+    return q;
+  }
+
+  if (stage === "new") {
+    const excludePlaceIds = userContacts
+      .filter((c) => c.stage !== "new")
+      .map((c) => c.place_id);
+    if (excludePlaceIds.length > 0) {
+      q = q.not("place_id", "in", `(${excludePlaceIds.join(",")})`);
+    }
+    return q;
+  }
+
+  const matchingPlaceIds = userContacts
+    .filter((c) => c.stage === stage)
+    .map((c) => c.place_id);
+  if (matchingPlaceIds.length === 0) {
+    return null;
+  }
+  return q.in("place_id", matchingPlaceIds);
 }
 
 function applyUserContactFilters<
@@ -262,7 +302,7 @@ export async function fetchCrmBusinessRows(
 
     const { data: userContactsRaw, error: contactsError } = await supabase
       .from("crm_user_contacts")
-      .select("place_id, contact_count")
+      .select("place_id, contact_count, stage, owner_name, notes")
       .eq("user_id", userId);
 
     if (contactsError) {
@@ -272,15 +312,30 @@ export async function fetchCrmBusinessRows(
       return { rows: [], total: 0, error: contactsError.message + hint };
     }
 
-    const userContacts = (userContactsRaw ?? []) as UserContactRow[];
+    const userContacts: UserContactRow[] = (userContactsRaw ?? []).map((row) => ({
+      place_id: String(row.place_id),
+      contact_count: Number(row.contact_count) || 0,
+      stage: parseUserContactStage(row.stage),
+      owner_name:
+        typeof row.owner_name === "string" ? row.owner_name : null,
+      notes: typeof row.notes === "string" ? row.notes : null,
+    }));
     const contactMap = new Map(
-      userContacts.map((c) => [c.place_id, c.contact_count]),
+      userContacts.map((c) => [
+        c.place_id,
+        {
+          contact_count: c.contact_count,
+          stage: c.stage,
+          owner_name: c.owner_name,
+          notes: c.notes,
+        },
+      ]),
     );
 
     let q = supabase
       .from("businesses_nowebsite")
       .select(CRM_BUSINESS_LIST_COLUMNS, { count: "exact" })
-      .neq("contact_count", -1)
+      .eq("is_invalid", false)
       .gte("reviews", p.minReviews)
       .lte("reviews", p.maxReviews)
       .gte("rating", p.minRating);
@@ -292,6 +347,12 @@ export async function fetchCrmBusinessRows(
       return { rows: [], total: 0, error: null };
     }
     q = filtered;
+
+    const stageFiltered = applyStageFilter(q, userContacts, p.stage);
+    if (stageFiltered === null) {
+      return { rows: [], total: 0, error: null };
+    }
+    q = stageFiltered;
 
     q = applyReviewExcerptsExtractedFilter(q);
 
@@ -310,12 +371,19 @@ export async function fetchCrmBusinessRows(
       return { rows: [], total: 0, error: error.message + hint };
     }
 
-    const rows = ((data ?? []) as Omit<BusinessLead, "contact_count">[]).map(
-      (row) => ({
+    const rows = ((data ?? []) as Omit<
+      BusinessLead,
+      "contact_count" | "stage" | "owner_name" | "notes"
+    >[]).map((row) => {
+      const userContact = contactMap.get(row.place_id);
+      return {
         ...row,
-        contact_count: contactMap.get(row.place_id) ?? 0,
-      }),
-    ) as BusinessLead[];
+        contact_count: userContact?.contact_count ?? 0,
+        stage: userContact?.stage ?? "new",
+        owner_name: userContact?.owner_name ?? null,
+        notes: userContact?.notes ?? null,
+      };
+    }) as BusinessLead[];
 
     return {
       rows,
@@ -328,8 +396,12 @@ export async function fetchCrmBusinessRows(
   }
 }
 
-export interface DemoBusiness extends Omit<BusinessLead, "contact_count"> {
+export interface DemoBusiness
+  extends Omit<BusinessLead, "contact_count" | "stage" | "owner_name" | "notes"> {
   contact_count?: number;
+  stage?: CrmStage;
+  owner_name?: string | null;
+  notes?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   is_spending_on_ads?: boolean | null;
@@ -352,7 +424,7 @@ export async function fetchAllDemoCohortPublicDemoPaths(): Promise<string[]> {
     let q = supabase
       .from("businesses_nowebsite")
       .select("place_id, demo_slug")
-      .neq("contact_count", -1)
+      .eq("is_invalid", false)
       .gte("reviews", c.minReviews)
       .lte("reviews", c.maxReviews)
       .gte("rating", c.minRating);
@@ -397,7 +469,7 @@ export async function fetchDemoBusinessByUrlSegment(
   let q = supabase
     .from("businesses_nowebsite")
     .select(DEMO_DETAIL_COLUMNS)
-    .neq("contact_count", -1);
+    .eq("is_invalid", false);
 
   if (isLikelyGooglePlaceId(raw)) {
     q = q.eq("place_id", raw);
@@ -429,7 +501,7 @@ export async function fetchDemoCohortPage(
   let q = supabase
     .from("businesses_nowebsite")
     .select(DEMO_INDEX_COLUMNS, { count: "exact" })
-    .neq("contact_count", -1)
+    .eq("is_invalid", false)
     .gte("reviews", c.minReviews)
     .lte("reviews", c.maxReviews)
     .gte("rating", c.minRating);

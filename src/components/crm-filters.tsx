@@ -65,12 +65,27 @@ export function CrmFilters({ params }: CrmFiltersProps) {
           </select>
         </label>
         <label className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
+          Stage (optional)
+          <select
+            name="stage"
+            defaultValue={params.stage ?? ""}
+            className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+          >
+            <option value="">All stages</option>
+            <option value="new">New</option>
+            <option value="replied">Replied</option>
+            <option value="demo_sent">Demo Sent</option>
+            <option value="interested">Interested</option>
+            <option value="closed">Closed</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400">
           Contact min (optional)
           <input
             type="number"
             name="contactMin"
             min={0}
-            max={50}
+            max={3}
             defaultValue={params.contactMin ?? ""}
             placeholder="—"
             className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
@@ -82,7 +97,7 @@ export function CrmFilters({ params }: CrmFiltersProps) {
             type="number"
             name="contactMax"
             min={0}
-            max={50}
+            max={3}
             defaultValue={params.contactMax ?? ""}
             placeholder="—"
             className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"

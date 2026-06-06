@@ -12,6 +12,7 @@ import {
   parseCitySlug,
   parseStateSlug,
   resolveCategoryForRow,
+  isUsStateForDirectory,
   stateNameToSlug,
   stateToAbbr,
 } from "@/lib/directory/slugs";
@@ -325,7 +326,7 @@ export const fetchDirectoryIndex = cache(async (): Promise<{
 
       const stateSlug = stateNameToSlug(state);
       const stateAbbr = stateToAbbr(state);
-      if (stateSlug && stateAbbr) {
+      if (stateSlug && stateAbbr && isUsStateForDirectory(state)) {
         const stateKey = stateSlug;
         const existingState = stateCounts.get(stateKey);
         if (existingState) {

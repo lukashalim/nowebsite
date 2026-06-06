@@ -8,10 +8,15 @@ import {
   Share2,
   Star,
 } from "lucide-react";
+import { listSpintaxTemplates } from "@/app/actions/spintax-templates";
 import { CrmFilters, CrmPagination } from "@/components/crm-filters";
 import { CrmLogin } from "@/components/crm-login";
 import { ContactCountSelect } from "@/components/contact-count-select";
+import { MarkInvalidButton } from "@/components/mark-invalid-button";
+import { NotesCell } from "@/components/notes-cell";
 import { OutreachSpintaxButton } from "@/components/outreach-spintax-button";
+import { OwnerNameInput } from "@/components/owner-name-input";
+import { StageSelect } from "@/components/stage-select";
 import type { BusinessLead } from "@/lib/business";
 import { fetchCrmBusinessRows } from "@/lib/crm-cohort";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
@@ -99,8 +104,12 @@ export default async function CrmPage({ searchParams }: PageProps) {
   }
 
   const p = parsed.data;
-  const { rows, total, error: loadErr } = await fetchCrmBusinessRows(p, user.id);
+  const [{ rows, total, error: loadErr }, spintaxResult] = await Promise.all([
+    fetchCrmBusinessRows(p, user.id),
+    listSpintaxTemplates(),
+  ]);
   const loadError = loadErr;
+  const spintaxTemplates = spintaxResult.ok ? spintaxResult.templates : [];
 
   return (
     <div className="mx-auto flex min-h-0 flex-1 flex-col gap-6 p-4 sm:p-6 lg:max-w-[1400px]">
@@ -111,6 +120,13 @@ export default async function CrmPage({ searchParams }: PageProps) {
             className="text-zinc-700 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
           >
             Scrape queue →
+          </Link>
+          <span className="mx-2 text-zinc-300 dark:text-zinc-600">·</span>
+          <Link
+            href={`${CRM_BASE_PATH}/spintax`}
+            className="text-zinc-700 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+          >
+            Spintax templates →
           </Link>
         </p>
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
@@ -146,7 +162,7 @@ export default async function CrmPage({ searchParams }: PageProps) {
       ) : (
         <>
           <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-            <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+            <table className="w-full min-w-[1280px] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-zinc-200 bg-zinc-50 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
                   <th className="px-3 py-3">Business</th>
@@ -158,6 +174,10 @@ export default async function CrmPage({ searchParams }: PageProps) {
                   <th className="px-3 py-3">Links</th>
                   <th className="px-3 py-3">DM spintax</th>
                   <th className="px-3 py-3">Demo</th>
+                  <th className="px-3 py-3">Stage</th>
+                  <th className="px-3 py-3">Owner</th>
+                  <th className="px-3 py-3">Notes</th>
+                  <th className="px-3 py-3">Invalid</th>
                   <th className="px-3 py-3">Contacted</th>
                 </tr>
               </thead>
@@ -165,7 +185,7 @@ export default async function CrmPage({ searchParams }: PageProps) {
                 {rows.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={10}
+                      colSpan={14}
                       className="px-3 py-8 text-center text-zinc-500 dark:text-zinc-400"
                     >
                       No rows match these filters.
@@ -310,11 +330,12 @@ export default async function CrmPage({ searchParams }: PageProps) {
                         </td>
                         <td className="px-3 py-3 align-top">
                           <OutreachSpintaxButton
-                            placeId={b.place_id}
+                            userId={user.id}
                             businessName={b.name}
                             mainCategory={b.main_category}
                             businessType={b.business_type}
                             eligible={spintaxEligible}
+                            templates={spintaxTemplates}
                           />
                         </td>
                         <td className="px-3 py-3">
@@ -326,6 +347,30 @@ export default async function CrmPage({ searchParams }: PageProps) {
                           >
                             Demo
                           </a>
+                        </td>
+                        <td className="px-3 py-3">
+                          <StageSelect
+                            key={`${b.place_id}-${b.stage}`}
+                            placeId={b.place_id}
+                            value={b.stage}
+                          />
+                        </td>
+                        <td className="px-3 py-3">
+                          <OwnerNameInput
+                            key={`${b.place_id}-owner-${b.owner_name ?? ""}`}
+                            placeId={b.place_id}
+                            value={b.owner_name}
+                          />
+                        </td>
+                        <td className="px-3 py-3">
+                          <NotesCell
+                            key={`${b.place_id}-notes-${b.notes ?? ""}`}
+                            placeId={b.place_id}
+                            value={b.notes}
+                          />
+                        </td>
+                        <td className="px-3 py-3">
+                          <MarkInvalidButton placeId={b.place_id} />
                         </td>
                         <td className="px-3 py-3">
                           <ContactCountSelect
