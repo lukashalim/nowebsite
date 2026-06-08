@@ -1,0 +1,63 @@
+# No Website Business Leads
+
+The prospecting CRM for web designers and agencies.
+
+Find, pitch, and close local businesses that don't have a website — or worse, have Facebook listed as their Google Maps website link.
+
+**Live:** [nowebsitebusinessleads.com](https://nowebsitebusinessleads.com)
+
+## What It Does
+
+No Website Business Leads aggregates public Google Business data to surface local businesses operating without a dedicated website, organized by city and category. The platform pairs a searchable directory with **Outreach Engine**, an outreach-focused CRM so designers can manage their pipeline and launch cold outreach from a single dashboard.
+
+A common high-converting target: businesses using **Facebook as their website** on Google Maps. That setup hurts mobile conversions and conflicts with how Google expects listings to be structured.
+
+## Key Features
+
+- **Lead directory** — verified no-website businesses across US cities, browsable by city and category
+- **Facebook filter** — surface businesses using Facebook as their primary website link
+- **Outreach Engine CRM** — auth-gated dashboard with contact stage tracking, owner notes, and outreach history
+- **One-click outreach** — cold call, SMS (with Twilio line-type check), and Facebook DM from the CRM with pre-generated spintax openers
+- **Spintax templates** — editable Facebook DM and SMS templates by lead type (Facebook listing vs no Facebook)
+- **Demo page builder** — live mobile preview sites via [ringreadysite.com](https://ringreadysite.com) for cold outreach pitches
+- **CSV export** — download lead lists by city and category
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Framework | Next.js (App Router) |
+| Database | Supabase (Postgres) |
+| Auth | Google OAuth via Supabase |
+| Hosting | Vercel |
+
+## Project Structure
+
+```
+src/          # Next.js app — pages, components, API routes
+src/app/crm/  # Outreach Engine CRM (leads, spintax editor)
+scrape/       # Google Business Profile scraping pipeline
+public/       # Static assets
+```
+
+## Local Development
+
+1. Copy `.env.local.example` to `.env.local` and fill in Supabase credentials.
+2. Optional: add `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` for SMS line-type lookup in the CRM.
+3. Run SQL migrations in `scrape/sql/` against your Supabase project as needed.
+4. Start the dev server:
+
+```bash
+npm install
+npm run dev
+```
+
+Sign in at `/sign-in` or `/crm` with Google OAuth. Configure Supabase **Site URL** and **Redirect URLs** for your environment (e.g. `https://nowebsitebusinessleads.com/auth/callback` in production).
+
+## Related
+
+- [ringreadysite.com](https://ringreadysite.com) — companion tool that generates demo websites from Google Maps data for use during cold outreach
+
+## Contact
+
+Built by Lukas Halim — [lukas@nowebsitebusinessleads.com](mailto:lukas@nowebsitebusinessleads.com)
