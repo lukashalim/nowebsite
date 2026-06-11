@@ -65,7 +65,7 @@ export function DownloadCsvButton({
   businesses,
   contactAccess,
   pagePath,
-  label = "Download CSV",
+  label = "Download as CSV",
   className,
 }: DownloadCsvButtonProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);

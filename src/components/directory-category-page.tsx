@@ -215,24 +215,11 @@ export function DirectoryCategoryPage({
         />
       ) : null}
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-        <DownloadCsvButton
-          businesses={stripContactFieldsList(businesses)}
-          contactAccess={contactAccess}
-          pagePath={path}
-          label={
-            paginated
-              ? `Download page CSV (${range.start}–${range.end})`
-              : "Download CSV"
-          }
-        />
-        {paginated ? (
-          <p className="text-xs text-zinc-500">
-            CSV includes listings on this page only ({businesses.length} of{" "}
-            {totalCount.toLocaleString()}).
-          </p>
-        ) : null}
-      </div>
+      <DownloadCsvButton
+        businesses={stripContactFieldsList(businesses)}
+        contactAccess={contactAccess}
+        pagePath={path}
+      />
     </div>
   );
 }
