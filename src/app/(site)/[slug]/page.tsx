@@ -4,6 +4,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { CategoryIcon } from "@/components/category-icon";
 import { DirectoryCategoryPage } from "@/components/directory-category-page";
 import { DirectoryBusinessList } from "@/components/directory-business-list";
+import { DownloadCsvButton } from "@/components/download-csv-button";
 import { DirectoryLastUpdated } from "@/components/directory-last-updated";
 import { DirectoryListingFilters } from "@/components/directory-listing-filters";
 import { DirectoryStatePage } from "@/components/directory-state-page";
@@ -41,6 +42,7 @@ import {
   listingScopeForCity,
   listingScopeForState,
 } from "@/lib/directory/listing-scope";
+import { stripContactFieldsList } from "@/lib/directory/contact-fields";
 
 export const revalidate = 3600;
 export const dynamicParams = true;
@@ -343,6 +345,14 @@ export default async function SlugDirectoryPage({
             </p>
           )}
         </section>
+
+        {businesses.length > 0 ? (
+          <DownloadCsvButton
+            businesses={stripContactFieldsList(businesses)}
+            contactAccess={contactAccess}
+            pagePath={`/${lower}`}
+          />
+        ) : null}
       </div>
     );
   }

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { CategoryIcon } from "@/components/category-icon";
 import { DirectoryBusinessList } from "@/components/directory-business-list";
+import { DownloadCsvButton } from "@/components/download-csv-button";
 import { DirectoryLastUpdated } from "@/components/directory-last-updated";
 import { DirectoryStatePage } from "@/components/directory-state-page";
 import {
@@ -26,6 +27,7 @@ import {
 } from "@/lib/directory/ui-classes";
 import { createDirectoryContactAccess } from "@/lib/directory/contact-access";
 import { listingScopeForGbCity } from "@/lib/directory/listing-scope";
+import { stripContactFieldsList } from "@/lib/directory/contact-fields";
 
 export const revalidate = 3600;
 export const dynamicParams = true;
@@ -237,6 +239,14 @@ export default async function UnitedKingdomNestedPage({ params }: PageProps) {
             contactAccess={contactAccess}
           />
         </section>
+
+        {businesses.length > 0 ? (
+          <DownloadCsvButton
+            businesses={stripContactFieldsList(businesses)}
+            contactAccess={contactAccess}
+            pagePath={gbCityPath(citySlug)}
+          />
+        ) : null}
       </div>
     );
   }

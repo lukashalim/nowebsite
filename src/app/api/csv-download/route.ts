@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import {
+  FREE_MONTHLY_DIRECTORY_CSV_LIMIT,
+  getDirectoryCsvDownloadCount,
+  getDirectoryCsvDownloadSummary,
+  normalizeCsvDownloadEmail,
+} from "@/lib/csv-download-limits";
 import { addContactToList } from "@/lib/sendfox";
+import { getAuthenticatedUserProfile, isPro } from "@/lib/subscription";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -12,12 +19,51 @@ const csvDownloadSchema = z.object({
   mode: z.literal("page"),
 });
 
+export async function GET(request: Request) {
+  const auth = await getAuthenticatedUserProfile();
+  const userIsPro = isPro(auth?.profile);
+
+  if (userIsPro) {
+    return NextResponse.json({ isPro: true });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const rawEmail = searchParams.get("email");
+
+  if (rawEmail?.trim()) {
+    const normalizedEmail = normalizeCsvDownloadEmail(rawEmail);
+    try {
+      const summary = await getDirectoryCsvDownloadSummary(normalizedEmail);
+      return NextResponse.json({
+        isPro: false,
+        used: summary.used,
+        remaining: summary.remaining,
+        limit: summary.limit,
+        periodEnd: summary.periodEnd,
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Could not load download status";
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
+  }
+
+  return NextResponse.json({
+    isPro: false,
+    used: 0,
+    remaining: FREE_MONTHLY_DIRECTORY_CSV_LIMIT,
+    limit: FREE_MONTHLY_DIRECTORY_CSV_LIMIT,
+  });
+}
+
 async function logCsvDownload(email: string, pageUrl: string): Promise<void> {
-  try {
-    const supabase = createSupabaseAdmin();
-    await supabase.from("csv_downloads").insert({ email, page_url: pageUrl });
-  } catch {
-    // Non-blocking: SendFox subscription is the gate; logging is best-effort.
+  const supabase = createSupabaseAdmin();
+  const { error } = await supabase.from("csv_downloads").insert({
+    email: normalizeCsvDownloadEmail(email),
+    page_url: pageUrl,
+  });
+  if (error) {
+    throw new Error(error.message);
   }
 }
 
@@ -48,6 +94,35 @@ export async function POST(request: Request) {
   }
 
   const { email, pageUrl } = parsed.data;
+  const normalizedEmail = normalizeCsvDownloadEmail(email);
+
+  const auth = await getAuthenticatedUserProfile();
+  const userIsPro = isPro(auth?.profile);
+
+  if (!userIsPro) {
+    let used: number;
+    try {
+      used = await getDirectoryCsvDownloadCount(normalizedEmail);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Could not verify download limit";
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
+
+    if (used >= FREE_MONTHLY_DIRECTORY_CSV_LIMIT) {
+      const summary = await getDirectoryCsvDownloadSummary(normalizedEmail);
+      return NextResponse.json(
+        {
+          error: "Monthly CSV download limit reached.",
+          code: "csv_limit_reached",
+          used: summary.used,
+          limit: summary.limit,
+          periodEnd: summary.periodEnd,
+        },
+        { status: 403 },
+      );
+    }
+  }
 
   try {
     await addContactToList(email);
@@ -57,7 +132,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 502 });
   }
 
-  await logCsvDownload(email, pageUrl);
+  try {
+    await logCsvDownload(normalizedEmail, pageUrl);
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Failed to log CSV download";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 
-  return NextResponse.json({ ok: true });
+  if (userIsPro) {
+    return NextResponse.json({ ok: true, remaining: null, limit: null });
+  }
+
+  const summary = await getDirectoryCsvDownloadSummary(normalizedEmail);
+  return NextResponse.json({
+    ok: true,
+    remaining: summary.remaining,
+    limit: summary.limit,
+  });
 }
