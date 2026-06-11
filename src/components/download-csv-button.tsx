@@ -11,15 +11,10 @@ import { directoryOutlineButtonClass } from "@/lib/directory/ui-classes";
 
 const SESSION_EMAIL_KEY = "csv_download_email";
 
-type CsvExportType = "category" | "state" | "facebook";
-
 interface DownloadCsvButtonProps {
   businesses: DirectoryBusiness[];
   pagePath: string;
-  mode?: "page" | "full";
   label?: string;
-  exportType?: CsvExportType;
-  exportSlug?: string;
   className?: string;
 }
 
@@ -51,10 +46,7 @@ function setSessionEmail(email: string): void {
 export function DownloadCsvButton({
   businesses,
   pagePath,
-  mode = "page",
   label = "Download CSV",
-  exportType,
-  exportSlug,
   className,
 }: DownloadCsvButtonProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -73,26 +65,15 @@ export function DownloadCsvButton({
       setPending(true);
       setError(null);
 
-      const body =
-        mode === "full"
-          ? {
-              email: submittedEmail,
-              pageUrl: pagePath,
-              mode: "full" as const,
-              type: exportType,
-              ...(exportSlug ? { slug: exportSlug } : {}),
-            }
-          : {
-              email: submittedEmail,
-              pageUrl: pagePath,
-              mode: "page" as const,
-            };
-
       try {
         const response = await fetch("/api/csv-download", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          body: JSON.stringify({
+            email: submittedEmail,
+            pageUrl: pagePath,
+            mode: "page" as const,
+          }),
         });
 
         if (!response.ok) {
@@ -105,24 +86,14 @@ export function DownloadCsvButton({
 
         setSessionEmail(submittedEmail);
         dialogRef.current?.close();
-
-        if (mode === "full") {
-          const blob = await response.blob();
-          const disposition = response.headers.get("Content-Disposition");
-          const filenameMatch = disposition?.match(/filename="([^"]+)"/);
-          const filename =
-            filenameMatch?.[1] ?? csvFilenameFromPagePath(pagePath);
-          triggerBlobDownload(blob, filename);
-        } else {
-          downloadPageCsv();
-        }
+        downloadPageCsv();
       } catch {
         setError("Network error. Please try again.");
       } finally {
         setPending(false);
       }
     },
-    [mode, pagePath, exportType, exportSlug, downloadPageCsv],
+    [pagePath, downloadPageCsv],
   );
 
   const handleClick = useCallback(() => {
@@ -144,7 +115,7 @@ export function DownloadCsvButton({
         <button
           type="button"
           onClick={handleClick}
-          disabled={pending}
+          disabled={pending || businesses.length === 0}
           className={buttonClass}
         >
           <Download className="size-4" aria-hidden />
@@ -177,8 +148,8 @@ export function DownloadCsvButton({
               Download CSV
             </h2>
             <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-              Enter your email to download the CSV. We&apos;ll send occasional
-              updates.
+              Enter your email to download this page as CSV. We&apos;ll send
+              occasional updates.
             </p>
           </div>
           <input

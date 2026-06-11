@@ -82,8 +82,6 @@ export function DirectoryStatePage({
   const showUsFilters = !isUkRegion && filters && filterOptions;
   const filtersActive = filters ? hasActiveDirectoryListingFilters(filters) : false;
   const unfilteredCount = unfilteredCountProp ?? totalCount;
-  const showFullCsvDownload = paginated && !isUkRegion;
-
   return (
     <div className="space-y-8">
       <script
@@ -196,22 +194,19 @@ export function DirectoryStatePage({
       ) : null}
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-        {showFullCsvDownload ? (
-          <DownloadCsvButton
-            businesses={businesses}
-            pagePath={path}
-            mode="full"
-            exportType="state"
-            exportSlug={stateSlug}
-            label={`Download all ${totalCount.toLocaleString()} as CSV`}
-          />
-        ) : (
-          <DownloadCsvButton businesses={businesses} pagePath={path} />
-        )}
-        {showFullCsvDownload ? (
+        <DownloadCsvButton
+          businesses={businesses}
+          pagePath={path}
+          label={
+            paginated
+              ? `Download page CSV (${range.start}–${range.end})`
+              : "Download CSV"
+          }
+        />
+        {paginated ? (
           <p className="text-xs text-zinc-500">
-            CSV includes every listing in this state, not only this page
-            {filtersActive ? " (unfiltered)" : ""}.
+            CSV includes listings on this page only ({businesses.length} of{" "}
+            {totalCount.toLocaleString()}).
           </p>
         ) : null}
       </div>

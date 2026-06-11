@@ -1,27 +1,16 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createCsvDownloadToken } from "@/lib/csv-download-token";
-import { buildDirectoryExport } from "@/lib/directory/build-export";
 import { addContactToList } from "@/lib/sendfox";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const csvDownloadSchema = z.discriminatedUnion("mode", [
-  z.object({
-    email: z.email(),
-    pageUrl: z.string().min(1).max(500),
-    mode: z.literal("page"),
-  }),
-  z.object({
-    email: z.email(),
-    pageUrl: z.string().min(1).max(500),
-    mode: z.literal("full"),
-    type: z.enum(["category", "state", "facebook"]),
-    slug: z.string().min(1).max(100).optional(),
-  }),
-]);
+const csvDownloadSchema = z.object({
+  email: z.email(),
+  pageUrl: z.string().min(1).max(500),
+  mode: z.literal("page"),
+});
 
 async function logCsvDownload(email: string, pageUrl: string): Promise<void> {
   try {
@@ -42,13 +31,23 @@ export async function POST(request: Request) {
 
   const parsed = csvDownloadSchema.safeParse(body);
   if (!parsed.success) {
+    const legacyFull =
+      typeof body === "object" &&
+      body !== null &&
+      (body as { mode?: string }).mode === "full";
+    if (legacyFull) {
+      return NextResponse.json(
+        { error: "Full directory CSV export is not available" },
+        { status: 403 },
+      );
+    }
     return NextResponse.json(
       { error: "Invalid request", details: parsed.error.flatten() },
       { status: 400 },
     );
   }
 
-  const { email, pageUrl, mode } = parsed.data;
+  const { email, pageUrl } = parsed.data;
 
   try {
     await addContactToList(email);
@@ -60,29 +59,5 @@ export async function POST(request: Request) {
 
   await logCsvDownload(email, pageUrl);
 
-  if (mode === "page") {
-    return NextResponse.json({ ok: true });
-  }
-
-  const { type, slug } = parsed.data;
-  if (type !== "facebook" && !slug) {
-    return NextResponse.json({ error: "Missing slug" }, { status: 400 });
-  }
-
-  const exportResult = await buildDirectoryExport(type, slug);
-  if (!exportResult) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  const token = createCsvDownloadToken(email, type, slug);
-
-  return new NextResponse(exportResult.csv, {
-    status: 200,
-    headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${exportResult.filename}"`,
-      "Cache-Control": "private, no-store",
-      "X-Csv-Download-Token": token,
-    },
-  });
+  return NextResponse.json({ ok: true });
 }

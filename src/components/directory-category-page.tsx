@@ -207,22 +207,19 @@ export function DirectoryCategoryPage({
       ) : null}
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+        <DownloadCsvButton
+          businesses={businesses}
+          pagePath={path}
+          label={
+            paginated
+              ? `Download page CSV (${range.start}–${range.end})`
+              : "Download CSV"
+          }
+        />
         {paginated ? (
-          <DownloadCsvButton
-            businesses={businesses}
-            pagePath={path}
-            mode="full"
-            exportType="category"
-            exportSlug={categorySlug}
-            label={`Download all ${totalCount.toLocaleString()} as CSV`}
-          />
-        ) : (
-          <DownloadCsvButton businesses={businesses} pagePath={path} />
-        )}
-        {paginated || filtersActive ? (
           <p className="text-xs text-zinc-500">
-            CSV includes every listing in this category, not only this page
-            {filtersActive ? " (unfiltered)" : ""}.
+            CSV includes listings on this page only ({businesses.length} of{" "}
+            {totalCount.toLocaleString()}).
           </p>
         ) : null}
       </div>
