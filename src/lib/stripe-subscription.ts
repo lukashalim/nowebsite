@@ -200,12 +200,15 @@ export async function syncProForUser(
     return false;
   }
 
-  const search = await stripe.checkout.sessions.search({
-    query: `client_reference_id:'${userId}' AND status:'complete'`,
-    limit: 5,
+  const oneDayAgo = Math.floor(Date.now() / 1000) - 86_400;
+  const listed = await stripe.checkout.sessions.list({
+    status: "complete",
+    limit: 100,
+    created: { gte: oneDayAgo },
   });
 
-  for (const session of search.data) {
+  for (const session of listed.data) {
+    if (session.client_reference_id !== userId) continue;
     if (session.payment_status !== "paid") continue;
     const activated = await activateProFromCheckoutSession(session);
     if (activated) return true;
