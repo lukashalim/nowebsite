@@ -22,13 +22,18 @@ export function OwnerNameInput({ placeId, value }: OwnerNameInputProps) {
   const [pending, setPending] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
+  const [suggestAttempted, setSuggestAttempted] = useState(false);
   const [draft, setDraft] = useState(value ?? "");
+
+  const hasSavedOwner = Boolean((value ?? "").trim());
+  const showSuggest = !hasSavedOwner && !suggestAttempted;
 
   async function handleSuggest() {
     setHint(null);
     setSuggesting(true);
     const res = await suggestOwnerNameFromReviews(placeId);
     setSuggesting(false);
+    setSuggestAttempted(true);
 
     if (!res.ok) {
       window.alert(res.error);
@@ -38,7 +43,10 @@ export function OwnerNameInput({ placeId, value }: OwnerNameInputProps) {
     if (res.ownerName) {
       setDraft(res.ownerName);
       setHint(null);
+      setSuggestAttempted(true);
+      router.refresh();
     } else {
+      setSuggestAttempted(true);
       setHint("No clear owner name in reviews.");
     }
   }
@@ -67,6 +75,9 @@ export function OwnerNameInput({ placeId, value }: OwnerNameInputProps) {
             const res = await updateOwnerName(placeId, trimmed || null);
             setPending(false);
             if (res.ok) {
+              if (!trimmed) {
+                setSuggestAttempted(false);
+              }
               router.refresh();
             } else {
               setDraft(value ?? "");
@@ -79,14 +90,16 @@ export function OwnerNameInput({ placeId, value }: OwnerNameInputProps) {
             }
           }}
         />
-        <button
-          type="button"
-          disabled={pending || suggesting}
-          className={suggestButtonClass}
-          onClick={handleSuggest}
-        >
-          {suggesting ? "…" : "Suggest"}
-        </button>
+        {showSuggest ? (
+          <button
+            type="button"
+            disabled={pending || suggesting}
+            className={suggestButtonClass}
+            onClick={handleSuggest}
+          >
+            {suggesting ? "…" : "Suggest"}
+          </button>
+        ) : null}
       </div>
       {hint ? (
         <p className="mt-0.5 px-1.5 text-xs text-zinc-500 dark:text-zinc-400">

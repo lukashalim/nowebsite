@@ -9,7 +9,9 @@ import { CrmFilters, CrmPagination } from "@/components/crm-filters";
 import { CrmLeadsTableBody } from "@/components/crm-leads-table-body";
 import { CrmLogin } from "@/components/crm-login";
 import { CrmNav } from "@/components/crm-nav";
+import { CrmUsageBanner } from "@/components/crm-usage-banner";
 import { fetchCrmBusinessRows, fetchCrmFilterOptions } from "@/lib/crm-cohort";
+import { getCrmUsageSummary } from "@/lib/crm-usage";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
 import { tryParseCrmSearchParams } from "@/lib/crm-params";
 import {
@@ -87,13 +89,15 @@ export default async function CrmPage({ searchParams }: PageProps) {
   }
 
   const userIsPro = isPro(profile);
+  const usageSummary = userIsPro ? null : await getCrmUsageSummary(user.id);
+  const outreachLimitReached =
+    raw.limit === "outreach" ||
+    (!userIsPro && usageSummary !== null && usageSummary.remaining === 0);
 
   const [{ rows, total, error: loadErr }, spintaxResult, filterOptions] =
     await Promise.all([
       fetchCrmBusinessRows(p, user.id),
-      userIsPro
-        ? listSpintaxTemplates()
-        : Promise.resolve({ ok: true as const, templates: [] }),
+      listSpintaxTemplates(),
       fetchCrmFilterOptions(),
     ]);
   const loadError = loadErr;
@@ -114,6 +118,13 @@ export default async function CrmPage({ searchParams }: PageProps) {
       </header>
 
       <CheckoutSuccessBanner show={checkoutSuccess} isPro={userIsPro} />
+
+      {usageSummary ? (
+        <CrmUsageBanner
+          usage={usageSummary}
+          limitReached={outreachLimitReached}
+        />
+      ) : null}
 
       <CrmFilters
         params={p}
@@ -174,6 +185,9 @@ export default async function CrmPage({ searchParams }: PageProps) {
                   webPresence={p.webPresence}
                   spintaxTemplates={spintaxTemplates}
                   isPro={userIsPro}
+                  initialOutreachRemaining={
+                    userIsPro ? null : (usageSummary?.remaining ?? 0)
+                  }
                 />
               </tbody>
             </table>

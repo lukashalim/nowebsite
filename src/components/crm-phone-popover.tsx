@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { MessageSquare, Phone } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { recordOutreachUsage } from "@/app/actions/crm-usage";
 import { buildOutreachMessage } from "@/lib/outreach-spintax";
 import { normalizePhoneE164, type PhoneCountry } from "@/lib/phone-lookup";
 import {
@@ -9,18 +11,19 @@ import {
   type SpintaxAudience,
 } from "@/lib/spintax-audience";
 import type { SpintaxTemplate } from "@/lib/spintax-templates";
-import { ProFeatureLock } from "@/components/pro-gate-overlay";
 
 interface CrmPhonePopoverProps {
   phone: string;
   country?: PhoneCountry | null;
   userId: string;
+  placeId: string;
   businessName: string | null;
   mainCategory: string | null;
   businessType: string | null;
   leadAudience: SpintaxAudience;
   templates: SpintaxTemplate[];
-  isPro: boolean;
+  outreachRemaining: number | null;
+  onOutreachRecorded?: (remaining: number | null) => void;
 }
 
 type SmsFlowState = "idle" | "checking" | "confirm_landline" | "confirm_unverified";
@@ -49,18 +52,23 @@ export function CrmPhonePopover({
   phone,
   country,
   userId,
+  placeId,
   businessName,
   mainCategory,
   businessType,
   leadAudience,
   templates,
-  isPro,
+  outreachRemaining,
+  onOutreachRecorded,
 }: CrmPhonePopoverProps) {
   const [open, setOpen] = useState(false);
   const [selectedId, setSelectedId] = useState("");
   const [smsFlowState, setSmsFlowState] = useState<SmsFlowState>("idle");
   const [pendingSms, setPendingSms] = useState<PendingSms | null>(null);
+  const [limitError, setLimitError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const outreachBlocked = outreachRemaining === 0;
 
   const matchingTemplates = useMemo(
     () => filterSpintaxTemplatesForLeadChannel(templates, "sms", leadAudience),
@@ -105,13 +113,28 @@ export function CrmPhonePopover({
     if (!open) {
       setSmsFlowState("idle");
       setPendingSms(null);
+      setLimitError(null);
     }
   }, [open]);
 
   const selectedTemplate =
     matchingTemplates.find((t) => t.id === selectedId) ?? matchingTemplates[0];
 
-  function openSmsLink(pending: PendingSms) {
+  async function recordSmsUsage(): Promise<boolean> {
+    const usage = await recordOutreachUsage("sms", placeId);
+    if (!usage.ok) {
+      setLimitError(usage.error);
+      onOutreachRecorded?.(usage.remaining);
+      return false;
+    }
+    onOutreachRecorded?.(usage.remaining);
+    setLimitError(null);
+    return true;
+  }
+
+  async function openSmsLink(pending: PendingSms) {
+    const ok = await recordSmsUsage();
+    if (!ok) return;
     window.location.href = `sms:${pending.e164}?body=${encodeURIComponent(pending.message)}`;
     setOpen(false);
     setSmsFlowState("idle");
@@ -125,6 +148,11 @@ export function CrmPhonePopover({
 
   async function startSendSms() {
     if (!selectedTemplate || !smsPhoneE164) return;
+
+    if (outreachBlocked) {
+      setLimitError("Monthly outreach limit reached.");
+      return;
+    }
 
     const message = buildOutreachMessage(selectedTemplate.template, {
       name: businessName,
@@ -159,7 +187,7 @@ export function CrmPhonePopover({
       };
 
       if (data?.ok === true && data.classification === "mobile") {
-        openSmsLink(pending);
+        await openSmsLink(pending);
         return;
       }
 
@@ -182,7 +210,7 @@ export function CrmPhonePopover({
 
   function confirmSendAnyway() {
     if (!pendingSms) return;
-    openSmsLink(pendingSms);
+    void openSmsLink(pendingSms);
   }
 
   return (
@@ -218,8 +246,16 @@ export function CrmPhonePopover({
               <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                 SMS
               </p>
-              {!isPro ? (
-                <ProFeatureLock label="SMS Spintax" />
+              {outreachBlocked ? (
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Limit reached ·{" "}
+                  <Link
+                    href="/pro"
+                    className="text-blue-600 hover:underline dark:text-blue-400"
+                  >
+                    Upgrade
+                  </Link>
+                </p>
               ) : matchingTemplates.length === 0 ? (
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
                   No SMS templates match this lead type.
@@ -283,6 +319,11 @@ export function CrmPhonePopover({
                       </option>
                     ))}
                   </select>
+                  {limitError ? (
+                    <p className="text-xs text-red-600 dark:text-red-400" role="alert">
+                      {limitError}
+                    </p>
+                  ) : null}
                   <button
                     type="button"
                     onClick={() => void startSendSms()}

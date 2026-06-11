@@ -18,6 +18,10 @@ import {
   fetchScrapeJobsSummary,
   type ScrapeJobRow,
 } from "@/lib/scrape-jobs";
+import {
+  fetchRecentBatches,
+  type ScrapeBatchRow,
+} from "@/lib/country-batch";
 import { isLocalAdminEnabled } from "@/lib/local-admin";
 
 export const dynamic = "force-dynamic";
@@ -81,7 +85,7 @@ function statusBadgeClass(status: string): string {
   if (s === "pending") {
     return "bg-zinc-100 text-zinc-900 dark:bg-zinc-800/80 dark:text-zinc-100";
   }
-  if (s === "in_progress") {
+  if (s === "in_progress" || s === "running") {
     return "bg-blue-100 text-blue-900 dark:bg-blue-900/40 dark:text-blue-100";
   }
   if (s === "completed") {
@@ -90,7 +94,50 @@ function statusBadgeClass(status: string): string {
   if (s === "failed") {
     return "bg-rose-100 text-rose-900 dark:bg-rose-900/40 dark:text-rose-100";
   }
+  if (s === "skipped" || s === "cancelled") {
+    return "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300";
+  }
   return "bg-violet-100 text-violet-900 dark:bg-violet-900/40 dark:text-violet-100";
+}
+
+function BatchRow({ row }: { row: ScrapeBatchRow }) {
+  const done = row.completed_locations + row.failed_locations;
+  const pct =
+    row.total_locations > 0
+      ? Math.round((done / row.total_locations) * 100)
+      : 0;
+  return (
+    <tr className="border-b border-zinc-100 dark:border-zinc-800">
+      <td className="whitespace-nowrap px-3 py-2 text-sm tabular-nums text-zinc-900 dark:text-zinc-100">
+        #{row.id}
+      </td>
+      <td className="whitespace-nowrap px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100">
+        {formatWhen(row.created_at)}
+      </td>
+      <td className="max-w-[140px] truncate px-3 py-2 text-sm text-zinc-800 dark:text-zinc-200">
+        {row.business_type}
+      </td>
+      <td className="whitespace-nowrap px-3 py-2 text-sm text-zinc-600 dark:text-zinc-400">
+        {row.strategy}
+      </td>
+      <td className="whitespace-nowrap px-3 py-2 text-center text-sm">
+        <span
+          className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(row.status)}`}
+        >
+          {row.status}
+        </span>
+      </td>
+      <td className="whitespace-nowrap px-3 py-2 text-sm tabular-nums text-zinc-700 dark:text-zinc-300">
+        {done}/{row.total_locations} ({pct}%)
+      </td>
+      <td className="whitespace-nowrap px-3 py-2 text-right text-sm tabular-nums font-medium text-zinc-900 dark:text-zinc-100">
+        {row.rows_emitted}
+      </td>
+      <td className="whitespace-nowrap px-3 py-2 text-sm text-zinc-500 dark:text-zinc-500">
+        {formatRelative(row.updated_at)}
+      </td>
+    </tr>
+  );
 }
 
 function JobRow({ row }: { row: ScrapeJobRow }) {
@@ -204,11 +251,13 @@ export default async function ScrapeProgressPage({ searchParams }: PageProps) {
     { rows, error: rowsError },
     { summary, error: summaryError },
     { rows: ndjsonRuns, error: ndjsonError },
+    { batches, error: batchesError },
   ] =
     await Promise.all([
       fetchScrapeJobsRecent(limit),
       fetchScrapeJobsSummary(),
       fetchExtractLocalCacheRuns(20),
+      fetchRecentBatches(15),
     ]);
 
   const summaryLoadError = summaryError;
@@ -235,7 +284,7 @@ export default async function ScrapeProgressPage({ searchParams }: PageProps) {
                 href="/admin/scrape"
                 className="text-zinc-700 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
               >
-                Run NDJSON ingest (local)
+                Local scrape admin
               </Link>
             </>
           ) : null}
@@ -382,6 +431,50 @@ export default async function ScrapeProgressPage({ searchParams }: PageProps) {
                   : "no rows"
               }
             />
+          </section>
+
+          <section className="mb-8 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-400">
+                Country batches (historical)
+              </h2>
+            </div>
+
+            {batchesError ? (
+              <div
+                className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100"
+                role="alert"
+              >
+                <p className="font-medium">Could not load country batches</p>
+                <p className="mt-1 opacity-90">{batchesError}</p>
+              </div>
+            ) : batches.length === 0 ? (
+              <p className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-300">
+                No country batches recorded.
+              </p>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+                <table className="w-full min-w-[900px] border-collapse text-left">
+                  <thead>
+                    <tr className="border-b border-zinc-200 bg-zinc-50 text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-400">
+                      <th className="px-3 py-2">Batch</th>
+                      <th className="px-3 py-2">Created</th>
+                      <th className="px-3 py-2">Type</th>
+                      <th className="px-3 py-2">Strategy</th>
+                      <th className="px-3 py-2 text-center">Status</th>
+                      <th className="px-3 py-2">Locations</th>
+                      <th className="px-3 py-2 text-right">Emitted</th>
+                      <th className="px-3 py-2">Updated</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {batches.map((batch) => (
+                      <BatchRow key={batch.id} row={batch} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </section>
 
           <section className="mb-8 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">

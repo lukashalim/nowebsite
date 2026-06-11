@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { listSpintaxTemplates } from "@/app/actions/spintax-templates";
 import { CrmLogin } from "@/components/crm-login";
 import { CrmNav } from "@/components/crm-nav";
-import { ProGateOverlay } from "@/components/pro-gate-overlay";
 import { SpintaxTemplateEditor } from "@/components/spintax-template-editor";
 import { getUserProfile, isPro } from "@/lib/subscription";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -28,9 +27,7 @@ export default async function CrmSpintaxPage() {
 
   const profile = await getUserProfile(user.id);
   const userIsPro = isPro(profile);
-  const result = userIsPro
-    ? await listSpintaxTemplates()
-    : { ok: true as const, templates: [] };
+  const result = await listSpintaxTemplates();
 
   return (
     <div className="mx-auto flex min-h-0 flex-1 flex-col gap-6 p-4 sm:p-6 lg:max-w-[1100px]">
@@ -45,24 +42,16 @@ export default async function CrmSpintaxPage() {
         </p>
       </header>
 
-      <div className="relative min-h-[320px]">
-        {!result.ok ? (
-          <div
-            className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
-            role="alert"
-          >
-            {result.error}
-          </div>
-        ) : (
-          <SpintaxTemplateEditor initialTemplates={result.templates} />
-        )}
-        {!userIsPro ? (
-          <ProGateOverlay
-            title="DM Spintax templates"
-            description="Upgrade to Pro to edit Facebook DM and SMS spintax templates for cold outreach."
-          />
-        ) : null}
-      </div>
+      {!result.ok ? (
+        <div
+          className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
+          role="alert"
+        >
+          {result.error}
+        </div>
+      ) : (
+        <SpintaxTemplateEditor initialTemplates={result.templates} />
+      )}
     </div>
   );
 }

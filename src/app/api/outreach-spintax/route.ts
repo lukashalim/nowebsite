@@ -8,6 +8,7 @@ import {
   type FacebookOutreachRow,
 } from "@/lib/outreach-spintax";
 import type { CrmWebPresence } from "@/lib/crm-params";
+import { recordCrmUsage } from "@/lib/crm-usage";
 import {
   filterSpintaxTemplatesForLeadChannel,
   leadSpintaxAudience,
@@ -68,10 +69,10 @@ export async function POST(req: Request) {
 
     const profile = await getUserProfile(user.id);
     if (!isPro(profile)) {
-      return NextResponse.json(
-        { error: "Pro subscription required" },
-        { status: 403 },
-      );
+      const usage = await recordCrmUsage(user.id, profile, "dm", placeId);
+      if (!usage.ok) {
+        return NextResponse.json({ error: usage.error }, { status: 403 });
+      }
     }
 
     const supabase = createSupabaseAdmin();

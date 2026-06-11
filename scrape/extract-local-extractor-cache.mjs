@@ -3,47 +3,11 @@
  * (%AppData%/Roaming/googlemapsextractor/task_results/cache) and emit businesses
  * that match core filters (no website by default, min rating; no review count band).
  *
+ * Primary local ingest path: read Google Maps Extractor desktop app cache → filter → Supabase.
+ * Supplemental to the EC2 dispatch/poller/pipeline.
+ *
  * Usage (from scrape/):
  *   node extract-local-extractor-cache.mjs --business-type "Appliance repair"
- *
- * Env:
- *   GOOGLE_MAPS_EXTRACTOR_DIR — app root or .../task_results/cache (default: %APPDATA%/googlemapsextractor on Windows)
- *   SWEET_SPOT_MIN_RATING — default 4 (review min/max band is not applied here; see pipeline.mjs)
- *   SCRAPE_MIN_RECENT_REVIEWS — default 4 (alias: SCRAPE_MIN_REVIEWS_IN_CALENDAR_YEAR)
- *   SCRAPE_RECENT_REVIEWS_MONTHS — rolling window, default 6 (proves listing is active)
- *   SCRAPE_SKIP_MIN_RECENT_REVIEWS_FILTER=1 — disable recent-review count gate
- *   (Extractor must include review arrays with dates; fetch enough reviews to find 4+ in window.)
- *   EXTRACT_LOCAL_COUNTRY — optional US|GB|AU; default per-row detection
- *   EXTRACT_LOCAL_LOCATION_HINT — US ZIP, UK postcode, or AU 4-digit postcode when NDJSON lacks locality
- *   EXTRACT_LOCAL_SCRAPE_ZIP — deprecated alias for EXTRACT_LOCAL_LOCATION_HINT
- *
- * Flags:
- *   --root <path>              — same as GOOGLE_MAPS_EXTRACTOR_DIR
- *   --business-type <text>     — stored on rows as business_type (metadata only here)
- *   --include-tasks            — also scan task_results/tasks/*.ndjson (dedupe by place_id)
- *   --allow-website            — do not skip rows with a website
- *   --no-sweet-spot            — skip min-rating filter
- *   --format jsonl|csv         — with --dry-run, print matches (default jsonl)
- *   --max-files N              — only read the first N cache files (smallest first), for testing
- *   --keep-files               — do not delete .ndjson after a file is fully read (default: delete to save disk)
- *   --dry-run                  — do not write to Supabase or delete cache files; print matches to stdout
- *
- * By default, matching rows are upserted into Supabase `businesses_nowebsite` (or BUSINESSES_TABLE). Env matches
- * pipeline.mjs: BUSINESSES_TABLE, BUSINESSES_UPSERT_BATCH_SIZE.
- *
- * Payload columns: core `rowToBusiness` fields (incl. `can_claim`, `is_spending_on_ads`) + `facebook_url` only, unless
- * EXTRACT_LOCAL_INCLUDE_DEMO_SEO_FIELDS=1 (then adds review_highlights, services_offered, hours, open_now).
- *
- * After each file is read to EOF successfully, the script removes that .ndjson. Cache entries under
- * task_results/cache_storage.json for deleted cache/*.ndjson files are removed in one write at the end.
- *
- * Run log: each execution appends a row to Supabase `extract_local_cache_runs` (see scrape/sql).
- * Set EXTRACT_LOCAL_DISABLE_RUN_LOG=1 to skip inserts.
- *
- * Category stats: each run additively updates `category_content` (business_in_category,
- * business_without_website, website_adoption_pct) from the Maps sample before cohort filters.
- * Set EXTRACT_LOCAL_DISABLE_CATEGORY_STATS=1 to skip. Requires --business-type (not local_cache).
- * Additive counts may double-count place_id across runs; stats reflect extractor samples, not DB totals.
  */
 
 import fs from "node:fs";
@@ -52,45 +16,21 @@ import readline from "node:readline";
 import {
   loadEnvLocal,
   getSupabase,
-  rowToBusiness,
-  passesSweetSpotRatingFilter,
-  passesMinRecentReviews,
   getMinRecentReviewsFilterConfig,
-  omitUndefined,
   parseBusinessTypeArg,
 } from "./lib/scrape-pipeline/index.mjs";
-import { buildBusinessUpsertPayload } from "./lib/business-payload-from-raw.mjs";
 import {
-  applyLocationFallbacks,
-  enrichLocationAsync,
-} from "./lib/location-fallbacks.mjs";
-import {
-  createDemoSlugAllocator,
-  assignDemoSlugToPayload,
-} from "./lib/demo-slug.mjs";
-import {
-  businessTypeArgToCategorySlug,
-  humanizeDisplayName,
-  isCategoryStatsDisabled,
-  mergeCategoryContentStats,
-} from "./lib/category-content-stats.mjs";
-import {
-  applyConversionUpdate,
-  createExistingLookup,
-  mergeTrackingIntoPayloadBatch,
-  shouldRecordConversion,
-} from "./lib/conversion-tracking.mjs";
+  emptyIngestStats,
+  createIngestRunner,
+  applyCategoryContentStats,
+  persistExtractRunLog,
+} from "./lib/ingest-filtered-rows.mjs";
 
 const DEFAULT_WIN_EXTRACTOR_DIR = "googlemapsextractor";
 
 /** Set at start of `main()` for crash logging in `.catch`. */
 let currentExtractRunStartedMs = 0;
 
-/**
- * App root is .../googlemapsextractor. Accept .../task_results/cache as well.
- * @param {string} resolved
- * @returns {string}
- */
 function normalizeExtractorRoot(resolved) {
   const p = path.resolve(resolved);
   if (path.basename(p).toLowerCase() === "cache") {
@@ -164,7 +104,6 @@ function parseFormat(argv) {
   return "jsonl";
 }
 
-/** @returns {number|null} */
 function parseMaxFiles(argv) {
   const args = argv.slice(2);
   for (let i = 0; i < args.length; i++) {
@@ -179,7 +118,6 @@ function parseMaxFiles(argv) {
   return null;
 }
 
-/** @param {string} dir */
 function listNdjson(dir) {
   if (!fs.existsSync(dir)) {
     return [];
@@ -190,7 +128,6 @@ function listNdjson(dir) {
     .map((e) => path.join(dir, e.name));
 }
 
-/** @param {string} filePath */
 function ndjsonFileSize(filePath) {
   try {
     return fs.statSync(filePath).size;
@@ -199,7 +136,6 @@ function ndjsonFileSize(filePath) {
   }
 }
 
-/** Smallest files first; name breaks ties for stable ordering. @param {string[]} files */
 function sortNdjsonBySizeAsc(files) {
   return files.sort((a, b) => {
     const diff = ndjsonFileSize(a) - ndjsonFileSize(b);
@@ -207,7 +143,6 @@ function sortNdjsonBySizeAsc(files) {
   });
 }
 
-/** @param {string} filePath */
 async function* linesOfNdjson(filePath) {
   const stream = fs.createReadStream(filePath, { encoding: "utf8" });
   const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
@@ -220,18 +155,6 @@ async function* linesOfNdjson(filePath) {
   }
 }
 
-function csvEscape(value) {
-  const s = value == null ? "" : String(value);
-  if (/[",\n\r]/.test(s)) {
-    return `"${s.replace(/"/g, '""')}"`;
-  }
-  return s;
-}
-
-const BUSINESSES_UPSERT_BATCH_SIZE = Math.max(
-  25,
-  Number.parseInt(process.env.BUSINESSES_UPSERT_BATCH_SIZE ?? "100", 10) || 100,
-);
 const BUSINESSES_TABLE = process.env.BUSINESSES_TABLE ?? "businesses_nowebsite";
 const FILE_LIST_REFRESH_EVERY = Math.max(
   10,
@@ -242,50 +165,6 @@ const TASKS_RETENTION_DAYS = Math.max(
   Number.parseInt(process.env.EXTRACT_LOCAL_TASKS_RETENTION_DAYS ?? "3", 10) || 3,
 );
 
-const DRY_RUN_COLUMNS = [
-  "place_id",
-  "name",
-  "city",
-  "state",
-  "postal_code",
-  "rating",
-  "reviews",
-  "phone",
-  "main_category",
-  "business_type",
-  "google_maps_link",
-];
-
-function emptyRunStats(filesCount = 0) {
-  return {
-    files: filesCount,
-    filesMissing: 0,
-    lines: 0,
-    jsonErrors: 0,
-    dupes: 0,
-    noPlaceId: 0,
-    hasWebsite: 0,
-    sweetSpotFail: 0,
-    skippedMinRecentReviews: 0,
-    emitted: 0,
-    businessesUpserted: 0,
-    upsertBatchErrors: 0,
-    filesDeleted: 0,
-    filesDeleteFailed: 0,
-    tasksFilesDeleted: 0,
-    tasksFilesDeleteFailed: 0,
-    categorySampleTotal: 0,
-    categorySampleWithoutWebsite: 0,
-    conversionsRecorded: 0,
-  };
-}
-
-/**
- * Delete old NDJSON from task_results/tasks older than retention window.
- * @param {string} tasksDir
- * @param {number} retentionDays
- * @param {ReturnType<typeof emptyRunStats>} stats
- */
 async function pruneOldTaskNdjson(tasksDir, retentionDays, stats) {
   if (!fs.existsSync(tasksDir)) {
     return;
@@ -311,112 +190,6 @@ async function pruneOldTaskNdjson(tasksDir, retentionDays, stats) {
   }
 }
 
-/**
- * @param {import('@supabase/supabase-js').SupabaseClient} supabase
- * @param {string} businessType
- * @param {ReturnType<typeof emptyRunStats>} stats
- * @param {boolean} dryRun
- * @returns {Promise<object|null>}
- */
-async function applyCategoryContentStats(supabase, businessType, stats, dryRun) {
-  if (isCategoryStatsDisabled()) {
-    return { skipped: true, reason: "EXTRACT_LOCAL_DISABLE_CATEGORY_STATS" };
-  }
-  const slug = businessTypeArgToCategorySlug(businessType);
-  if (!slug) {
-    return { skipped: true, reason: "no category slug for business type" };
-  }
-  const runInCategory = stats.categorySampleTotal;
-  const runWithoutWebsite = stats.categorySampleWithoutWebsite;
-  if (runInCategory <= 0) {
-    return { skipped: true, reason: "categorySampleTotal is 0", slug };
-  }
-  if (dryRun) {
-    return {
-      dryRun: true,
-      slug,
-      runInCategory,
-      runWithoutWebsite,
-    };
-  }
-  const result = await mergeCategoryContentStats(supabase, {
-    slug,
-    displayName: humanizeDisplayName(businessType),
-    runInCategory,
-    runWithoutWebsite,
-  });
-  return { slug, ...result };
-}
-
-/**
- * @param {object} p
- * @param {number} p.startedMs
- * @param {number} p.exitCode
- * @param {string} p.root
- * @param {string} p.businessType
- * @param {boolean} p.dryRun
- * @param {string|null} p.businessesTable
- * @param {boolean} p.deleteAfter
- * @param {boolean} p.allowWebsite
- * @param {boolean} p.noSweetSpot
- * @param {object} p.stats — counters from emptyRunStats()
- * @param {number} p.pendingCacheDeletes
- * @param {string|null} [p.errorMessage]
- */
-async function persistExtractRunLog(p) {
-  if (process.env.EXTRACT_LOCAL_DISABLE_RUN_LOG === "1") {
-    return;
-  }
-  try {
-    const db = getSupabase();
-    const duration_ms = Math.max(0, Date.now() - p.startedMs);
-    const rf = getMinRecentReviewsFilterConfig();
-    const filter_snapshot = {
-      allowWebsite: p.allowWebsite,
-      noSweetSpot: p.noSweetSpot,
-      sweetSpot: p.noSweetSpot
-        ? null
-        : {
-            minRating: Number(process.env.SWEET_SPOT_MIN_RATING ?? 4),
-          },
-      minRecentReviews: {
-        ...rf,
-        skipped: p.stats.skippedMinRecentReviews ?? 0,
-      },
-    };
-    const row = {
-      duration_ms,
-      exit_code: p.exitCode,
-      extractor_root: p.root,
-      business_type: p.businessType,
-      dry_run: p.dryRun,
-      businesses_target_table: p.dryRun ? null : p.businessesTable,
-      cache_files_scanned: p.stats.files,
-      lines_read: p.stats.lines,
-      skipped_no_place_id: p.stats.noPlaceId,
-      skipped_duplicate_place: p.stats.dupes,
-      skipped_has_website: p.stats.hasWebsite,
-      skipped_sweet_spot: p.stats.sweetSpotFail,
-      skipped_min_recent_reviews: p.stats.skippedMinRecentReviews ?? 0,
-      matched_leads: p.stats.emitted,
-      businesses_upserted: p.stats.businessesUpserted,
-      upsert_batch_errors: p.stats.upsertBatchErrors,
-      json_parse_errors: p.stats.jsonErrors,
-      files_deleted: p.stats.filesDeleted,
-      files_delete_failed: p.stats.filesDeleteFailed,
-      pending_cache_deletes: p.pendingCacheDeletes,
-      error_message: p.errorMessage ?? null,
-      filter_snapshot,
-    };
-    const { error } = await db.from("extract_local_cache_runs").insert(row);
-    if (error) {
-      console.error("extract_local_cache_runs insert failed:", error.message);
-    }
-  } catch (e) {
-    console.error("extract_local_cache_runs log:", e?.message ?? e);
-  }
-}
-
 async function main() {
   const argv = process.argv;
   loadEnvLocal();
@@ -432,22 +205,32 @@ async function main() {
   const dryRun = hasFlag(argv, "--dry-run");
   const format = parseFormat(argv);
   const businessType = parseBusinessTypeArg(argv) || "local_cache";
+  const forcedCountry = process.env.EXTRACT_LOCAL_COUNTRY?.trim() || null;
+  const locationHint =
+    process.env.EXTRACT_LOCAL_LOCATION_HINT?.trim() ||
+    process.env.EXTRACT_LOCAL_SCRAPE_ZIP?.trim() ||
+    null;
 
   const supabase = getSupabase();
-  const existingLookup = createExistingLookup(supabase, BUSINESSES_TABLE);
-  /** @type {object[]} */
-  const payloadBuffer = [];
-  /** @type {Promise<{ slugToPlace: Map<string, string>, placeToSlug: Map<string, string> }>|null} */
-  let slugStatePromise = null;
+  const stats = emptyIngestStats(0);
+  const runner = createIngestRunner({
+    supabase,
+    businessesTable: BUSINESSES_TABLE,
+    businessType,
+    locationHint,
+    forcedCountry,
+    allowWebsite,
+    noSweetSpot,
+    dryRun,
+    dryRunFormat: format === "csv" ? "csv" : "jsonl",
+    stats,
+  });
 
   const cacheDir = path.join(root, "task_results", "cache");
   const tasksDir = path.join(root, "task_results", "tasks");
   const maxFiles = parseMaxFiles(argv);
 
-  const seenPlace = new Set();
-  const stats = emptyRunStats(0);
   const seenFile = new Set();
-  /** @type {string[]} */
   const pendingFiles = [];
 
   function refreshPendingFiles() {
@@ -481,89 +264,21 @@ async function main() {
       businessType,
       dryRun,
       businessesTable: BUSINESSES_TABLE,
-      deleteAfter,
       allowWebsite,
       noSweetSpot,
       stats,
       pendingCacheDeletes: 0,
       errorMessage: msg,
+      filterSnapshotExtra: { source: "ndjson_cache" },
     });
     process.exit(1);
   }
 
-  /**
-   * Upsert chunk; on batch json/constraint errors, split and retry so good rows still land.
-   * @param {object[]} chunk
-   */
-  async function upsertChunkRecursive(chunk) {
-    if (chunk.length === 0) {
-      return;
-    }
-    const { error: upErr } = await supabase
-      .from(BUSINESSES_TABLE)
-      .upsert(chunk, { onConflict: "place_id" });
-    if (!upErr) {
-      stats.businessesUpserted += chunk.length;
-      return;
-    }
-    if (chunk.length === 1) {
-      stats.upsertBatchErrors += 1;
-      const placeId = chunk[0]?.place_id ?? "?";
-      console.error(`Upsert failed (${placeId}):`, upErr.message);
-      return;
-    }
-    const mid = Math.floor(chunk.length / 2);
-    await upsertChunkRecursive(chunk.slice(0, mid));
-    await upsertChunkRecursive(chunk.slice(mid));
-  }
-
-  /**
-   * @param {boolean} drainAll — if true, upsert any remainder (smaller than batch); if false, only when buffer is full batch
-   */
-  async function flushPayloadBuffer(drainAll) {
-    if (dryRun) {
-      return;
-    }
-    for (;;) {
-      if (payloadBuffer.length === 0) {
-        return;
-      }
-      if (!drainAll && payloadBuffer.length < BUSINESSES_UPSERT_BATCH_SIZE) {
-        return;
-      }
-      const n = Math.min(BUSINESSES_UPSERT_BATCH_SIZE, payloadBuffer.length);
-      const chunk = payloadBuffer.splice(0, n);
-      if (!slugStatePromise) {
-        slugStatePromise = createDemoSlugAllocator(supabase, BUSINESSES_TABLE);
-      }
-      const slugState = await slugStatePromise;
-      for (const row of chunk) {
-        assignDemoSlugToPayload(slugState, row);
-      }
-      try {
-        const { conversionsRecorded } = await mergeTrackingIntoPayloadBatch(
-          supabase,
-          BUSINESSES_TABLE,
-          chunk,
-        );
-        stats.conversionsRecorded += conversionsRecorded;
-      } catch (trackErr) {
-        console.error(
-          `Conversion tracking (batch): ${trackErr?.message ?? trackErr}`,
-        );
-      }
-      await upsertChunkRecursive(chunk);
-    }
-  }
-
   const norm = (p) => path.normalize(p);
   const isCacheFile = (fp) => norm(path.dirname(fp)) === norm(cacheDir);
-  /** @type {string[]} cache/*.ndjson basenames deleted during this run */
   const cacheBasenamesDeleted = [];
 
-  if (dryRun && format === "csv") {
-    console.log(DRY_RUN_COLUMNS.join(","));
-  }
+  runner.printDryRunHeader();
 
   let processedFiles = 0;
   for (;;) {
@@ -579,7 +294,6 @@ async function main() {
     }
     try {
       for await (const line of linesOfNdjson(filePath)) {
-        stats.lines += 1;
         let raw;
         try {
           raw = JSON.parse(line);
@@ -587,124 +301,10 @@ async function main() {
           stats.jsonErrors += 1;
           continue;
         }
-
-        const base = rowToBusiness(raw, businessType);
-        const forcedCountry = process.env.EXTRACT_LOCAL_COUNTRY?.trim() || null;
-        const locationHint =
-          process.env.EXTRACT_LOCAL_LOCATION_HINT?.trim() ||
-          process.env.EXTRACT_LOCAL_SCRAPE_ZIP?.trim() ||
-          null;
-        applyLocationFallbacks(base, raw, { forcedCountry });
-        if (!base.place_id) {
-          stats.noPlaceId += 1;
-          continue;
-        }
-        if (seenPlace.has(base.place_id)) {
-          stats.dupes += 1;
-          continue;
-        }
-        seenPlace.add(base.place_id);
-
-        stats.categorySampleTotal += 1;
-        if (!base.has_website) {
-          stats.categorySampleWithoutWebsite += 1;
-        }
-
-        if (!allowWebsite && base.has_website === true) {
-          const existing = await existingLookup.ensureOne(base.place_id);
-          if (shouldRecordConversion(base, existing)) {
-            try {
-              await enrichLocationAsync(base, {
-                locationHint,
-                scrapeZip: locationHint,
-                forcedCountry,
-                country: base.country,
-              });
-            } catch (locErr) {
-              console.error(
-                `Location enrich (conversion ${base.name ?? base.place_id}):`,
-                locErr.message ?? locErr,
-              );
-            }
-            try {
-              const converted = await applyConversionUpdate(
-                supabase,
-                BUSINESSES_TABLE,
-                base,
-                existing,
-              );
-              if (converted) {
-                stats.conversionsRecorded += 1;
-                console.log(
-                  `Converted (website found): ${base.name ?? base.place_id}`,
-                );
-              }
-            } catch (convErr) {
-              console.error(
-                `Conversion update (${base.place_id}):`,
-                convErr?.message ?? convErr,
-              );
-            }
-          } else {
-            stats.hasWebsite += 1;
-          }
-          continue;
-        }
-        if (!noSweetSpot && !passesSweetSpotRatingFilter(base.rating)) {
-          stats.sweetSpotFail += 1;
-          continue;
-        }
-
-        if (!passesMinRecentReviews(raw)) {
-          stats.skippedMinRecentReviews += 1;
-          continue;
-        }
-
-        try {
-          await enrichLocationAsync(base, {
-            locationHint,
-            scrapeZip: locationHint,
-            forcedCountry,
-            country: base.country,
-          });
-        } catch (locErr) {
-          console.error(
-            `Location enrich (${base.name ?? base.place_id}):`,
-            locErr.message ?? locErr,
-          );
-        }
-
-        const payload = buildBusinessUpsertPayload(raw, base);
-
-        stats.emitted += 1;
-
-        if (dryRun) {
-          const out = omitUndefined({
-            place_id: payload.place_id,
-            name: payload.name,
-            city: payload.city,
-            state: payload.state,
-            country: payload.country,
-            postal_code: payload.postal_code,
-            rating: payload.rating,
-            reviews: payload.reviews,
-            phone: payload.phone,
-            main_category: payload.main_category,
-            business_type: payload.business_type,
-            google_maps_link: payload.google_maps_link,
-          });
-          if (format === "csv") {
-            console.log(DRY_RUN_COLUMNS.map((c) => csvEscape(out[c])).join(","));
-          } else {
-            console.log(JSON.stringify(out));
-          }
-        } else {
-          payloadBuffer.push(payload);
-          await flushPayloadBuffer(false);
-        }
+        await runner.processRow(raw);
       }
 
-      await flushPayloadBuffer(true);
+      await runner.flush(true);
 
       if (deleteAfter && !dryRun && stats.upsertBatchErrors === 0) {
         try {
@@ -721,7 +321,6 @@ async function main() {
         }
       }
     } catch (fileErr) {
-      // Extractor cache can change while we are reading it; treat missing files as non-fatal.
       if (fileErr?.code === "ENOENT") {
         stats.filesMissing += 1;
         console.error(`Skipped missing file: ${filePath}`);
@@ -738,9 +337,8 @@ async function main() {
     }
   }
 
-  await flushPayloadBuffer(true);
+  await runner.flush(true);
 
-  /** @type {object|null} */
   let categoryContentStats = null;
 
   const buildStatPayload = () => ({
@@ -763,6 +361,7 @@ async function main() {
         ...getMinRecentReviewsFilterConfig(),
         skipped: stats.skippedMinRecentReviews,
       },
+      source: "ndjson_cache",
     },
   });
 
@@ -802,12 +401,12 @@ async function main() {
       businessType,
       dryRun,
       businessesTable: BUSINESSES_TABLE,
-      deleteAfter,
       allowWebsite,
       noSweetSpot,
       stats,
       pendingCacheDeletes: 0,
       errorMessage: `Supabase upsert: ${stats.upsertBatchErrors} row failure(s); some files kept for re-run.`,
+      filterSnapshotExtra: { source: "ndjson_cache" },
     });
     process.exit(1);
   }
@@ -824,13 +423,8 @@ async function main() {
       dryRun,
     );
   } catch (catErr) {
-    console.error(
-      "category_content stats failed:",
-      catErr?.message ?? catErr,
-    );
-    categoryContentStats = {
-      error: String(catErr?.message ?? catErr),
-    };
+    console.error("category_content stats failed:", catErr?.message ?? catErr);
+    categoryContentStats = { error: String(catErr?.message ?? catErr) };
   }
 
   console.error(JSON.stringify(buildStatPayload(), null, 2));
@@ -842,12 +436,12 @@ async function main() {
     businessType,
     dryRun,
     businessesTable: BUSINESSES_TABLE,
-    deleteAfter,
     allowWebsite,
     noSweetSpot,
     stats,
     pendingCacheDeletes: 0,
     errorMessage: null,
+    filterSnapshotExtra: { source: "ndjson_cache" },
   });
 }
 
@@ -861,14 +455,13 @@ main().catch(async (e) => {
       root: normalizeExtractorRoot(parseRootArg(av) ?? defaultExtractorRoot()),
       businessType: parseBusinessTypeArg(av) || "local_cache",
       dryRun: hasFlag(av, "--dry-run"),
-      businessesTable: process.env.BUSINESSES_TABLE ?? "businesses",
-      deleteAfter:
-        !hasFlag(av, "--keep-files") && !envFlag("EXTRACT_LOCAL_KEEP_FILES", false),
+      businessesTable: process.env.BUSINESSES_TABLE ?? "businesses_nowebsite",
       allowWebsite: hasFlag(av, "--allow-website"),
       noSweetSpot: hasFlag(av, "--no-sweet-spot"),
-      stats: emptyRunStats(0),
+      stats: emptyIngestStats(0),
       pendingCacheDeletes: 0,
       errorMessage: String(e?.message ?? e),
+      filterSnapshotExtra: { source: "ndjson_cache" },
     });
   } catch {
     /* ignore secondary log failures */

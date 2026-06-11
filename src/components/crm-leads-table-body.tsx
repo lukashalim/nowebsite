@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import {
   ExternalLink,
@@ -15,14 +16,12 @@ import { OwnerNameInput } from "@/components/owner-name-input";
 import { StageSelect } from "@/components/stage-select";
 import type { BusinessLead } from "@/lib/business";
 import type { CrmWebPresence } from "@/lib/crm-params";
-import { demoPublicPath } from "@/lib/demo-slug";
 import {
   isEligibleForCrmSpintax,
   resolveFacebookPageUrl,
 } from "@/lib/outreach-spintax";
 import { leadSpintaxAudience } from "@/lib/spintax-audience";
 import type { SpintaxTemplate } from "@/lib/spintax-templates";
-import { ProFeatureLock } from "@/components/pro-gate-overlay";
 
 interface CrmLeadsTableBodyProps {
   rows: BusinessLead[];
@@ -30,6 +29,7 @@ interface CrmLeadsTableBodyProps {
   webPresence: CrmWebPresence;
   spintaxTemplates: SpintaxTemplate[];
   isPro: boolean;
+  initialOutreachRemaining: number | null;
 }
 
 function initialContactCounts(rows: BusinessLead[]): Record<string, number> {
@@ -44,14 +44,26 @@ export function CrmLeadsTableBody({
   webPresence,
   spintaxTemplates,
   isPro,
+  initialOutreachRemaining,
 }: CrmLeadsTableBodyProps) {
   const [contactCounts, setContactCounts] = useState(() =>
     initialContactCounts(rows),
+  );
+  const [outreachRemaining, setOutreachRemaining] = useState(
+    initialOutreachRemaining,
   );
 
   function setContactCountForPlace(placeId: string, next: number) {
     setContactCounts((prev) => ({ ...prev, [placeId]: next }));
   }
+
+  function handleOutreachRecorded(remaining: number | null) {
+    if (!isPro && remaining !== null) {
+      setOutreachRemaining(remaining);
+    }
+  }
+
+  const outreachBlocked = !isPro && outreachRemaining === 0;
 
   if (rows.length === 0) {
     return (
@@ -138,43 +150,51 @@ export function CrmLeadsTableBody({
                   phone={b.phone}
                   country={b.country}
                   userId={userId}
+                  placeId={b.place_id}
                   businessName={b.name}
                   mainCategory={b.main_category}
                   businessType={b.business_type}
                   leadAudience={spintaxLeadAudience}
                   templates={spintaxTemplates}
-                  isPro={isPro}
+                  outreachRemaining={outreachRemaining}
+                  onOutreachRecorded={handleOutreachRecorded}
                 />
               ) : (
                 "—"
               )}
             </td>
             <td className="px-3 py-3 align-top">
-              {!isPro ? (
-                <ProFeatureLock label="DM Spintax" />
-              ) : (
-                <OutreachSpintaxButton
-                  placeId={b.place_id}
-                  userId={userId}
-                  businessName={b.name}
-                  mainCategory={b.main_category}
-                  businessType={b.business_type}
-                  eligible={spintaxEligible}
-                  leadAudience={spintaxLeadAudience}
-                  templates={spintaxTemplates}
-                  facebookUrl={resolveFacebookPageUrl(outreachRow)}
-                  onContactCountChange={(next) =>
-                    setContactCountForPlace(b.place_id, next)
-                  }
-                />
-              )}
+              <OutreachSpintaxButton
+                placeId={b.place_id}
+                userId={userId}
+                businessName={b.name}
+                mainCategory={b.main_category}
+                businessType={b.business_type}
+                eligible={spintaxEligible}
+                leadAudience={spintaxLeadAudience}
+                templates={spintaxTemplates}
+                facebookUrl={resolveFacebookPageUrl(outreachRow)}
+                outreachRemaining={outreachRemaining}
+                onOutreachRecorded={handleOutreachRecorded}
+                onContactCountChange={(next) =>
+                  setContactCountForPlace(b.place_id, next)
+                }
+              />
             </td>
             <td className="px-3 py-3">
-              {!isPro ? (
-                <ProFeatureLock label="Demo" />
+              {outreachBlocked ? (
+                <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Limit reached ·{" "}
+                  <Link
+                    href="/pro"
+                    className="text-blue-600 hover:underline dark:text-blue-400"
+                  >
+                    Upgrade
+                  </Link>
+                </span>
               ) : (
                 <a
-                  href={demoPublicPath(b)}
+                  href={`/api/crm-demo?placeId=${encodeURIComponent(b.place_id)}`}
                   className="text-blue-600 hover:underline dark:text-blue-400"
                   target="_blank"
                   rel="noopener noreferrer"

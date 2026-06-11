@@ -24,7 +24,6 @@
   "dependencies": {
     "@aws-sdk/client-ec2": "^3.1035.0",
     "@supabase/supabase-js": "^2.104.0",
-    "botasaurus-desktop-api": "^4.1.96",
     "dotenv": "^17.4.2",
     "undici": "^7.16.0"
   }

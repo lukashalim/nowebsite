@@ -15,7 +15,6 @@ import {
   type SpintaxTemplate,
 } from "@/lib/spintax-templates";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
-import { requireProUser } from "@/lib/subscription";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const SPINTAX_PATH = `${CRM_BASE_PATH}/spintax`;
@@ -88,11 +87,6 @@ export async function updateSpintaxTemplate(
     return { ok: false, error: validationError };
   }
 
-  const proCheck = await requireProUser();
-  if (!proCheck.ok) {
-    return { ok: false, error: proCheck.error };
-  }
-
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -139,11 +133,6 @@ export async function createSpintaxTemplate(
     return { ok: false, error: validationError };
   }
 
-  const proCheck = await requireProUser();
-  if (!proCheck.ok) {
-    return { ok: false, error: proCheck.error };
-  }
-
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -181,11 +170,6 @@ export async function deleteSpintaxTemplate(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!id || typeof id !== "string") {
     return { ok: false, error: "Invalid template" };
-  }
-
-  const proCheck = await requireProUser();
-  if (!proCheck.ok) {
-    return { ok: false, error: proCheck.error };
   }
 
   const supabase = await createSupabaseServerClient();

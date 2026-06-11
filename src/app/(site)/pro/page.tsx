@@ -96,7 +96,9 @@ export default async function ProPage() {
           $27<span className="text-lg font-normal text-zinc-600 dark:text-zinc-400">/month</span>
         </p>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          CSV export, DM spintax, and demo page links from your pipeline.
+          Free includes full CRM access with 25 outreach actions per month (DMs,
+          SMS, demo links) and CSV export for the current page. Pro adds
+          unlimited outreach and full-filter CSV export.
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
           {userIsPro ? (

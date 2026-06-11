@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { MessageSquare } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { recordOutreachUsage } from "@/app/actions/crm-usage";
 import { incrementContactCount } from "@/app/actions/update-contact";
 import { buildOutreachMessage } from "@/lib/outreach-spintax";
 import {
@@ -20,6 +22,8 @@ interface OutreachSpintaxButtonProps {
   leadAudience: SpintaxAudience;
   templates: SpintaxTemplate[];
   facebookUrl?: string | null;
+  outreachRemaining: number | null;
+  onOutreachRecorded?: (remaining: number | null) => void;
   onContactCountChange?: (next: number) => void;
 }
 
@@ -43,13 +47,18 @@ export function OutreachSpintaxButton({
   leadAudience,
   templates,
   facebookUrl,
+  outreachRemaining,
+  onOutreachRecorded,
   onContactCountChange,
 }: OutreachSpintaxButtonProps) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
   const [selectedId, setSelectedId] = useState("");
+  const [limitError, setLimitError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const outreachBlocked = outreachRemaining === 0;
 
   const matchingTemplates = useMemo(
     () =>
@@ -96,10 +105,30 @@ export function OutreachSpintaxButton({
     return <span className="text-zinc-400">—</span>;
   }
 
+  if (outreachBlocked) {
+    return (
+      <span className="text-xs text-zinc-500 dark:text-zinc-400">
+        Limit reached ·{" "}
+        <Link href="/pro" className="text-blue-600 hover:underline dark:text-blue-400">
+          Upgrade
+        </Link>
+      </span>
+    );
+  }
+
   const selectedTemplate =
     matchingTemplates.find((t) => t.id === selectedId) ?? matchingTemplates[0];
 
   async function copyDm(template: SpintaxTemplate) {
+    const usage = await recordOutreachUsage("dm", placeId);
+    if (!usage.ok) {
+      setLimitError(usage.error);
+      onOutreachRecorded?.(usage.remaining);
+      return false;
+    }
+
+    onOutreachRecorded?.(usage.remaining);
+
     const message = buildOutreachMessage(template.template, {
       name: businessName,
       mainCategory,
@@ -111,10 +140,13 @@ export function OutreachSpintaxButton({
       template.id,
     );
     setSelectedId(template.id);
+    setLimitError(null);
+    return true;
   }
 
   async function copyOnly() {
-    await copyDm(selectedTemplate);
+    const ok = await copyDm(selectedTemplate);
+    if (!ok) return;
     setCopied(true);
     setOpen(false);
     setTimeout(() => setCopied(false), 2000);
@@ -122,7 +154,8 @@ export function OutreachSpintaxButton({
 
   async function copyAndOpenFacebook() {
     if (!facebookHref) return;
-    await copyDm(selectedTemplate);
+    const ok = await copyDm(selectedTemplate);
+    if (!ok) return;
     window.open(facebookHref, "_blank", "noopener,noreferrer");
     setOpen(false);
     setToastVisible(true);
@@ -177,6 +210,11 @@ export function OutreachSpintaxButton({
                   </option>
                 ))}
               </select>
+              {limitError ? (
+                <p className="text-xs text-red-600 dark:text-red-400" role="alert">
+                  {limitError}
+                </p>
+              ) : null}
               <button
                 type="button"
                 onClick={() =>

@@ -33,6 +33,14 @@ yarn-error.log*
 .pnpm-debug.log*
 scrape/_extract_last_run.log
 scrape/logs/
+scrape/error_logs/
+scrape/output/
+scrape/stderr.txt
+scrape/python/vendor/
+scrape/python/__pycache__/
+scrape/python/stderr.txt
+scrape/python/scrape-out.json
+scrape/_asar_extract/
 Same
 
 # env files (can opt-in for committing if needed)

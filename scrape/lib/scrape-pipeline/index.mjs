@@ -799,3 +799,109 @@ export async function fetchAllTaskResults(taskId) {
   } while (page <= totalPages);
   return all;
 }
+
+function normalizeTaskStatus(v) {
+  const s = String(v ?? "").trim().toLowerCase();
+  return s || "unknown";
+}
+
+const TERMINAL_TASK_STATUSES = new Set(["completed", "failed", "cancelled"]);
+
+/**
+ * Poll Botasaurus until a task reaches a terminal status.
+ * @param {number|string} taskId
+ * @param {{ pollMs?: number, timeoutMs?: number, onPoll?: (status: string) => void }} [opts]
+ * @returns {Promise<{ status: string, task: Record<string, unknown> }>}
+ */
+export async function waitForTaskComplete(taskId, opts = {}) {
+  const pollMs =
+    Number.parseInt(String(opts.pollMs ?? process.env.BOTASAURUS_POLL_MS ?? "5000"), 10) ||
+    5000;
+  const timeoutMs =
+    Number.parseInt(
+      String(opts.timeoutMs ?? process.env.BOTASAURUS_TASK_TIMEOUT_MS ?? "3600000"),
+      10,
+    ) || 3_600_000;
+  const base = getBotasaurusBase();
+  const started = Date.now();
+
+  for (;;) {
+    const res = await botasaurusFetch(`${base}/tasks/${taskId}`);
+    if (!res.ok) {
+      throw new Error(`Task status HTTP ${res.status}: ${await res.text()}`);
+    }
+    const task = await res.json();
+    const status = normalizeTaskStatus(task?.status);
+    opts.onPoll?.(status);
+
+    if (TERMINAL_TASK_STATUSES.has(status)) {
+      if (status !== "completed") {
+        throw new Error(
+          `Botasaurus task ${taskId} ended with status "${status}"`,
+        );
+      }
+      return { status, task };
+    }
+
+    if (Date.now() - started > timeoutMs) {
+      throw new Error(
+        `Botasaurus task ${taskId} timed out after ${timeoutMs}ms (last status: ${status})`,
+      );
+    }
+    await sleep(pollMs);
+  }
+}
+
+export function parseLocationHintArg(argv) {
+  const args = argv.slice(2);
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    const m =
+      /^--location-hint=(.*)$/.exec(arg) ?? /^--location_hint=(.*)$/.exec(arg);
+    if (m) {
+      return m[1].replace(/^['"]|['"]$/g, "").trim();
+    }
+    if (
+      (arg === "--location-hint" || arg === "--location_hint") &&
+      args[i + 1] &&
+      !args[i + 1].startsWith("--")
+    ) {
+      return args[i + 1].replace(/^['"]|['"]$/g, "").trim();
+    }
+  }
+  return "";
+}
+
+export function parseCountryArg(argv) {
+  const args = argv.slice(2);
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    const m = /^--country=(.*)$/i.exec(arg);
+    if (m) {
+      const c = m[1].replace(/^['"]|['"]$/g, "").trim().toUpperCase();
+      if (c === "US" || c === "GB" || c === "AU") return c;
+      return null;
+    }
+    if (/^--country$/i.test(arg) && args[i + 1] && !args[i + 1].startsWith("--")) {
+      const c = args[i + 1].replace(/^['"]|['"]$/g, "").trim().toUpperCase();
+      if (c === "US" || c === "GB" || c === "AU") return c;
+      return null;
+    }
+  }
+  return null;
+}
+
+/** @returns {number} */
+export function parseMaxResultsArg(argv, defaultValue = 100) {
+  const args = argv.slice(2);
+  for (let i = 0; i < args.length; i++) {
+    const m = /^--max-results=(\d+)$/.exec(args[i]);
+    if (m) {
+      return Math.max(1, parseInt(m[1], 10));
+    }
+    if (args[i] === "--max-results" && args[i + 1] && /^\d+$/.test(args[i + 1])) {
+      return Math.max(1, parseInt(args[i + 1], 10));
+    }
+  }
+  return defaultValue;
+}

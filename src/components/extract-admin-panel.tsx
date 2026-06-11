@@ -20,17 +20,14 @@ export function ExtractAdminPanel() {
     try {
       const res = await fetch("/api/admin/extract-local");
       if (res.status === 404) {
-        setError("Admin API is not available (not running locally).");
         return;
       }
       if (!res.ok) {
-        setError(`Status check failed (${res.status})`);
         return;
       }
       setStatus((await res.json()) as ExtractRunnerSnapshot);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not reach admin API.");
+    } catch {
+      // ignore transient poll errors
     }
   }, []);
 
@@ -40,7 +37,14 @@ export function ExtractAdminPanel() {
     return () => clearInterval(id);
   }, [refresh]);
 
-  async function startIngest(includeTasksForRun: boolean, dryRunForRun = dryRun) {
+  async function startIngest(
+    overrides: {
+      includeTasks?: boolean;
+      dryRun?: boolean;
+    } = {},
+  ) {
+    const dryRunForRun = overrides.dryRun ?? dryRun;
+
     setStarting(true);
     setError(null);
     try {
@@ -53,7 +57,7 @@ export function ExtractAdminPanel() {
           locationHint: locationHint.trim() || undefined,
           dryRun: dryRunForRun,
           keepFiles,
-          includeTasks: includeTasksForRun,
+          includeTasks: overrides.includeTasks ?? includeTasks,
           maxFiles: maxFiles.trim() ? Number.parseInt(maxFiles, 10) : undefined,
         }),
       });
@@ -73,8 +77,10 @@ export function ExtractAdminPanel() {
 
   async function handleStart(e: React.FormEvent) {
     e.preventDefault();
-    await startIngest(includeTasks);
+    await startIngest();
   }
+
+  const running = status?.running ?? false;
 
   return (
     <div className="mx-auto max-w-3xl space-y-8 p-4 sm:p-6">
@@ -93,20 +99,14 @@ export function ExtractAdminPanel() {
           </Link>
         </p>
         <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
-          Local scrape — NDJSON to Supabase
+          Local ingest — Supabase
         </h1>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Ingest Google Maps Extractor cache (
-          <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">.ndjson</code>
-          ) into{" "}
+          Ingest Google Maps Extractor NDJSON cache into{" "}
           <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">
             businesses_nowebsite
-          </code>{" "}
-          via{" "}
-          <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">
-            extract-local-extractor-cache.mjs
           </code>
-          . Localhost only (
+          . Scrape in the desktop app first, then run ingest here. Localhost only (
           <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">npm run dev</code>
           ).
         </p>
@@ -204,22 +204,18 @@ export function ExtractAdminPanel() {
         <div className="flex flex-wrap gap-2">
           <button
             type="submit"
-            disabled={starting || status?.running}
+            disabled={starting || running}
             className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
           >
-            {status?.running
-              ? "Running…"
-              : starting
-                ? "Starting…"
-                : "Run standard ingest"}
+            {running ? "Running…" : starting ? "Starting…" : "Run NDJSON ingest"}
           </button>
           <button
             type="button"
-            disabled={starting || status?.running}
-            onClick={() => void startIngest(true, false)}
+            disabled={starting || running}
+            onClick={() => void startIngest({ includeTasks: true, dryRun: false })}
             className="rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
           >
-            {status?.running
+            {running
               ? "Running…"
               : starting
                 ? "Starting…"

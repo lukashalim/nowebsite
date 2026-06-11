@@ -166,15 +166,12 @@ export function tryParseCrmSearchParams(
   return { ok: false, issues: result.error.issues };
 }
 
-export function buildCrmQueryString(params: CrmSearchParams): string {
-  const sp = new URLSearchParams();
+function appendCrmFilterParams(sp: URLSearchParams, params: CrmSearchParams): void {
   if (params.minReviews !== 25) sp.set("minReviews", String(params.minReviews));
   if (params.maxReviews !== 199) sp.set("maxReviews", String(params.maxReviews));
   if (params.minRating !== 4) sp.set("minRating", String(params.minRating));
   if (params.webPresence !== "all")
     sp.set("webPresence", params.webPresence);
-  if (params.page !== 1) sp.set("page", String(params.page));
-  if (params.pageSize !== 50) sp.set("pageSize", String(params.pageSize));
   if (params.contactMin !== undefined)
     sp.set("contactMin", String(params.contactMin));
   if (params.contactMax !== undefined)
@@ -182,6 +179,28 @@ export function buildCrmQueryString(params: CrmSearchParams): string {
   if (params.stage !== undefined) sp.set("stage", params.stage);
   if (params.category !== undefined) sp.set("category", params.category);
   if (params.state !== undefined) sp.set("state", params.state);
+}
+
+export function buildCrmQueryString(params: CrmSearchParams): string {
+  const sp = new URLSearchParams();
+  appendCrmFilterParams(sp, params);
+  if (params.page !== 1) sp.set("page", String(params.page));
+  if (params.pageSize !== 50) sp.set("pageSize", String(params.pageSize));
+  const s = sp.toString();
+  return s ? `?${s}` : "";
+}
+
+/** CRM CSV export: free users always send explicit page bounds; Pro omits them (server exports all matches). */
+export function buildCrmExportQueryString(
+  params: CrmSearchParams,
+  options: { isPro: boolean },
+): string {
+  const sp = new URLSearchParams();
+  appendCrmFilterParams(sp, params);
+  if (!options.isPro) {
+    sp.set("page", String(params.page));
+    sp.set("pageSize", String(params.pageSize));
+  }
   const s = sp.toString();
   return s ? `?${s}` : "";
 }

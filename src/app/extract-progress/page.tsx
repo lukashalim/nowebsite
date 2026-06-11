@@ -118,24 +118,25 @@ export default async function ExtractProgressPage() {
                 href="/admin/scrape"
                 className="text-zinc-700 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
               >
-                Run NDJSON ingest (local)
+                Run local ingest (NDJSON cache)
               </Link>
             </>
           ) : null}
         </p>
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          Local extractor progress
+          Local ingest progress
         </h1>
         <p className="max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
           One row per run of{" "}
           <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">
             extract-local-extractor-cache.mjs
           </code>{" "}
-          (e.g. Task Scheduler).{" "}
+          (Task Scheduler or admin UI). Scrape in Google Maps Extractor first, then
+          ingest here.{" "}
           <strong className="font-medium text-zinc-800 dark:text-zinc-200">
             Lines
           </strong>{" "}
-          = NDJSON rows scanned;{" "}
+          = rows scanned (NDJSON lines or API results);{" "}
           <strong className="font-medium text-zinc-800 dark:text-zinc-200">
             Has website
           </strong>{" "}

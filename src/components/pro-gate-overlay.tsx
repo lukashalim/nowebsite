@@ -9,7 +9,7 @@ interface ProGateOverlayProps {
 
 export function ProGateOverlay({
   title = "Pro feature",
-  description = "Upgrade to unlock CSV export, DM spintax, and demo pages.",
+  description = "Upgrade for unlimited DMs, SMS, demo links, and full CSV export.",
   className = "",
 }: ProGateOverlayProps) {
   return (

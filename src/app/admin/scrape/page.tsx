@@ -5,7 +5,7 @@ import { ExtractAdminPanel } from "@/components/extract-admin-panel";
 import { isLocalAdminEnabled } from "@/lib/local-admin";
 
 export const metadata: Metadata = {
-  title: "Local NDJSON scrape → Supabase",
+  title: "Local ingest — NDJSON cache",
   robots: { index: false, follow: false },
 };
 

@@ -56,9 +56,7 @@ export async function GET(request: Request) {
   }
 
   const profile = await getUserProfile(user.id);
-  if (!isPro(profile)) {
-    return NextResponse.json({ error: "Pro subscription required" }, { status: 403 });
-  }
+  const userIsPro = isPro(profile);
 
   const { searchParams } = new URL(request.url);
   const raw: Record<string, string | string[] | undefined> = {};
@@ -66,7 +64,35 @@ export async function GET(request: Request) {
     raw[key] = value;
   });
 
-  const { rows, error } = await fetchAllCrmRows(user.id, raw);
+  if (!userIsPro && searchParams.get("all") === "1") {
+    return NextResponse.json(
+      { error: "Full CSV export requires Pro" },
+      { status: 403 },
+    );
+  }
+
+  const { rows, error } = userIsPro
+    ? await fetchAllCrmRows(user.id, raw)
+    : await (async () => {
+        const parsed = tryParseCrmSearchParams(raw);
+        if (!parsed.ok) {
+          return { rows: [], error: "Invalid export filters" };
+        }
+        // Free tier: single page only (current filters + page/pageSize).
+        const result = await fetchCrmBusinessRows(
+          {
+            ...parsed.data,
+            page: parsed.data.page,
+            pageSize: parsed.data.pageSize,
+          },
+          user.id,
+        );
+        if (result.error) {
+          return { rows: [], error: result.error };
+        }
+        return { rows: result.rows, error: null };
+      })();
+
   if (error) {
     return NextResponse.json({ error }, { status: 400 });
   }
