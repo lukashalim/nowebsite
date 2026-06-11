@@ -1,59 +1,48 @@
 import { NextResponse } from "next/server";
-import {
-  buildDirectoryBusinessesCsv,
-  csvFilenameFromPagePath,
-} from "@/lib/directory/csv-export";
-import {
-  fetchFacebookDirectoryAllListings,
-  fetchNationwideCategoryAllListings,
-  fetchStateAllListings,
-} from "@/lib/directory/data";
+import { verifyCsvDownloadToken } from "@/lib/csv-download-token";
+import { buildDirectoryExport } from "@/lib/directory/build-export";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
+  const token = searchParams.get("token")?.trim();
+  if (!token) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const payload = verifyCsvDownloadToken(token);
+  if (!payload) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const slug = searchParams.get("slug")?.trim().toLowerCase();
   const type = searchParams.get("type")?.trim().toLowerCase();
 
-  if (type === "facebook") {
-    const data = await fetchFacebookDirectoryAllListings();
-    if (!data) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (type !== payload.type) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (type !== "facebook") {
+    if (!slug || slug !== payload.slug) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const csv = buildDirectoryBusinessesCsv(data.businesses);
-    const filename = csvFilenameFromPagePath("/facebook");
-    return new NextResponse(csv, {
-      status: 200,
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${filename}"`,
-        "Cache-Control": "private, max-age=3600",
-      },
-    });
   }
 
-  if (!slug || (type !== "category" && type !== "state")) {
-    return NextResponse.json({ error: "Invalid export request" }, { status: 400 });
-  }
+  const exportResult = await buildDirectoryExport(
+    payload.type,
+    payload.slug ?? slug ?? undefined,
+  );
 
-  const data =
-    type === "category"
-      ? await fetchNationwideCategoryAllListings(slug)
-      : await fetchStateAllListings(slug);
-
-  if (!data) {
+  if (!exportResult) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const csv = buildDirectoryBusinessesCsv(data.businesses);
-  const filename = csvFilenameFromPagePath(`/${slug}`);
-
-  return new NextResponse(csv, {
+  return new NextResponse(exportResult.csv, {
     status: 200,
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Content-Disposition": `attachment; filename="${exportResult.filename}"`,
       "Cache-Control": "private, max-age=3600",
     },
   });

@@ -23,7 +23,6 @@ import {
 import {
   directoryBreadcrumbLinkClass,
   directoryCalloutClass,
-  directoryOutlineButtonClass,
 } from "@/lib/directory/ui-classes";
 import type { DirectoryCityGroup } from "@/lib/directory/types";
 import type { DirectoryBusiness } from "@/lib/directory/types";
@@ -69,7 +68,6 @@ export function DirectoryCategoryPage({
   const pluralLower = pluralCategoryForTitle(categoryLabel).toLowerCase();
   const paginated = totalPages > 1;
   const range = directoryPageRange(page, pageSize, totalCount);
-  const fullCsvHref = `/api/directory-export?slug=${encodeURIComponent(categorySlug)}&type=category`;
   const hrefForPage = (p: number) =>
     categoryPathWithPage(categorySlug, p, filters);
   const showPitch = Boolean(
@@ -210,9 +208,14 @@ export function DirectoryCategoryPage({
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
         {paginated ? (
-          <a href={fullCsvHref} className={directoryOutlineButtonClass}>
-            Download all {totalCount.toLocaleString()} as CSV
-          </a>
+          <DownloadCsvButton
+            businesses={businesses}
+            pagePath={path}
+            mode="full"
+            exportType="category"
+            exportSlug={categorySlug}
+            label={`Download all ${totalCount.toLocaleString()} as CSV`}
+          />
         ) : (
           <DownloadCsvButton businesses={businesses} pagePath={path} />
         )}

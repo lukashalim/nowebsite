@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
 import { getRequestOrigin } from "@/lib/auth-redirect";
+import { addContactToListBestEffort } from "@/lib/sendfox";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/route-handler";
 
 export const runtime = "nodejs";
@@ -29,6 +30,13 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user?.email) {
+        await addContactToListBestEffort(user.email);
+      }
+
       const response = NextResponse.redirect(`${redirectOrigin}${next}`);
       response.cookies.delete("auth_next");
       return applyCookies(response);

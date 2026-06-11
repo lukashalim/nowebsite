@@ -16,10 +16,7 @@ import {
   directoryPageRange,
   statePathWithPage,
 } from "@/lib/directory/pagination";
-import {
-  directoryBreadcrumbLinkClass,
-  directoryOutlineButtonClass,
-} from "@/lib/directory/ui-classes";
+import { directoryBreadcrumbLinkClass } from "@/lib/directory/ui-classes";
 import { stateAbbrToDisplayName, stateToAbbr } from "@/lib/directory/slugs";
 import type { DirectoryCityGroup } from "@/lib/directory/types";
 import type { DirectoryBusiness } from "@/lib/directory/types";
@@ -85,9 +82,7 @@ export function DirectoryStatePage({
   const showUsFilters = !isUkRegion && filters && filterOptions;
   const filtersActive = filters ? hasActiveDirectoryListingFilters(filters) : false;
   const unfilteredCount = unfilteredCountProp ?? totalCount;
-  const fullCsvHref = isUkRegion
-    ? null
-    : `/api/directory-export?slug=${encodeURIComponent(stateSlug)}&type=state`;
+  const showFullCsvDownload = paginated && !isUkRegion;
 
   return (
     <div className="space-y-8">
@@ -201,14 +196,19 @@ export function DirectoryStatePage({
       ) : null}
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-        {paginated && fullCsvHref ? (
-          <a href={fullCsvHref} className={directoryOutlineButtonClass}>
-            Download all {totalCount.toLocaleString()} as CSV
-          </a>
+        {showFullCsvDownload ? (
+          <DownloadCsvButton
+            businesses={businesses}
+            pagePath={path}
+            mode="full"
+            exportType="state"
+            exportSlug={stateSlug}
+            label={`Download all ${totalCount.toLocaleString()} as CSV`}
+          />
         ) : (
           <DownloadCsvButton businesses={businesses} pagePath={path} />
         )}
-        {paginated && fullCsvHref ? (
+        {showFullCsvDownload ? (
           <p className="text-xs text-zinc-500">
             CSV includes every listing in this state, not only this page
             {filtersActive ? " (unfiltered)" : ""}.

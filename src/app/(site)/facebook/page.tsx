@@ -98,7 +98,6 @@ export default async function FacebookDirectoryPage({
     ? directoryPageRange(data.page, data.pageSize, data.totalCount)
     : null;
   const hrefForPage = (p: number) => facebookPathWithPage(p, data?.filters);
-  const fullCsvHref = "/api/directory-export?type=facebook";
 
   const jsonLd = data
     ? buildDirectoryListJsonLd(data.businesses, PAGE_PATH, PAGE_TITLE)
@@ -257,12 +256,14 @@ export default async function FacebookDirectoryPage({
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
             {paginated ? (
-              <a
-                href={fullCsvHref}
-                className="inline-flex items-center justify-center rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
-              >
-                Download all {data.unfilteredCount.toLocaleString()} as CSV
-              </a>
+              <DownloadCsvButton
+                businesses={data.businesses}
+                pagePath={PAGE_PATH}
+                mode="full"
+                exportType="facebook"
+                label={`Download all ${data.unfilteredCount.toLocaleString()} as CSV`}
+                className="inline-flex items-center justify-center gap-2 rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
+              />
             ) : (
               <DownloadCsvButton businesses={data.businesses} pagePath={PAGE_PATH} />
             )}
