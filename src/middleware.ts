@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { parseCitySlug } from "@/lib/directory/slugs";
 import { updateSession } from "@/lib/supabase/middleware";
+import {
+  checkRateLimit,
+  getClientIp,
+  rateLimitHeaders,
+} from "@/lib/rate-limit";
 
 const RESERVED_FIRST_SEGMENTS = new Set([
   "api",
@@ -16,6 +21,38 @@ const RESERVED_FIRST_SEGMENTS = new Set([
   "sitemap.xml",
   "united-kingdom",
 ]);
+
+const DIRECTORY_EXACT = new Set([
+  "/",
+  "/cities",
+  "/categories",
+  "/states",
+  "/facebook",
+  "/united-kingdom",
+]);
+
+const SKIP_RATE_LIMIT_PREFIXES = [
+  "/api/",
+  "/crm",
+  "/auth",
+  "/sign-in",
+  "/demo",
+  "/admin",
+  "/_next",
+  "/scrape-progress",
+  "/extract-progress",
+];
+
+function isDirectoryPagePath(pathname: string): boolean {
+  if (SKIP_RATE_LIMIT_PREFIXES.some((p) => pathname.startsWith(p))) {
+    return false;
+  }
+  const normalized = pathname.replace(/\/$/, "") || "/";
+  if (DIRECTORY_EXACT.has(normalized)) return true;
+  if (pathname.startsWith("/united-kingdom/")) return true;
+  const segments = pathname.split("/").filter(Boolean);
+  return segments.length === 1;
+}
 
 function copyCookies(from: NextResponse, to: NextResponse) {
   from.cookies.getAll().forEach(({ name, value }) => {
@@ -35,8 +72,29 @@ export async function middleware(request: NextRequest) {
     return response;
   };
 
+  if (request.method === "GET" && isDirectoryPagePath(pathname)) {
+    const userAgent = request.headers.get("user-agent");
+    const ip = getClientIp(request);
+    const rateLimit = await checkRateLimit("directoryPage", ip, userAgent);
+    if (!rateLimit.success) {
+      return withRobotsHeader(
+        new NextResponse("Too many requests. Please try again later.", {
+          status: 429,
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+            ...rateLimitHeaders(rateLimit),
+          },
+        }),
+      );
+    }
+  }
+
   let sessionResponse: NextResponse | null = null;
-  if (pathname.startsWith("/crm") || pathname.startsWith("/auth") || pathname.startsWith("/sign-in")) {
+  if (
+    pathname.startsWith("/crm") ||
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/sign-in")
+  ) {
     sessionResponse = await updateSession(request);
   }
 

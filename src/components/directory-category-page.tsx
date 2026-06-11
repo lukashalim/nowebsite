@@ -26,6 +26,8 @@ import {
 } from "@/lib/directory/ui-classes";
 import type { DirectoryCityGroup } from "@/lib/directory/types";
 import type { DirectoryBusiness } from "@/lib/directory/types";
+import type { DirectoryContactAccess } from "@/lib/directory/contact-fields";
+import { stripContactFieldsList } from "@/lib/directory/contact-fields";
 
 interface DirectoryCategoryPageProps {
   categorySlug: string;
@@ -43,6 +45,7 @@ interface DirectoryCategoryPageProps {
   content?: CategoryContent | null;
   filters: DirectoryListingFiltersState;
   filterOptions: DirectoryFilterOptions;
+  contactAccess: DirectoryContactAccess;
 }
 
 export function DirectoryCategoryPage({
@@ -61,6 +64,7 @@ export function DirectoryCategoryPage({
   content,
   filters,
   filterOptions,
+  contactAccess,
 }: DirectoryCategoryPageProps) {
   const title = nationwideCategoryPageTitle(categoryLabel);
   const path = `/${categorySlug}`;
@@ -180,12 +184,17 @@ export function DirectoryCategoryPage({
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
               Listings
             </h2>
-            <DirectoryBusinessList businesses={businesses} showCityState />
+            <DirectoryBusinessList
+              businesses={businesses}
+              showCityState
+              contactAccess={contactAccess}
+            />
           </>
         ) : cityGroups.length > 0 ? (
           <DirectoryGroupedByCity
             cityGroups={cityGroups}
             publishedCitySlugs={publishedCitySlugs}
+            listingFilters={filters}
           />
         ) : (
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -208,7 +217,8 @@ export function DirectoryCategoryPage({
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
         <DownloadCsvButton
-          businesses={businesses}
+          businesses={stripContactFieldsList(businesses)}
+          contactAccess={contactAccess}
           pagePath={path}
           label={
             paginated

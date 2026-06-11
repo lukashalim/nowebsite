@@ -22,6 +22,9 @@ import {
 } from "@/lib/directory/pagination";
 import { DIRECTORY_MIN_CITY_LISTINGS } from "@/lib/directory/types";
 import { absoluteUrl } from "@/lib/site-url";
+import { createDirectoryContactAccess } from "@/lib/directory/contact-access";
+import { listingScopeForFacebook } from "@/lib/directory/listing-scope";
+import { stripContactFieldsList } from "@/lib/directory/contact-fields";
 
 export const revalidate = 3600;
 
@@ -98,6 +101,14 @@ export default async function FacebookDirectoryPage({
     ? directoryPageRange(data.page, data.pageSize, data.totalCount)
     : null;
   const hrefForPage = (p: number) => facebookPathWithPage(p, data?.filters);
+
+  const contactAccess = data
+    ? createDirectoryContactAccess(
+        listingScopeForFacebook(),
+        data.page,
+        data.filters,
+      )
+    : null;
 
   const jsonLd = data
     ? buildDirectoryListJsonLd(data.businesses, PAGE_PATH, PAGE_TITLE)
@@ -223,7 +234,11 @@ export default async function FacebookDirectoryPage({
                   Listings
                 </h2>
                 {data.businesses.length > 0 ? (
-                  <DirectoryBusinessList businesses={data.businesses} showCityState />
+                  <DirectoryBusinessList
+                    businesses={data.businesses}
+                    showCityState
+                    contactAccess={contactAccess!}
+                  />
                 ) : (
                   <p className="text-sm text-zinc-600 dark:text-zinc-400">
                     No listings match these filters.
@@ -234,6 +249,7 @@ export default async function FacebookDirectoryPage({
               <DirectoryGroupedByCity
                 cityGroups={data.cityGroups}
                 publishedCitySlugs={publishedCitySlugs}
+                listingFilters={data.filters}
               />
             ) : (
               <p className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -254,9 +270,11 @@ export default async function FacebookDirectoryPage({
             />
           ) : null}
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+          {paginated && range && contactAccess ? (
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
             <DownloadCsvButton
-              businesses={data.businesses}
+              businesses={stripContactFieldsList(data.businesses)}
+              contactAccess={contactAccess}
               pagePath={PAGE_PATH}
               label={
                 paginated
@@ -272,6 +290,7 @@ export default async function FacebookDirectoryPage({
               </p>
             ) : null}
           </div>
+          ) : null}
         </>
       ) : null}
     </div>

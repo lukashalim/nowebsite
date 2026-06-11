@@ -20,6 +20,8 @@ import { directoryBreadcrumbLinkClass } from "@/lib/directory/ui-classes";
 import { stateAbbrToDisplayName, stateToAbbr } from "@/lib/directory/slugs";
 import type { DirectoryCityGroup } from "@/lib/directory/types";
 import type { DirectoryBusiness } from "@/lib/directory/types";
+import type { DirectoryContactAccess } from "@/lib/directory/contact-fields";
+import { stripContactFieldsList } from "@/lib/directory/contact-fields";
 
 interface DirectoryStatePageProps {
   stateSlug: string;
@@ -42,6 +44,7 @@ interface DirectoryStatePageProps {
   totalPages?: number;
   filters?: DirectoryListingFiltersState;
   filterOptions?: DirectoryFilterOptions;
+  contactAccess?: DirectoryContactAccess;
 }
 
 export function DirectoryStatePage({
@@ -65,6 +68,7 @@ export function DirectoryStatePage({
   totalPages = 1,
   filters,
   filterOptions,
+  contactAccess,
 }: DirectoryStatePageProps) {
   const title = isUkRegion ? ukRegionHubTitle(state) : stateHubTitle(state);
   const path = pathPrefix
@@ -165,7 +169,11 @@ export function DirectoryStatePage({
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
               Listings
             </h2>
-            <DirectoryBusinessList businesses={businesses} showCityState />
+            <DirectoryBusinessList
+              businesses={businesses}
+              showCityState
+              contactAccess={contactAccess!}
+            />
           </>
         ) : cityGroups.length > 0 ? (
           <DirectoryGroupedByCity
@@ -173,6 +181,7 @@ export function DirectoryStatePage({
             publishedCitySlugs={publishedCitySlugs}
             getCityHref={getCityHref}
             isCityPublished={isCityPublished}
+            listingFilters={filters}
           />
         ) : (
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -193,9 +202,11 @@ export function DirectoryStatePage({
         />
       ) : null}
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+      {paginated && contactAccess ? (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
         <DownloadCsvButton
-          businesses={businesses}
+          businesses={stripContactFieldsList(businesses)}
+          contactAccess={contactAccess}
           pagePath={path}
           label={
             paginated
@@ -210,6 +221,7 @@ export function DirectoryStatePage({
           </p>
         ) : null}
       </div>
+      ) : null}
     </div>
   );
 }

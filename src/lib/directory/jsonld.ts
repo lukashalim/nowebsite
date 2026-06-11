@@ -14,8 +14,6 @@ export function buildDirectoryListJsonLd(
       name,
       position: index + 1,
     };
-    if (b.phone?.trim()) item.telephone = b.phone.trim();
-    if (b.google_maps_link?.trim()) item.sameAs = [b.google_maps_link.trim()];
     if (b.rating != null && b.reviews != null && b.reviews > 0) {
       item.aggregateRating = {
         "@type": "AggregateRating",

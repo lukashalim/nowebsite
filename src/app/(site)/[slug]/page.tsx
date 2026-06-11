@@ -35,6 +35,12 @@ import {
 } from "@/lib/directory/pagination";
 import { categoryContentMetaDescription } from "@/lib/directory/category-content";
 import { absoluteUrl } from "@/lib/site-url";
+import { createDirectoryContactAccess } from "@/lib/directory/contact-access";
+import {
+  listingScopeForCategory,
+  listingScopeForCity,
+  listingScopeForState,
+} from "@/lib/directory/listing-scope";
 
 export const revalidate = 3600;
 export const dynamicParams = true;
@@ -162,6 +168,11 @@ export default async function SlugDirectoryPage({
 
   if (resolved.kind === "category") {
     const { data } = resolved;
+    const contactAccess = createDirectoryContactAccess(
+      listingScopeForCategory(lower),
+      data.page,
+      data.filters,
+    );
     return (
       <DirectoryCategoryPage
         categorySlug={lower}
@@ -179,12 +190,18 @@ export default async function SlugDirectoryPage({
         content={data.content}
         filters={data.filters}
         filterOptions={data.filterOptions}
+        contactAccess={contactAccess}
       />
     );
   }
 
   if (resolved.kind === "state") {
     const { data } = resolved;
+    const contactAccess = createDirectoryContactAccess(
+      listingScopeForState(lower),
+      data.page,
+      data.filters,
+    );
     return (
       <DirectoryStatePage
         stateSlug={lower}
@@ -201,12 +218,18 @@ export default async function SlugDirectoryPage({
         publishedCitySlugs={data.publishedCitySlugs}
         filters={data.filters}
         filterOptions={data.filterOptions}
+        contactAccess={contactAccess}
       />
     );
   }
 
   if (resolved.kind === "city") {
     const { hub, businesses, cityData } = resolved;
+    const contactAccess = createDirectoryContactAccess(
+      listingScopeForCity(lower),
+      1,
+      cityData.filters,
+    );
     const title = cityHubTitle(hub.city, hub.state, hub.country);
     const publishedSlugs = new Set(
       hub.publishedCategories.map((c) => c.categorySlug),
@@ -310,7 +333,10 @@ export default async function SlugDirectoryPage({
             All listings in {hub.city}
           </h2>
           {businesses.length > 0 ? (
-            <DirectoryBusinessList businesses={businesses} />
+            <DirectoryBusinessList
+              businesses={businesses}
+              contactAccess={contactAccess}
+            />
           ) : (
             <p className="text-sm text-zinc-600 dark:text-zinc-400">
               No listings match these filters.

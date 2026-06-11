@@ -2,17 +2,21 @@
 
 import { Download } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
-import type { DirectoryBusiness } from "@/lib/directory/types";
+import type { DirectoryBusinessPublic } from "@/lib/directory/contact-fields";
+import type { DirectoryContactAccess } from "@/lib/directory/contact-fields";
+import { fetchDirectoryContacts } from "@/lib/directory/contact-api-client";
 import {
   buildDirectoryBusinessesCsv,
   csvFilenameFromPagePath,
 } from "@/lib/directory/csv-export";
+import type { DirectoryBusiness } from "@/lib/directory/types";
 import { directoryOutlineButtonClass } from "@/lib/directory/ui-classes";
 
 const SESSION_EMAIL_KEY = "csv_download_email";
 
 interface DownloadCsvButtonProps {
-  businesses: DirectoryBusiness[];
+  businesses: DirectoryBusinessPublic[];
+  contactAccess: DirectoryContactAccess;
   pagePath: string;
   label?: string;
   className?: string;
@@ -43,8 +47,23 @@ function setSessionEmail(email: string): void {
   }
 }
 
+function mergeContactsIntoBusinesses(
+  businesses: DirectoryBusinessPublic[],
+  contacts: Awaited<ReturnType<typeof fetchDirectoryContacts>>,
+): DirectoryBusiness[] {
+  return businesses.map((b, i) => {
+    const contact = contacts.find((c) => c.i === i);
+    return {
+      ...b,
+      phone: contact?.phone ?? null,
+      google_maps_link: contact?.google_maps_link ?? null,
+    };
+  });
+}
+
 export function DownloadCsvButton({
   businesses,
+  contactAccess,
   pagePath,
   label = "Download CSV",
   className,
@@ -54,11 +73,13 @@ export function DownloadCsvButton({
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  const downloadPageCsv = useCallback(() => {
-    const csv = buildDirectoryBusinessesCsv(businesses);
+  const downloadPageCsv = useCallback(async () => {
+    const contacts = await fetchDirectoryContacts(contactAccess);
+    const merged = mergeContactsIntoBusinesses(businesses, contacts);
+    const csv = buildDirectoryBusinessesCsv(merged);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     triggerBlobDownload(blob, csvFilenameFromPagePath(pagePath));
-  }, [businesses, pagePath]);
+  }, [businesses, contactAccess, pagePath]);
 
   const submitDownload = useCallback(
     async (submittedEmail: string) => {
@@ -86,7 +107,7 @@ export function DownloadCsvButton({
 
         setSessionEmail(submittedEmail);
         dialogRef.current?.close();
-        downloadPageCsv();
+        await downloadPageCsv();
       } catch {
         setError("Network error. Please try again.");
       } finally {

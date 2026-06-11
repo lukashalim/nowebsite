@@ -24,6 +24,8 @@ import {
   directoryRowLinkStaticClass,
   directoryRowLinkWithGapClass,
 } from "@/lib/directory/ui-classes";
+import { createDirectoryContactAccess } from "@/lib/directory/contact-access";
+import { listingScopeForGbCity } from "@/lib/directory/listing-scope";
 
 export const revalidate = 3600;
 export const dynamicParams = true;
@@ -133,6 +135,11 @@ export default async function UnitedKingdomNestedPage({ params }: PageProps) {
     const { hub, businesses } = resolved;
     const citySlug = segments[0]!;
     const regionSlug = hub.regionSlug;
+    const contactAccess = createDirectoryContactAccess(
+      listingScopeForGbCity(citySlug),
+      1,
+      { stateSlug: null, citySlug: null, minReviews: 0 },
+    );
     const title = cityHubTitle(hub.city, hub.state, COUNTRY_GB, hub.region);
     const publishedSlugs = new Set(
       hub.publishedCategories.map((c) => c.categorySlug),
@@ -225,7 +232,10 @@ export default async function UnitedKingdomNestedPage({ params }: PageProps) {
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
             All listings in {hub.city}
           </h2>
-          <DirectoryBusinessList businesses={businesses} />
+          <DirectoryBusinessList
+            businesses={businesses}
+            contactAccess={contactAccess}
+          />
         </section>
       </div>
     );

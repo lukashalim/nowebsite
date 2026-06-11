@@ -3,12 +3,19 @@ import { DirectoryBusinessList } from "@/components/directory-business-list";
 import { cityPath, formatLocationLabel } from "@/lib/directory/labels";
 import { directoryCityHeadingLinkClass } from "@/lib/directory/ui-classes";
 import type { DirectoryCityGroup } from "@/lib/directory/types";
+import { createDirectoryContactAccess } from "@/lib/directory/contact-access";
+import {
+  DEFAULT_DIRECTORY_LISTING_FILTERS,
+  type DirectoryListingFilters,
+} from "@/lib/directory/listing-filters";
+import { listingScopeForCity } from "@/lib/directory/listing-scope";
 
 interface DirectoryGroupedByCityProps {
   cityGroups: DirectoryCityGroup[];
   publishedCitySlugs?: Set<string>;
   getCityHref?: (group: DirectoryCityGroup) => string;
   isCityPublished?: (group: DirectoryCityGroup) => boolean;
+  listingFilters?: DirectoryListingFilters;
 }
 
 export function DirectoryGroupedByCity({
@@ -16,6 +23,7 @@ export function DirectoryGroupedByCity({
   publishedCitySlugs,
   getCityHref,
   isCityPublished,
+  listingFilters = DEFAULT_DIRECTORY_LISTING_FILTERS,
 }: DirectoryGroupedByCityProps) {
   if (cityGroups.length === 0) {
     return (
@@ -36,6 +44,11 @@ export function DirectoryGroupedByCity({
           ? isCityPublished(group)
           : (publishedCitySlugs?.has(group.citySlug) ?? false);
         const href = getCityHref ? getCityHref(group) : cityPath(group.citySlug);
+        const contactAccess = createDirectoryContactAccess(
+          listingScopeForCity(group.citySlug),
+          1,
+          listingFilters,
+        );
 
         return (
           <section key={group.citySlug} className="space-y-3">
@@ -51,7 +64,10 @@ export function DirectoryGroupedByCity({
                 ({group.businesses.length.toLocaleString()})
               </span>
             </h2>
-            <DirectoryBusinessList businesses={group.businesses} />
+            <DirectoryBusinessList
+              businesses={group.businesses}
+              contactAccess={contactAccess}
+            />
           </section>
         );
       })}
