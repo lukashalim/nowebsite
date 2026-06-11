@@ -147,3 +147,26 @@ export function canonicalizeBusinessTypeToken(
 export function isMergedSecondarySlug(slug: string): boolean {
   return secondarySlugToPrimary.has(slug.trim().toLowerCase());
 }
+
+/** business_type values to query for a category URL slug (includes merged legacy types). */
+export function businessTypeTokensForCategorySlug(categorySlug: string): string[] {
+  const canonical = canonicalCategorySlug(categorySlug.trim().toLowerCase());
+  const tokens = new Set<string>();
+
+  function add(value: string) {
+    const key = normalizeTypeKey(value);
+    if (!key || key === "local_cache") return;
+    tokens.add(key);
+  }
+
+  add(canonical.replace(/-/g, "_"));
+
+  const group = CATEGORY_MERGE_GROUPS.find((g) => g.primarySlug === canonical);
+  if (group) {
+    add(group.canonicalBusinessType);
+    for (const legacy of group.legacyBusinessTypes) add(legacy);
+    for (const secondary of group.secondarySlugs) add(secondary.replace(/-/g, "_"));
+  }
+
+  return [...tokens];
+}

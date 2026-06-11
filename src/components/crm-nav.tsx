@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { signOutFromCrm } from "@/app/actions/auth";
+import { ManageSubscriptionButton } from "@/components/manage-subscription-button";
+import { UpgradeToProButton } from "@/components/upgrade-to-pro-button";
 import { shouldShowLocalDevTools } from "@/lib/dev-host";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
 
 interface CrmNavProps {
   active?: "leads" | "spintax";
+  isPro?: boolean;
 }
 
 const breadcrumbLinkClass =
@@ -22,7 +25,7 @@ function BreadcrumbSeparator() {
   );
 }
 
-export async function CrmNav({ active }: CrmNavProps) {
+export async function CrmNav({ active, isPro = false }: CrmNavProps) {
   const host = (await headers()).get("host") ?? "";
   const showScrapeQueue = shouldShowLocalDevTools(host);
 
@@ -65,6 +68,27 @@ export async function CrmNav({ active }: CrmNavProps) {
           </Link>
         </>
       ) : null}
+      {!isPro ? (
+        <>
+          <BreadcrumbSeparator />
+          <UpgradeToProButton
+            className="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+            label="Upgrade to Pro"
+          />
+        </>
+      ) : (
+        <>
+          <BreadcrumbSeparator />
+          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+            Pro
+          </span>
+          <BreadcrumbSeparator />
+          <ManageSubscriptionButton
+            className="font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+            label="Manage subscription"
+          />
+        </>
+      )}
       <BreadcrumbSeparator />
       <form action={signOutFromCrm} className="inline">
         <button

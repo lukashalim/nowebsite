@@ -7,6 +7,7 @@ import {
   fetchDirectoryLastUpdatedLabel,
 } from "@/lib/directory/data";
 import { categoryGridLabel } from "@/lib/directory/labels";
+import { directoryBreadcrumbLinkClass, directoryCardLinkClass } from "@/lib/directory/ui-classes";
 import { DIRECTORY_MIN_CATEGORY_LISTINGS } from "@/lib/directory/types";
 import { absoluteUrl } from "@/lib/site-url";
 
@@ -46,7 +47,7 @@ export default async function CategoriesIndexPage() {
     <div className="space-y-8">
       <header className="space-y-3">
         <p className="text-sm text-zinc-500">
-          <Link href="/" className="hover:underline">
+          <Link href="/" className={directoryBreadcrumbLinkClass}>
             Home
           </Link>
         </p>
@@ -72,10 +73,7 @@ export default async function CategoriesIndexPage() {
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {categories.map((cat) => (
             <li key={cat.categorySlug}>
-              <Link
-                href={cat.href}
-                className="flex items-start gap-3 rounded-lg border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/50"
-              >
+              <Link href={cat.href} className={directoryCardLinkClass}>
                 <CategoryIcon
                   categoryLabel={cat.categoryLabel}
                   className="mt-0.5 size-5 shrink-0 text-zinc-500"

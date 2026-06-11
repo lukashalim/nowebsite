@@ -12,7 +12,11 @@ import {
 } from "@/lib/crm-params";
 import { formatCategoryDisplayName } from "@/lib/directory/labels";
 import { stateAbbrToDisplayName } from "@/lib/directory/slugs";
-import type { DemoReviewHighlight } from "@/lib/demo-review-types";
+import { fetchCrmDistinctFilterValues } from "@/lib/directory/aggregate-queries";
+import {
+  parseReviewHighlights,
+  type DemoReviewHighlight,
+} from "@/lib/demo-review-types";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { demoPublicPath, isLikelyGooglePlaceId } from "@/lib/demo-slug";
 import { cache } from "react";
@@ -79,33 +83,6 @@ export interface DemoBusinessHour {
   opens?: string;
   closes?: string;
   text?: string;
-}
-
-function parseReviewHighlights(value: unknown): DemoReviewHighlight[] | null {
-  if (!Array.isArray(value)) return null;
-  const out: DemoReviewHighlight[] = [];
-  for (const raw of value) {
-    if (!raw || typeof raw !== "object") continue;
-    const row = raw as Record<string, unknown>;
-    const excerpt =
-      typeof row.excerpt === "string" ? row.excerpt.trim() : "";
-    if (!excerpt) continue;
-    const rating =
-      typeof row.rating === "number" && Number.isFinite(row.rating)
-        ? row.rating
-        : undefined;
-    const relative_time =
-      typeof row.relative_time === "string" ? row.relative_time : undefined;
-    const reviewer_name =
-      typeof row.reviewer_name === "string" ? row.reviewer_name.trim() : "";
-    out.push({
-      excerpt,
-      rating,
-      relative_time,
-      ...(reviewer_name ? { reviewer_name } : {}),
-    });
-  }
-  return out.length > 0 ? out : null;
 }
 
 /** Synthetic scrape placeholder for business_type — not a customer-facing service. */
@@ -419,40 +396,13 @@ export interface CrmFilterOptions {
 
 export const fetchCrmFilterOptions = cache(
   async (): Promise<CrmFilterOptions> => {
-    const supabase = createSupabaseAdmin();
+    const rows = await fetchCrmDistinctFilterValues();
     const categorySet = new Set<string>();
     const stateSet = new Set<string>();
-    let offset = 0;
 
-    for (;;) {
-      let q = supabase
-        .from("businesses_nowebsite")
-        .select("main_category, state")
-        .eq("is_invalid", false);
-      q = applyReviewExcerptsExtractedFilter(q);
-      const { data, error } = await q
-        .order("place_id", { ascending: true })
-        .range(offset, offset + BATCH - 1);
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      const rows = data ?? [];
-      for (const row of rows) {
-        const category =
-          typeof row.main_category === "string"
-            ? row.main_category.trim()
-            : "";
-        if (category) categorySet.add(category);
-
-        const state =
-          typeof row.state === "string" ? row.state.trim() : "";
-        if (state) stateSet.add(state);
-      }
-
-      if (rows.length < BATCH) break;
-      offset += BATCH;
+    for (const row of rows) {
+      if (row.main_category) categorySet.add(row.main_category);
+      if (row.state) stateSet.add(row.state);
     }
 
     const categories = [...categorySet]

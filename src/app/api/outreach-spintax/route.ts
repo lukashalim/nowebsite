@@ -13,6 +13,7 @@ import {
   leadSpintaxAudience,
   templateMatchesLeadAudience,
 } from "@/lib/spintax-audience";
+import { getUserProfile, isPro } from "@/lib/subscription";
 import { fetchSpintaxTemplatesForUser } from "@/lib/spintax-templates";
 
 export const runtime = "nodejs";
@@ -59,6 +60,18 @@ export async function POST(req: Request) {
 
     if (!placeId) {
       return NextResponse.json({ error: "placeId is required" }, { status: 400 });
+    }
+
+    if (!user) {
+      return NextResponse.json({ error: "Sign in required" }, { status: 401 });
+    }
+
+    const profile = await getUserProfile(user.id);
+    if (!isPro(profile)) {
+      return NextResponse.json(
+        { error: "Pro subscription required" },
+        { status: 403 },
+      );
     }
 
     const supabase = createSupabaseAdmin();

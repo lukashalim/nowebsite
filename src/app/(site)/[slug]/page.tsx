@@ -20,6 +20,11 @@ import {
 import { fetchAllValidSlugParams } from "@/lib/directory/data";
 import { resolveDirectorySlugPage } from "@/lib/directory/resolve-slug-page";
 import { DIRECTORY_MIN_CATEGORY_LISTINGS } from "@/lib/directory/types";
+import {
+  directoryBreadcrumbLinkClass,
+  directoryRowLinkStaticClass,
+  directoryRowLinkWithGapClass,
+} from "@/lib/directory/ui-classes";
 import { hasActiveDirectoryListingFilters } from "@/lib/directory/listing-filters";
 import { parseDirectoryListingFilters } from "@/lib/directory/listing-filters";
 import {
@@ -211,7 +216,7 @@ export default async function SlugDirectoryPage({
       <div className="space-y-8">
         <header className="space-y-3">
           <p className="text-sm text-zinc-500">
-            <Link href="/" className="hover:underline">
+            <Link href="/" className={directoryBreadcrumbLinkClass}>
               Home
             </Link>
             <span aria-hidden> / </span>
@@ -272,7 +277,7 @@ export default async function SlugDirectoryPage({
                     {hasPage ? (
                       <Link
                         href={categoryPath(cat.categorySlug)}
-                        className="flex items-center gap-3 rounded-lg border border-zinc-200 px-4 py-3 text-sm hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/50"
+                        className={directoryRowLinkWithGapClass}
                       >
                         <CategoryIcon
                           categoryLabel={cat.categoryLabel}
@@ -283,7 +288,7 @@ export default async function SlugDirectoryPage({
                         </span>
                       </Link>
                     ) : (
-                      <div className="flex items-center gap-3 rounded-lg border border-dashed border-zinc-200 px-4 py-3 text-sm dark:border-zinc-800">
+                      <div className={`${directoryRowLinkStaticClass} border-dashed`}>
                         <CategoryIcon
                           categoryLabel={cat.categoryLabel}
                           className="size-4 shrink-0 text-zinc-400"

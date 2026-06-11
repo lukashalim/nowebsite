@@ -1,0 +1,11 @@
+-- Applied via Supabase MCP migration directory_aggregate_index_functions (project hihupmzzlgxotxwcknjh).
+-- SQL aggregate functions for directory index / counts (avoids full-table row scans in app code).
+
+-- See migration body in Supabase; functions:
+--   directory_us_index_buckets()
+--   directory_gb_index_buckets()
+--   directory_us_listing_total()
+--   directory_freshness_max()
+--   directory_facebook_listing_total()
+--   directory_gb_listing_total()
+--   crm_distinct_filter_values()

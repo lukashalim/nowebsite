@@ -3,10 +3,8 @@ import { formatLastUpdatedMonthYear } from "@/lib/directory/labels";
 import {
   COUNTRY_GB,
   COUNTRY_US,
-  parseDirectoryCountry,
 } from "@/lib/directory/country";
 import {
-  categoryMatchesSlug,
   cityStateToSlug,
   directoryCategoryLabel,
   parseCitySlug,
@@ -33,6 +31,13 @@ import {
   DIRECTORY_MIN_STATE_LISTINGS,
   DIRECTORY_MIN_UK_REGION_LISTINGS,
 } from "@/lib/directory/types";
+import {
+  bumpFreshnessIsoFromCandidate,
+  fetchDirectoryFreshnessMax,
+  fetchDirectoryUsListingTotal,
+  fetchFacebookDirectoryListingTotal,
+  fetchUsIndexBuckets,
+} from "@/lib/directory/aggregate-queries";
 import { fetchCategoryContent } from "@/lib/directory/category-content";
 import type { CategoryContent } from "@/lib/directory/category-content";
 import { sortCategoriesByPriority } from "@/lib/directory/category-priority";
@@ -60,6 +65,11 @@ import {
   sortByReviewsDesc,
   type RawDirectoryRow,
 } from "@/lib/directory/rows";
+import {
+  fetchDirectoryRowsForCategorySlug,
+  fetchDirectoryRowsForCity,
+  fetchDirectoryRowsForStateAbbr,
+} from "@/lib/directory/scoped-rows";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 
 const BATCH = 1000;
@@ -223,7 +233,12 @@ export const fetchDirectoryIndex = cache(async (): Promise<{
   /** Every US listing with city + state (not only 50+ city hubs). */
   totalUsListings: number;
 }> => {
-  const rows = await fetchAllNoWebsiteRows();
+  const [buckets, totalUsListings, freshnessMax] = await Promise.all([
+    fetchUsIndexBuckets(),
+    fetchDirectoryUsListingTotal(),
+    fetchDirectoryFreshnessMax(),
+  ]);
+
   const cityCounts = new Map<string, DirectoryCityRef>();
   const categoryCounts = new Map<
     string,
@@ -236,114 +251,107 @@ export const fetchDirectoryIndex = cache(async (): Promise<{
   >();
   const stateCounts = new Map<string, DirectoryStateRef>();
   const cityCategoryCounts = new Map<string, DirectoryCityCategoryRef>();
-  let homepageLastModifiedIso: string | null = null;
-  let totalUsListings = 0;
 
-  for (const row of rows) {
-    const city = row.city?.trim();
-    const state = row.state?.trim();
+  for (const bucket of buckets) {
+    const city = bucket.city;
+    const state = bucket.state;
     if (!city || !state) continue;
 
-    homepageLastModifiedIso = bumpFreshnessIso(homepageLastModifiedIso, row);
+    const count = bucket.listing_count;
+    const bucketFreshness = bucket.last_modified_at;
 
-    const country = parseDirectoryCountry(row.country);
+    const citySlug = cityStateToSlug(city, state, COUNTRY_US);
+    if (citySlug) {
+      const cityKey = citySlug;
+      const existingCity = cityCounts.get(cityKey);
+      if (existingCity) {
+        existingCity.listingCount += count;
+        existingCity.lastModifiedAt = bumpFreshnessIsoFromCandidate(
+          existingCity.lastModifiedAt,
+          bucketFreshness,
+        );
+      } else {
+        cityCounts.set(cityKey, {
+          citySlug,
+          city,
+          state,
+          region: state,
+          regionSlug: stateNameToSlug(state),
+          country: COUNTRY_US,
+          listingCount: count,
+          lastModifiedAt: bucketFreshness,
+        });
+      }
+    }
 
-    if (country === COUNTRY_US) {
-      totalUsListings += 1;
+    const resolved = resolveCategoryForRow(
+      bucket.main_category,
+      bucket.business_type,
+    );
+    if (resolved) {
+      const catKey = resolved.slug;
+      const label = directoryCategoryLabel(
+        bucket.main_category,
+        bucket.business_type,
+      );
+      const existingCat = categoryCounts.get(catKey);
+      if (existingCat) {
+        existingCat.totalCount += count;
+        existingCat.lastModifiedAt = bumpFreshnessIsoFromCandidate(
+          existingCat.lastModifiedAt,
+          bucketFreshness,
+        );
+      } else {
+        categoryCounts.set(catKey, {
+          categoryLabel: label ?? resolved.label,
+          categorySlug: resolved.slug,
+          totalCount: count,
+          lastModifiedAt: bucketFreshness,
+        });
+      }
 
-      const citySlug = cityStateToSlug(city, state, COUNTRY_US);
       if (citySlug) {
-        const cityKey = citySlug;
-        const existingCity = cityCounts.get(cityKey);
-        if (existingCity) {
-          existingCity.listingCount += 1;
-          existingCity.lastModifiedAt = bumpFreshnessIso(
-            existingCity.lastModifiedAt,
-            row,
+        const ccKey = `${citySlug}::${resolved.slug}`;
+        const existingCc = cityCategoryCounts.get(ccKey);
+        if (existingCc) {
+          existingCc.listingCount += count;
+          existingCc.lastModifiedAt = bumpFreshnessIsoFromCandidate(
+            existingCc.lastModifiedAt,
+            bucketFreshness,
           );
         } else {
-          cityCounts.set(cityKey, {
+          cityCategoryCounts.set(ccKey, {
             citySlug,
+            categorySlug: resolved.slug,
             city,
             state,
-            region: state,
-            regionSlug: stateNameToSlug(state),
-            country: COUNTRY_US,
-            listingCount: 1,
-            lastModifiedAt: bumpFreshnessIso(null, row),
-          });
-        }
-      }
-
-      const resolved = resolveCategoryForRow(
-        row.main_category,
-        row.business_type,
-      );
-      if (resolved) {
-        const catKey = resolved.slug;
-        const label = directoryCategoryLabel(
-          row.main_category,
-          row.business_type,
-        );
-        const existingCat = categoryCounts.get(catKey);
-        if (existingCat) {
-          existingCat.totalCount += 1;
-          existingCat.lastModifiedAt = bumpFreshnessIso(
-            existingCat.lastModifiedAt,
-            row,
-          );
-        } else {
-          categoryCounts.set(catKey, {
             categoryLabel: label ?? resolved.label,
-            categorySlug: resolved.slug,
-            totalCount: 1,
-            lastModifiedAt: bumpFreshnessIso(null, row),
+            listingCount: count,
+            lastModifiedAt: bucketFreshness,
           });
-        }
-
-        if (citySlug) {
-          const ccKey = `${citySlug}::${resolved.slug}`;
-          const existingCc = cityCategoryCounts.get(ccKey);
-          if (existingCc) {
-            existingCc.listingCount += 1;
-            existingCc.lastModifiedAt = bumpFreshnessIso(
-              existingCc.lastModifiedAt,
-              row,
-            );
-          } else {
-            cityCategoryCounts.set(ccKey, {
-              citySlug,
-              categorySlug: resolved.slug,
-              city,
-              state,
-              categoryLabel: label ?? resolved.label,
-              listingCount: 1,
-              lastModifiedAt: bumpFreshnessIso(null, row),
-            });
-          }
         }
       }
+    }
 
-      const stateSlug = stateNameToSlug(state);
-      const stateAbbr = stateToAbbr(state);
-      if (stateSlug && stateAbbr && isUsStateForDirectory(state)) {
-        const stateKey = stateSlug;
-        const existingState = stateCounts.get(stateKey);
-        if (existingState) {
-          existingState.listingCount += 1;
-          existingState.lastModifiedAt = bumpFreshnessIso(
-            existingState.lastModifiedAt,
-            row,
-          );
-        } else {
-          stateCounts.set(stateKey, {
-            stateSlug,
-            state,
-            country: COUNTRY_US,
-            listingCount: 1,
-            lastModifiedAt: bumpFreshnessIso(null, row),
-          });
-        }
+    const stateSlug = stateNameToSlug(state);
+    const stateAbbr = stateToAbbr(state);
+    if (stateSlug && stateAbbr && isUsStateForDirectory(state)) {
+      const stateKey = stateSlug;
+      const existingState = stateCounts.get(stateKey);
+      if (existingState) {
+        existingState.listingCount += count;
+        existingState.lastModifiedAt = bumpFreshnessIsoFromCandidate(
+          existingState.lastModifiedAt,
+          bucketFreshness,
+        );
+      } else {
+        stateCounts.set(stateKey, {
+          stateSlug,
+          state,
+          country: COUNTRY_US,
+          listingCount: count,
+          lastModifiedAt: bucketFreshness,
+        });
       }
     }
   }
@@ -362,9 +370,7 @@ export const fetchDirectoryIndex = cache(async (): Promise<{
     .filter((s) => s.listingCount >= DIRECTORY_MIN_STATE_LISTINGS)
     .sort((a, b) => b.listingCount - a.listingCount);
 
-  const homepageLastModified = homepageLastModifiedIso
-    ? new Date(homepageLastModifiedIso)
-    : null;
+  const homepageLastModified = freshnessMax ? new Date(freshnessMax) : null;
 
   return {
     cities,
@@ -383,16 +389,7 @@ export {
   fetchUkListingCount,
 } from "@/lib/directory/gb-data";
 
-function rowMatchesCitySlug(row: RawDirectoryRow, citySlug: string): boolean {
-  const parsed = parseCitySlug(citySlug);
-  if (!parsed) return false;
-  const country = parseDirectoryCountry(row.country);
-  if (parsed.country !== country) return false;
-  return (
-    cityStateToSlug(row.city ?? "", row.state ?? "", country) ===
-    citySlug.trim().toLowerCase()
-  );
-}
+export { fetchFacebookDirectoryListingTotal } from "@/lib/directory/aggregate-queries";
 
 export interface DirectorySummary {
   totalListings: number;
@@ -449,18 +446,14 @@ export async function fetchCityListings(
 
   if (parsed.country === COUNTRY_GB) {
     return null;
-  } else {
-    const { cities } = await fetchDirectoryIndex();
-    if (!cities.some((c) => c.citySlug === citySlug.toLowerCase())) {
-      return null;
-    }
   }
 
-  const rows = await fetchAllNoWebsiteRows();
-  const allBusinesses = rows
-    .filter((row) => rowMatchesCitySlug(row, citySlug))
-    .map(rowToBusiness)
-    .sort(sortByReviewsDesc);
+  const { cities } = await fetchDirectoryIndex();
+  const cityRef = cities.find((c) => c.citySlug === citySlug.toLowerCase());
+  if (!cityRef) return null;
+
+  const rows = await fetchDirectoryRowsForCity(cityRef.city, cityRef.state);
+  const allBusinesses = rows.map(rowToBusiness).sort(sortByReviewsDesc);
 
   const slice = paginateDirectoryCohort(allBusinesses, {
     page: 1,
@@ -522,18 +515,6 @@ export async function fetchCityHub(citySlug: string): Promise<{
   };
 }
 
-const fetchCategoryMatchedRows = cache(
-  async (categorySlug: string): Promise<RawDirectoryRow[]> => {
-    const slug = categorySlug.trim().toLowerCase();
-    const rows = await fetchAllNoWebsiteRows();
-    return rows.filter(
-      (row) =>
-        parseDirectoryCountry(row.country) === COUNTRY_US &&
-        categoryMatchesSlug(row.main_category, row.business_type, slug),
-    );
-  },
-);
-
 export async function fetchNationwideCategoryListings(
   categorySlug: string,
   opts?: {
@@ -570,7 +551,7 @@ export async function fetchNationwideCategoryListings(
   }
 
   const [matched, content] = await Promise.all([
-    fetchCategoryMatchedRows(slug),
+    fetchDirectoryRowsForCategorySlug(slug),
     fetchCategoryContent(slug),
   ]);
   const allBusinesses = matched.map(rowToBusiness).sort(sortByReviewsDesc);
@@ -628,7 +609,7 @@ export async function fetchNationwideCategoryAllListings(
     return null;
   }
 
-  const matched = await fetchCategoryMatchedRows(slug);
+  const matched = await fetchDirectoryRowsForCategorySlug(slug);
   const businesses = matched.map(rowToBusiness).sort(sortByReviewsDesc);
   if (businesses.length < DIRECTORY_MIN_CATEGORY_LISTINGS) return null;
 
@@ -653,12 +634,7 @@ async function fetchStateMatchedBusinesses(stateSlug: string): Promise<{
   );
   if (!stateRef) return null;
 
-  const rows = await fetchAllNoWebsiteRows();
-  const matched = rows.filter(
-    (row) =>
-      parseDirectoryCountry(row.country) === COUNTRY_US &&
-      stateToAbbr(row.state ?? "") === parsed.stateAbbr,
-  );
+  const matched = await fetchDirectoryRowsForStateAbbr(parsed.stateAbbr);
   const allBusinesses = matched.map(rowToBusiness).sort(sortByReviewsDesc);
 
   if (allBusinesses.length < DIRECTORY_MIN_STATE_LISTINGS) return null;

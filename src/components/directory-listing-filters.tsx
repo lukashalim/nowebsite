@@ -6,6 +6,7 @@ import {
   type DirectoryFilterOptions,
   type DirectoryListingFilters,
 } from "@/lib/directory/listing-filters";
+import { directoryPrimaryButtonClass } from "@/lib/directory/ui-classes";
 
 export type DirectoryListingFiltersMode =
   | "full"
@@ -116,10 +117,7 @@ export function DirectoryListingFilters({
         </label>
 
         <div className="flex flex-wrap items-end gap-2 sm:col-span-2 lg:col-span-1">
-          <button
-            type="submit"
-            className="rounded-md bg-zinc-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-          >
+          <button type="submit" className={directoryPrimaryButtonClass}>
             Apply
           </button>
           {filtered ? (

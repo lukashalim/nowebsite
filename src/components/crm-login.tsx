@@ -2,29 +2,16 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
 
 export function CrmLogin() {
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  async function signInWithGoogle() {
+  function signInWithGoogle() {
     setPending(true);
-    setError(null);
-
-    const supabase = createSupabaseBrowserClient();
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(CRM_BASE_PATH)}`;
-
-    const { error: signInError } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo },
-    });
-
-    if (signInError) {
-      setError(signInError.message);
-      setPending(false);
-    }
+    window.location.assign(
+      `/auth/google?next=${encodeURIComponent(CRM_BASE_PATH)}`,
+    );
   }
 
   return (
@@ -46,22 +33,13 @@ export function CrmLogin() {
 
           <button
             type="button"
-            onClick={() => void signInWithGoogle()}
+            onClick={signInWithGoogle}
             disabled={pending}
             className="flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-900 shadow-sm transition hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
           >
             <GoogleIcon />
             {pending ? "Redirecting…" : "Sign in with Google"}
           </button>
-
-          {error ? (
-            <p
-              className="text-center text-sm text-red-600 dark:text-red-400"
-              role="alert"
-            >
-              {error}
-            </p>
-          ) : null}
         </div>
 
         <div className="border-t border-zinc-100 px-8 py-4 text-center dark:border-zinc-800">

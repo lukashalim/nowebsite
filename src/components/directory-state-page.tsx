@@ -16,6 +16,10 @@ import {
   directoryPageRange,
   statePathWithPage,
 } from "@/lib/directory/pagination";
+import {
+  directoryBreadcrumbLinkClass,
+  directoryOutlineButtonClass,
+} from "@/lib/directory/ui-classes";
 import { stateAbbrToDisplayName, stateToAbbr } from "@/lib/directory/slugs";
 import type { DirectoryCityGroup } from "@/lib/directory/types";
 import type { DirectoryBusiness } from "@/lib/directory/types";
@@ -94,13 +98,13 @@ export function DirectoryStatePage({
 
       <header className="space-y-3">
         <p className="text-sm text-zinc-500">
-          <Link href={hubHref} className="hover:underline">
+          <Link href={hubHref} className={directoryBreadcrumbLinkClass}>
             {hubLabel}
           </Link>
           {paginated ? (
             <>
               <span aria-hidden> / </span>
-              <Link href={path} className="hover:underline">
+              <Link href={path} className={directoryBreadcrumbLinkClass}>
                 {title}
               </Link>
             </>
@@ -198,10 +202,7 @@ export function DirectoryStatePage({
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
         {paginated && fullCsvHref ? (
-          <a
-            href={fullCsvHref}
-            className="inline-flex items-center justify-center rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
-          >
+          <a href={fullCsvHref} className={directoryOutlineButtonClass}>
             Download all {totalCount.toLocaleString()} as CSV
           </a>
         ) : (

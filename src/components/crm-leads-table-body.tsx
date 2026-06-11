@@ -22,12 +22,14 @@ import {
 } from "@/lib/outreach-spintax";
 import { leadSpintaxAudience } from "@/lib/spintax-audience";
 import type { SpintaxTemplate } from "@/lib/spintax-templates";
+import { ProFeatureLock } from "@/components/pro-gate-overlay";
 
 interface CrmLeadsTableBodyProps {
   rows: BusinessLead[];
   userId: string;
   webPresence: CrmWebPresence;
   spintaxTemplates: SpintaxTemplate[];
+  isPro: boolean;
 }
 
 function initialContactCounts(rows: BusinessLead[]): Record<string, number> {
@@ -41,6 +43,7 @@ export function CrmLeadsTableBody({
   userId,
   webPresence,
   spintaxTemplates,
+  isPro,
 }: CrmLeadsTableBodyProps) {
   const [contactCounts, setContactCounts] = useState(() =>
     initialContactCounts(rows),
@@ -140,36 +143,45 @@ export function CrmLeadsTableBody({
                   businessType={b.business_type}
                   leadAudience={spintaxLeadAudience}
                   templates={spintaxTemplates}
+                  isPro={isPro}
                 />
               ) : (
                 "—"
               )}
             </td>
             <td className="px-3 py-3 align-top">
-              <OutreachSpintaxButton
-                placeId={b.place_id}
-                userId={userId}
-                businessName={b.name}
-                mainCategory={b.main_category}
-                businessType={b.business_type}
-                eligible={spintaxEligible}
-                leadAudience={spintaxLeadAudience}
-                templates={spintaxTemplates}
-                facebookUrl={resolveFacebookPageUrl(outreachRow)}
-                onContactCountChange={(next) =>
-                  setContactCountForPlace(b.place_id, next)
-                }
-              />
+              {!isPro ? (
+                <ProFeatureLock label="DM Spintax" />
+              ) : (
+                <OutreachSpintaxButton
+                  placeId={b.place_id}
+                  userId={userId}
+                  businessName={b.name}
+                  mainCategory={b.main_category}
+                  businessType={b.business_type}
+                  eligible={spintaxEligible}
+                  leadAudience={spintaxLeadAudience}
+                  templates={spintaxTemplates}
+                  facebookUrl={resolveFacebookPageUrl(outreachRow)}
+                  onContactCountChange={(next) =>
+                    setContactCountForPlace(b.place_id, next)
+                  }
+                />
+              )}
             </td>
             <td className="px-3 py-3">
-              <a
-                href={demoPublicPath(b)}
-                className="text-blue-600 hover:underline dark:text-blue-400"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Demo
-              </a>
+              {!isPro ? (
+                <ProFeatureLock label="Demo" />
+              ) : (
+                <a
+                  href={demoPublicPath(b)}
+                  className="text-blue-600 hover:underline dark:text-blue-400"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Demo
+                </a>
+              )}
             </td>
             <td className="px-3 py-3">
               <StageSelect

@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { listSpintaxTemplates } from "@/app/actions/spintax-templates";
+import { CheckoutSuccessBanner } from "@/components/checkout-success-banner";
+import {
+  CrmExportButton,
+} from "@/components/crm-export-button";
 import { CrmFilters, CrmPagination } from "@/components/crm-filters";
 import { CrmLeadsTableBody } from "@/components/crm-leads-table-body";
 import { CrmLogin } from "@/components/crm-login";
@@ -8,6 +12,11 @@ import { CrmNav } from "@/components/crm-nav";
 import { fetchCrmBusinessRows, fetchCrmFilterOptions } from "@/lib/crm-cohort";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
 import { tryParseCrmSearchParams } from "@/lib/crm-params";
+import {
+  getUserProfile,
+  isPro,
+} from "@/lib/subscription";
+import { syncProForUser } from "@/lib/stripe-subscription";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -62,10 +71,29 @@ export default async function CrmPage({ searchParams }: PageProps) {
   }
 
   const p = parsed.data;
+  let profile = await getUserProfile(user.id);
+  const checkoutSuccess = raw.checkout === "success";
+  const checkoutSessionId =
+    typeof raw.session_id === "string" ? raw.session_id.trim() : undefined;
+
+  if (!isPro(profile) && (checkoutSuccess || profile?.stripe_customer_id)) {
+    await syncProForUser(user.id, {
+      checkoutSessionId:
+        checkoutSuccess && checkoutSessionId ? checkoutSessionId : undefined,
+      stripeCustomerId: profile?.stripe_customer_id,
+      searchRecentCheckout: checkoutSuccess,
+    });
+    profile = await getUserProfile(user.id);
+  }
+
+  const userIsPro = isPro(profile);
+
   const [{ rows, total, error: loadErr }, spintaxResult, filterOptions] =
     await Promise.all([
       fetchCrmBusinessRows(p, user.id),
-      listSpintaxTemplates(),
+      userIsPro
+        ? listSpintaxTemplates()
+        : Promise.resolve({ ok: true as const, templates: [] }),
       fetchCrmFilterOptions(),
     ]);
   const loadError = loadErr;
@@ -74,7 +102,7 @@ export default async function CrmPage({ searchParams }: PageProps) {
   return (
     <div className="mx-auto flex min-h-0 flex-1 flex-col gap-6 p-4 sm:p-6 lg:max-w-[1400px]">
       <header className="space-y-2">
-        <CrmNav active="leads" />
+        <CrmNav active="leads" isPro={userIsPro} />
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
           No-website leads
         </h1>
@@ -85,10 +113,15 @@ export default async function CrmPage({ searchParams }: PageProps) {
         </p>
       </header>
 
+      <CheckoutSuccessBanner show={checkoutSuccess} isPro={userIsPro} />
+
       <CrmFilters
         params={p}
         categories={filterOptions.categories}
         states={filterOptions.states}
+        exportSlot={
+          <CrmExportButton params={p} isPro={userIsPro} />
+        }
       />
 
       {loadError ? (
@@ -99,10 +132,19 @@ export default async function CrmPage({ searchParams }: PageProps) {
           <p className="font-medium">Could not load data</p>
           <p className="mt-1 opacity-90">{loadError}</p>
           <p className="mt-2 text-xs opacity-80">
-            Set <code className="rounded bg-amber-100/80 px-1 dark:bg-amber-900/50">NEXT_PUBLIC_SUPABASE_URL</code>{" "}
+            Set{" "}
+            <code className="rounded bg-amber-100/80 px-1 dark:bg-amber-900/50">
+              NEXT_PUBLIC_SUPABASE_URL
+            </code>{" "}
             and{" "}
-            <code className="rounded bg-amber-100/80 px-1 dark:bg-amber-900/50">SUPABASE_SERVICE_ROLE_KEY</code>{" "}
-            in <code className="rounded bg-amber-100/80 px-1 dark:bg-amber-900/50">.env.local</code>.
+            <code className="rounded bg-amber-100/80 px-1 dark:bg-amber-900/50">
+              SUPABASE_SERVICE_ROLE_KEY
+            </code>{" "}
+            in{" "}
+            <code className="rounded bg-amber-100/80 px-1 dark:bg-amber-900/50">
+              .env.local
+            </code>
+            .
           </p>
         </div>
       ) : (
@@ -131,6 +173,7 @@ export default async function CrmPage({ searchParams }: PageProps) {
                   userId={user.id}
                   webPresence={p.webPresence}
                   spintaxTemplates={spintaxTemplates}
+                  isPro={userIsPro}
                 />
               </tbody>
             </table>

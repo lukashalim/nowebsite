@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { DirectoryBusinessList } from "@/components/directory-business-list";
 import { cityPath, formatLocationLabel } from "@/lib/directory/labels";
+import { directoryCityHeadingLinkClass } from "@/lib/directory/ui-classes";
 import type { DirectoryCityGroup } from "@/lib/directory/types";
 
 interface DirectoryGroupedByCityProps {
@@ -40,7 +41,7 @@ export function DirectoryGroupedByCity({
           <section key={group.citySlug} className="space-y-3">
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
               {isPublished ? (
-                <Link href={href} className="hover:underline">
+                <Link href={href} className={directoryCityHeadingLinkClass}>
                   {heading}
                 </Link>
               ) : (

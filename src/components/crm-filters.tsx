@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
   buildCrmQueryString,
   type CrmSearchParams,
@@ -10,6 +11,7 @@ interface CrmFiltersProps {
   params: CrmSearchParams;
   categories: CrmFilterOption[];
   states: CrmFilterOption[];
+  exportSlot?: ReactNode;
 }
 
 const fieldClass =
@@ -17,9 +19,16 @@ const fieldClass =
 
 const labelClass = "flex shrink-0 flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400";
 
-export function CrmFilters({ params, categories, states }: CrmFiltersProps) {
+export function CrmFilters({
+  params,
+  categories,
+  states,
+  exportSlot,
+}: CrmFiltersProps) {
   return (
-    <section className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-3 dark:border-zinc-800 dark:bg-zinc-900/40">
+    <section
+      className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-3 dark:border-zinc-800 dark:bg-zinc-900/40"
+    >
       <form
         method="get"
         className="flex flex-wrap items-end gap-x-3 gap-y-3"
@@ -156,6 +165,7 @@ export function CrmFilters({ params, categories, states }: CrmFiltersProps) {
         </label>
 
         <div className="ml-auto flex shrink-0 items-center gap-2">
+          {exportSlot}
           <button
             type="submit"
             className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"

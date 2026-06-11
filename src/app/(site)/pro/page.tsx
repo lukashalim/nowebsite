@@ -1,11 +1,17 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import {
   LayoutTemplate,
   MessageSquareText,
   Star,
   Workflow,
 } from "lucide-react";
+import { UpgradeToProButton } from "@/components/upgrade-to-pro-button";
+import { ManageSubscriptionButton } from "@/components/manage-subscription-button";
+import { CRM_BASE_PATH } from "@/lib/crm-path";
 import { absoluteUrl } from "@/lib/site-url";
+import { getUserProfile, isPro } from "@/lib/subscription";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const revalidate = 86400;
 
@@ -43,7 +49,15 @@ const features = [
   },
 ];
 
-export default function ProPage() {
+export default async function ProPage() {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const profile = user ? await getUserProfile(user.id) : null;
+  const userIsPro = isPro(profile);
+
   return (
     <div className="space-y-10">
       <section className="space-y-3">
@@ -51,9 +65,9 @@ export default function ProPage() {
           Pro CRM for web designers & agencies
         </h1>
         <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
-          Everything on the private outreach workspace (formerly ringreadysite.com):
-          filter thousands of no-website leads, log contacts, generate spintax, and
-          ship demo pages — built on the same Supabase dataset as this public directory.
+          Everything on the private outreach workspace: filter thousands of
+          no-website leads, log contacts, generate spintax, and ship demo pages
+          — built on the same Supabase dataset as this public directory.
         </p>
       </section>
 
@@ -74,20 +88,38 @@ export default function ProPage() {
         ))}
       </ul>
 
-      <section className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-6 dark:border-zinc-700 dark:bg-zinc-900/40">
+      <section className="rounded-xl border border-zinc-200 bg-zinc-50 p-6 dark:border-zinc-800 dark:bg-zinc-900/40">
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
           Pricing
         </h2>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          Coming soon. Want early access? Email{" "}
-          <a
-            href="mailto:lukas@nowebsitebusinessleads.com"
-            className="font-medium text-blue-600 hover:underline dark:text-blue-400"
-          >
-            lukas@nowebsitebusinessleads.com
-          </a>{" "}
-          and we&apos;ll notify you when Pro launches.
+        <p className="mt-2 text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+          $27<span className="text-lg font-normal text-zinc-600 dark:text-zinc-400">/month</span>
         </p>
+        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+          CSV export, DM spintax, and demo page links from your pipeline.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          {userIsPro ? (
+            <>
+              <Link
+                href={CRM_BASE_PATH}
+                className="inline-flex items-center justify-center rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              >
+                Open CRM
+              </Link>
+              <ManageSubscriptionButton />
+            </>
+          ) : user ? (
+            <UpgradeToProButton />
+          ) : (
+            <Link
+              href="/sign-in"
+              className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+            >
+              Sign in to upgrade
+            </Link>
+          )}
+        </div>
       </section>
     </div>
   );

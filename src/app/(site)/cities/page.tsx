@@ -3,6 +3,7 @@ import Link from "next/link";
 import { DirectoryLastUpdated } from "@/components/directory-last-updated";
 import { fetchAllDirectoryCities, fetchDirectoryLastUpdatedLabel } from "@/lib/directory/data";
 import { cityPath, formatCityState } from "@/lib/directory/labels";
+import { directoryBreadcrumbLinkClass, directoryRowLinkClass } from "@/lib/directory/ui-classes";
 import { absoluteUrl } from "@/lib/site-url";
 
 export const revalidate = 3600;
@@ -40,7 +41,7 @@ export default async function CitiesIndexPage() {
     <div className="space-y-8">
       <header className="space-y-3">
         <p className="text-sm text-zinc-500">
-          <Link href="/" className="hover:underline">
+          <Link href="/" className={directoryBreadcrumbLinkClass}>
             Home
           </Link>
         </p>
@@ -65,10 +66,7 @@ export default async function CitiesIndexPage() {
         <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {cities.map((c) => (
             <li key={c.citySlug}>
-              <Link
-                href={cityPath(c.citySlug)}
-                className="flex items-center justify-between rounded-lg border border-zinc-200 px-4 py-3 text-sm hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/50"
-              >
+              <Link href={cityPath(c.citySlug)} className={directoryRowLinkClass}>
                 <span className="font-medium text-zinc-900 dark:text-zinc-100">
                   {formatCityState(c.city, c.state)}
                 </span>

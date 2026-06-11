@@ -6,14 +6,19 @@ import {
   ukRegionNameToSlug,
 } from "@/lib/directory/country";
 import {
-  bumpFreshnessIso,
+  type GbIndexBucket,
+  bumpFreshnessIsoFromCandidate,
+  fetchDirectoryGbListingTotal,
+  fetchGbIndexBuckets,
+} from "@/lib/directory/aggregate-queries";
+import { sortCategoriesByPriority } from "@/lib/directory/category-priority";
+import {
   fetchAllNoWebsiteRows,
   groupBusinessesByCity,
   maxFreshnessIso,
   rowToBusiness,
   sortByReviewsDesc,
 } from "@/lib/directory/rows";
-import { sortCategoriesByPriority } from "@/lib/directory/category-priority";
 import {
   categoryMatchesSlug,
   cityNameToSlug,
@@ -83,23 +88,27 @@ function rowRegionName(row: {
 }
 
 export const fetchGbDirectoryIndex = cache(async (): Promise<GbDirectoryIndex> => {
-  const rows = await fetchAllNoWebsiteRows();
+  const buckets = await fetchGbIndexBuckets();
   const cityCounts = new Map<string, DirectoryCityRef>();
   const regionCounts = new Map<string, DirectoryUkRegionRef>();
   const cityCategoryCounts = new Map<string, DirectoryCityCategoryRef>();
   let lastModifiedIso: string | null = null;
 
-  for (const row of rows) {
-    if (parseDirectoryCountry(row.country) !== COUNTRY_GB) continue;
-    const city = row.city?.trim();
-    const state = row.state?.trim();
+  for (const bucket of buckets) {
+    const city = bucket.city;
+    const state = bucket.state;
     if (!city || !state) continue;
 
-    const regionSlug = rowRegionCode(row);
-    const region = rowRegionName(row);
-    if (!regionSlug) continue;
+    const count = bucket.listing_count;
+    const bucketFreshness = bucket.last_modified_at;
+    lastModifiedIso = bumpFreshnessIsoFromCandidate(
+      lastModifiedIso,
+      bucketFreshness,
+    );
 
-    lastModifiedIso = bumpFreshnessIso(lastModifiedIso, row);
+    const regionSlug = rowRegionCode(bucket as GbIndexBucket);
+    const region = rowRegionName(bucket);
+    if (!regionSlug) continue;
 
     const citySlug = cityNameToSlug(city);
     if (!citySlug) continue;
@@ -107,10 +116,10 @@ export const fetchGbDirectoryIndex = cache(async (): Promise<GbDirectoryIndex> =
     const cityKey = gbCityKey(regionSlug, citySlug);
     const existingCity = cityCounts.get(cityKey);
     if (existingCity) {
-      existingCity.listingCount += 1;
-      existingCity.lastModifiedAt = bumpFreshnessIso(
+      existingCity.listingCount += count;
+      existingCity.lastModifiedAt = bumpFreshnessIsoFromCandidate(
         existingCity.lastModifiedAt,
-        row,
+        bucketFreshness,
       );
     } else {
       cityCounts.set(cityKey, {
@@ -120,43 +129,43 @@ export const fetchGbDirectoryIndex = cache(async (): Promise<GbDirectoryIndex> =
         region,
         regionSlug,
         country: COUNTRY_GB,
-        listingCount: 1,
-        lastModifiedAt: bumpFreshnessIso(null, row),
+        listingCount: count,
+        lastModifiedAt: bucketFreshness,
       });
     }
 
     const existingRegion = regionCounts.get(regionSlug);
     if (existingRegion) {
-      existingRegion.listingCount += 1;
-      existingRegion.lastModifiedAt = bumpFreshnessIso(
+      existingRegion.listingCount += count;
+      existingRegion.lastModifiedAt = bumpFreshnessIsoFromCandidate(
         existingRegion.lastModifiedAt,
-        row,
+        bucketFreshness,
       );
     } else {
       regionCounts.set(regionSlug, {
         regionSlug,
         region,
-        listingCount: 1,
-        lastModifiedAt: bumpFreshnessIso(null, row),
+        listingCount: count,
+        lastModifiedAt: bucketFreshness,
       });
     }
 
     const resolved = resolveCategoryForRow(
-      row.main_category,
-      row.business_type,
+      bucket.main_category,
+      bucket.business_type,
     );
     if (resolved) {
       const label = directoryCategoryLabel(
-        row.main_category,
-        row.business_type,
+        bucket.main_category,
+        bucket.business_type,
       );
       const ccKey = `${cityKey}::${resolved.slug}`;
       const existingCc = cityCategoryCounts.get(ccKey);
       if (existingCc) {
-        existingCc.listingCount += 1;
-        existingCc.lastModifiedAt = bumpFreshnessIso(
+        existingCc.listingCount += count;
+        existingCc.lastModifiedAt = bumpFreshnessIsoFromCandidate(
           existingCc.lastModifiedAt,
-          row,
+          bucketFreshness,
         );
       } else {
         cityCategoryCounts.set(ccKey, {
@@ -165,8 +174,8 @@ export const fetchGbDirectoryIndex = cache(async (): Promise<GbDirectoryIndex> =
           city,
           state,
           categoryLabel: label ?? resolved.label,
-          listingCount: 1,
-          lastModifiedAt: bumpFreshnessIso(null, row),
+          listingCount: count,
+          lastModifiedAt: bucketFreshness,
         });
       }
     }
@@ -212,8 +221,7 @@ export async function fetchGbCountryLanding(): Promise<{
   listingCount: number;
   lastUpdatedLabel: string | null;
 }> {
-  const rows = await fetchAllNoWebsiteRows();
-  const gbRows = rows.filter((r) => parseDirectoryCountry(r.country) === COUNTRY_GB);
+  const listingCount = await fetchDirectoryGbListingTotal();
   const { cities, regions, lastModified } = await fetchGbDirectoryIndex();
 
   const byRegion = new Map<string, DirectoryCityRef[]>();
@@ -238,7 +246,7 @@ export async function fetchGbCountryLanding(): Promise<{
     cities,
     regions,
     regionCityGroups,
-    listingCount: gbRows.length,
+    listingCount,
     lastUpdatedLabel: formatLastUpdatedMonthYear(lastModified?.toISOString()),
   };
 }
@@ -402,9 +410,7 @@ export async function fetchUkCities(): Promise<DirectoryCityRef[]> {
 }
 
 export async function fetchGbListingCount(): Promise<number> {
-  const rows = await fetchAllNoWebsiteRows();
-  return rows.filter((r) => parseDirectoryCountry(r.country) === COUNTRY_GB)
-    .length;
+  return fetchDirectoryGbListingTotal();
 }
 
 /** @deprecated Use fetchGbListingCount */

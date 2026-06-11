@@ -6,6 +6,7 @@ import {
   fetchDirectoryLastUpdatedLabel,
 } from "@/lib/directory/data";
 import { statePath } from "@/lib/directory/labels";
+import { directoryBreadcrumbLinkClass, directoryRowLinkClass } from "@/lib/directory/ui-classes";
 import { stateAbbrToDisplayName, stateToAbbr } from "@/lib/directory/slugs";
 import { absoluteUrl } from "@/lib/site-url";
 
@@ -44,7 +45,7 @@ export default async function StatesIndexPage() {
     <div className="space-y-8">
       <header className="space-y-3">
         <p className="text-sm text-zinc-500">
-          <Link href="/" className="hover:underline">
+          <Link href="/" className={directoryBreadcrumbLinkClass}>
             Home
           </Link>
         </p>
@@ -69,10 +70,7 @@ export default async function StatesIndexPage() {
         <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {states.map((s) => (
             <li key={s.stateSlug}>
-              <Link
-                href={statePath(s.stateSlug)}
-                className="flex items-center justify-between rounded-lg border border-zinc-200 px-4 py-3 text-sm hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/50"
-              >
+              <Link href={statePath(s.stateSlug)} className={directoryRowLinkClass}>
                 <span className="font-medium text-zinc-900 dark:text-zinc-100">
                   {stateAbbrToDisplayName(stateToAbbr(s.state) ?? s.state)}
                 </span>

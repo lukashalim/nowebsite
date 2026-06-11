@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { directoryPaginationActiveClass, directoryPaginationLinkClass } from "@/lib/directory/ui-classes";
 import { directoryPaginationItems } from "@/lib/directory/pagination";
 
 interface DirectoryPaginationProps {
@@ -45,7 +46,7 @@ export function DirectoryPagination({
           {page > 1 ? (
             <Link
               href={hrefForPage(page - 1)}
-              className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
+              className={directoryPaginationLinkClass}
               rel="prev"
             >
               Previous
@@ -68,17 +69,11 @@ export function DirectoryPagination({
           ) : (
             <li key={item}>
               {item === page ? (
-                <span
-                  className="rounded-md border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
-                  aria-current="page"
-                >
+                <span className={directoryPaginationActiveClass} aria-current="page">
                   {item}
                 </span>
               ) : (
-                <Link
-                  href={hrefForPage(item)}
-                  className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm tabular-nums hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
-                >
+                <Link href={hrefForPage(item)} className={`${directoryPaginationLinkClass} tabular-nums`}>
                   {item}
                 </Link>
               )}
@@ -89,7 +84,7 @@ export function DirectoryPagination({
           {page < totalPages ? (
             <Link
               href={hrefForPage(page + 1)}
-              className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
+              className={directoryPaginationLinkClass}
               rel="next"
             >
               Next

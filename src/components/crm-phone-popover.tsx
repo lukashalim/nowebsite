@@ -9,6 +9,7 @@ import {
   type SpintaxAudience,
 } from "@/lib/spintax-audience";
 import type { SpintaxTemplate } from "@/lib/spintax-templates";
+import { ProFeatureLock } from "@/components/pro-gate-overlay";
 
 interface CrmPhonePopoverProps {
   phone: string;
@@ -19,6 +20,7 @@ interface CrmPhonePopoverProps {
   businessType: string | null;
   leadAudience: SpintaxAudience;
   templates: SpintaxTemplate[];
+  isPro: boolean;
 }
 
 type SmsFlowState = "idle" | "checking" | "confirm_landline" | "confirm_unverified";
@@ -52,6 +54,7 @@ export function CrmPhonePopover({
   businessType,
   leadAudience,
   templates,
+  isPro,
 }: CrmPhonePopoverProps) {
   const [open, setOpen] = useState(false);
   const [selectedId, setSelectedId] = useState("");
@@ -215,7 +218,9 @@ export function CrmPhonePopover({
               <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                 SMS
               </p>
-              {matchingTemplates.length === 0 ? (
+              {!isPro ? (
+                <ProFeatureLock label="SMS Spintax" />
+              ) : matchingTemplates.length === 0 ? (
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
                   No SMS templates match this lead type.
                 </p>

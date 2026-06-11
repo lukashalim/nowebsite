@@ -9,7 +9,7 @@ import {
   fetchAllPublishedCategoryLinks,
   fetchDirectoryLastUpdatedLabel,
   fetchDirectorySummary,
-  fetchFacebookDirectoryPageData,
+  fetchFacebookDirectoryListingTotal,
   fetchTopStates,
   fetchUkListingCount,
 } from "@/lib/directory/data";
@@ -19,6 +19,10 @@ import {
   DIRECTORY_MIN_STATE_LISTINGS,
 } from "@/lib/directory/types";
 import { absoluteUrl } from "@/lib/site-url";
+import {
+  directoryCardLinkClass,
+  directoryOutlineButtonClass,
+} from "@/lib/directory/ui-classes";
 
 const SIGN_IN_PATH = "/sign-in";
 
@@ -93,7 +97,7 @@ export default async function HomePage() {
         fetchDirectorySummary(),
         fetchAllPublishedCategoryLinks(),
         fetchTopStates(HOME_TOP_STATES),
-        fetchFacebookDirectoryPageData().then((d) => d.totalCount),
+        fetchFacebookDirectoryListingTotal(),
         fetchUkListingCount(),
       ]);
   } catch (e) {
@@ -217,10 +221,7 @@ export default async function HomePage() {
               <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {topCategories.map((cat) => (
                   <li key={cat.categorySlug}>
-                    <Link
-                      href={cat.href}
-                      className="flex items-start gap-3 rounded-lg border border-zinc-200 p-4 transition-colors hover:border-accent hover:bg-accent-muted/50 dark:border-zinc-800 dark:hover:border-amber-600/50 dark:hover:bg-amber-950/20"
-                    >
+                    <Link href={cat.href} className={directoryCardLinkClass}>
                       <CategoryIcon
                         categoryLabel={cat.categoryLabel}
                         className="mt-0.5 size-5 shrink-0 text-zinc-500"
@@ -240,10 +241,7 @@ export default async function HomePage() {
             )}
             {totalCategoryCount > 0 ? (
               <div className="flex justify-center pt-2">
-                <Link
-                  href="/categories"
-                  className="inline-flex rounded-md border border-accent bg-transparent px-5 py-2.5 text-sm font-semibold text-accent transition-colors hover:bg-accent-muted dark:hover:bg-amber-950/30"
-                >
+                <Link href="/categories" className={directoryOutlineButtonClass}>
                   Browse All {totalCategoryCount.toLocaleString()} Categories →
                 </Link>
               </div>

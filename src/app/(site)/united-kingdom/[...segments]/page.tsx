@@ -19,6 +19,11 @@ import { resolveGbPath } from "@/lib/directory/resolve-gb-path";
 import { categoryPath } from "@/lib/directory/labels";
 import { absoluteUrl } from "@/lib/site-url";
 import { gbCityPath, gbRegionPath } from "@/lib/directory/paths";
+import {
+  directoryBreadcrumbLinkClass,
+  directoryRowLinkStaticClass,
+  directoryRowLinkWithGapClass,
+} from "@/lib/directory/ui-classes";
 
 export const revalidate = 3600;
 export const dynamicParams = true;
@@ -137,15 +142,15 @@ export default async function UnitedKingdomNestedPage({ params }: PageProps) {
       <div className="space-y-8">
         <header className="space-y-3">
           <p className="text-sm text-zinc-500">
-            <Link href="/" className="hover:underline">
+            <Link href="/" className={directoryBreadcrumbLinkClass}>
               Home
             </Link>
             <span aria-hidden> / </span>
-            <Link href={gbCountryPath()} className="hover:underline">
+            <Link href={gbCountryPath()} className={directoryBreadcrumbLinkClass}>
               United Kingdom
             </Link>
             <span aria-hidden> / </span>
-            <Link href={gbRegionPath(regionSlug)} className="hover:underline">
+            <Link href={gbRegionPath(regionSlug)} className={directoryBreadcrumbLinkClass}>
               {hub.region}
             </Link>
             <span aria-hidden> / </span>
@@ -176,8 +181,6 @@ export default async function UnitedKingdomNestedPage({ params }: PageProps) {
             <ul className="grid gap-2 sm:grid-cols-2">
               {hub.categories.map((cat) => {
                 const hasNationwidePage = publishedSlugs.has(cat.categorySlug);
-                const rowClass =
-                  "flex items-center gap-3 rounded-lg border border-zinc-200 px-4 py-3 text-sm dark:border-zinc-800";
                 const inner = (
                   <>
                     <CategoryIcon
@@ -204,12 +207,12 @@ export default async function UnitedKingdomNestedPage({ params }: PageProps) {
                     {hasNationwidePage ? (
                       <Link
                         href={categoryPath(cat.categorySlug)}
-                        className={`${rowClass} hover:bg-zinc-50 dark:hover:bg-zinc-900/50`}
+                        className={directoryRowLinkWithGapClass}
                       >
                         {inner}
                       </Link>
                     ) : (
-                      <div className={rowClass}>{inner}</div>
+                      <div className={directoryRowLinkStaticClass}>{inner}</div>
                     )}
                   </li>
                 );
