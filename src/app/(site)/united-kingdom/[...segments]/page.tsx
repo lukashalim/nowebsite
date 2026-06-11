@@ -76,12 +76,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   if (resolved.kind === "city") {
-    const { hub } = resolved;
+    const { hub, businesses } = resolved;
     const title = cityHubTitle(hub.city, hub.state, COUNTRY_GB, hub.region);
     const description = cityHubMetaDescription(
       hub.city,
       hub.state,
-      hub.listingCount,
+      businesses.length,
       hub.lastUpdatedLabel,
       COUNTRY_GB,
       hub.region,
@@ -169,7 +169,7 @@ export default async function UnitedKingdomNestedPage({ params }: PageProps) {
             {title}
           </h1>
           <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
-            {hub.listingCount.toLocaleString()} local businesses in{" "}
+            {businesses.length.toLocaleString()} local businesses in{" "}
             {formatLocationLabel(hub.city, hub.state, COUNTRY_GB, hub.region)}{" "}
             without a standalone website — phone numbers, ratings, and Google Maps
             links for outreach.

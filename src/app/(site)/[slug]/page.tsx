@@ -110,7 +110,7 @@ export async function generateMetadata({
     const description = cityHubMetaDescription(
       hub.city,
       hub.state,
-      cityData.totalCount,
+      cityData.unfilteredCount,
       hub.lastUpdatedLabel,
       hub.country,
     );
@@ -251,7 +251,7 @@ export default async function SlugDirectoryPage({
             {title}
           </h1>
           <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
-            {hub.listingCount.toLocaleString()} local businesses in {hub.city} without
+            {cityData.unfilteredCount.toLocaleString()} local businesses in {hub.city} without
             a standalone website — phone numbers, ratings, and Google Maps links for
             outreach. Browse by category when available, or see every listing below.
           </p>

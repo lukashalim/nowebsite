@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Lock } from "lucide-react";
+import { Download, Lock, Mail } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DirectoryBusinessPublic } from "@/lib/directory/contact-fields";
@@ -17,6 +17,9 @@ import { FREE_MONTHLY_DIRECTORY_CSV_LIMIT } from "@/lib/directory-csv-limits";
 
 const SESSION_EMAIL_KEY = "csv_download_email";
 const TOAST_DURATION_MS = 4000;
+const CONFIRMATION_POLL_MS = 5000;
+
+type DialogStep = "email_entry" | "awaiting_confirmation";
 
 interface DownloadCsvButtonProps {
   businesses: DirectoryBusinessPublic[];
@@ -38,6 +41,7 @@ interface CsvDownloadStatusResponse {
   used?: number;
   remaining?: number;
   limit?: number;
+  emailConfirmed?: boolean;
 }
 
 interface CsvDownloadSuccessResponse {
@@ -89,13 +93,17 @@ export function DownloadCsvButton({
   businesses,
   contactAccess,
   pagePath,
-  label = "Export Page to CSV",
+  label = "Download CSV",
   className,
 }: DownloadCsvButtonProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const limitDialogRef = useRef<HTMLDialogElement>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const submittingRef = useRef(false);
   const [email, setEmail] = useState("");
+  const [pendingEmail, setPendingEmail] = useState("");
+  const [dialogStep, setDialogStep] = useState<DialogStep>("email_entry");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [isPro, setIsPro] = useState(false);
@@ -106,10 +114,18 @@ export function DownloadCsvButton({
 
   const limitReached = statusLoaded && !isPro && remaining === 0;
 
+  const stopPolling = useCallback(() => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  }, []);
+
   const showLimitDialog = useCallback(() => {
+    stopPolling();
     dialogRef.current?.close();
     limitDialogRef.current?.showModal();
-  }, []);
+  }, [stopPolling]);
 
   const showLastPageToast = useCallback(() => {
     if (toastTimerRef.current) {
@@ -121,6 +137,21 @@ export function DownloadCsvButton({
       toastTimerRef.current = null;
     }, TOAST_DURATION_MS);
   }, []);
+
+  const fetchEmailStatus = useCallback(
+    async (checkEmail: string): Promise<CsvDownloadStatusResponse | null> => {
+      try {
+        const response = await fetch(
+          `/api/csv-download?email=${encodeURIComponent(checkEmail)}`,
+        );
+        if (!response.ok) return null;
+        return (await response.json()) as CsvDownloadStatusResponse;
+      } catch {
+        return null;
+      }
+    },
+    [],
+  );
 
   const refreshStatus = useCallback(async (sessionEmail?: string | null) => {
     const emailParam = sessionEmail ?? getSessionEmail();
@@ -154,8 +185,9 @@ export function DownloadCsvButton({
       if (toastTimerRef.current) {
         clearTimeout(toastTimerRef.current);
       }
+      stopPolling();
     };
-  }, [refreshStatus]);
+  }, [refreshStatus, stopPolling]);
 
   const downloadPageCsv = useCallback(async () => {
     const contacts = await fetchDirectoryContacts(contactAccess);
@@ -167,6 +199,8 @@ export function DownloadCsvButton({
 
   const submitDownload = useCallback(
     async (submittedEmail: string) => {
+      if (submittingRef.current) return;
+      submittingRef.current = true;
       setPending(true);
       setError(null);
 
@@ -192,12 +226,21 @@ export function DownloadCsvButton({
             showLimitDialog();
             return;
           }
+          if (data?.code === "email_confirmation_required") {
+            setSessionEmail(submittedEmail);
+            setPendingEmail(submittedEmail);
+            setDialogStep("awaiting_confirmation");
+            dialogRef.current?.showModal();
+            return;
+          }
           setError(data?.error ?? "Something went wrong. Please try again.");
           return;
         }
 
         const data = (await response.json()) as CsvDownloadSuccessResponse;
         setSessionEmail(submittedEmail);
+        stopPolling();
+        setDialogStep("email_entry");
         dialogRef.current?.close();
 
         if (data.remaining !== null && data.limit !== null) {
@@ -213,13 +256,48 @@ export function DownloadCsvButton({
       } catch {
         setError("Network error. Please try again.");
       } finally {
+        submittingRef.current = false;
         setPending(false);
       }
     },
-    [pagePath, downloadPageCsv, showLimitDialog, showLastPageToast, refreshStatus],
+    [
+      pagePath,
+      downloadPageCsv,
+      showLimitDialog,
+      showLastPageToast,
+      refreshStatus,
+      stopPolling,
+    ],
   );
 
-  const handleClick = useCallback(() => {
+  const checkConfirmationAndPoll = useCallback(
+    async (checkEmail: string) => {
+      if (submittingRef.current || pending) return;
+      const data = await fetchEmailStatus(checkEmail);
+      if (!data) return;
+      if (data.emailConfirmed) {
+        void submitDownload(checkEmail);
+      }
+    },
+    [fetchEmailStatus, submitDownload, pending],
+  );
+
+  useEffect(() => {
+    if (dialogStep !== "awaiting_confirmation" || !pendingEmail) {
+      stopPolling();
+      return;
+    }
+
+    void checkConfirmationAndPoll(pendingEmail);
+
+    pollIntervalRef.current = setInterval(() => {
+      void checkConfirmationAndPoll(pendingEmail);
+    }, CONFIRMATION_POLL_MS);
+
+    return stopPolling;
+  }, [dialogStep, pendingEmail, checkConfirmationAndPoll, stopPolling]);
+
+  const handleClick = useCallback(async () => {
     if (pending || businesses.length === 0) return;
 
     if (limitReached) {
@@ -229,13 +307,34 @@ export function DownloadCsvButton({
 
     const savedEmail = getSessionEmail();
     if (savedEmail) {
+      if (!isPro) {
+        const data = await fetchEmailStatus(savedEmail);
+        if (data?.emailConfirmed === false) {
+          setPendingEmail(savedEmail);
+          setDialogStep("awaiting_confirmation");
+          setError(null);
+          dialogRef.current?.showModal();
+          return;
+        }
+      }
       void submitDownload(savedEmail);
       return;
     }
+
     setEmail("");
+    setPendingEmail("");
+    setDialogStep("email_entry");
     setError(null);
     dialogRef.current?.showModal();
-  }, [limitReached, pending, businesses.length, showLimitDialog, submitDownload]);
+  }, [
+    limitReached,
+    pending,
+    businesses.length,
+    showLimitDialog,
+    submitDownload,
+    isPro,
+    fetchEmailStatus,
+  ]);
 
   const buttonClass = className ?? `${directoryOutlineButtonClass} gap-2`;
   const buttonDisabled = pending || businesses.length === 0;
@@ -246,7 +345,7 @@ export function DownloadCsvButton({
       <div className="flex flex-col items-center gap-2 sm:items-start">
         <button
           type="button"
-          onClick={handleClick}
+          onClick={() => void handleClick()}
           aria-disabled={buttonLooksDisabled || undefined}
           className={`${buttonClass}${buttonLooksDisabled ? " cursor-not-allowed opacity-50" : ""}`}
         >
@@ -265,65 +364,118 @@ export function DownloadCsvButton({
         ref={dialogRef}
         className="w-[min(100vw-2rem,28rem)] rounded-xl border border-zinc-200 bg-white p-0 text-zinc-900 shadow-xl backdrop:bg-zinc-950/50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
         onClose={() => {
+          stopPolling();
           setError(null);
           setEmail("");
+          setPendingEmail("");
+          setDialogStep("email_entry");
         }}
       >
-        <form
-          className="flex flex-col gap-3 p-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const trimmed = email.trim();
-            if (!trimmed) {
-              setError("Email is required.");
-              return;
-            }
-            void submitDownload(trimmed);
-          }}
-        >
-          <div>
-            <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-              Export Page to CSV
-            </h2>
-            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-              Enter your email to export this page as CSV. We&apos;ll send
-              occasional updates.
-            </p>
-          </div>
-          <input
-            type="email"
-            required
-            autoComplete="email"
-            disabled={pending}
-            value={email}
-            aria-label="Email address"
-            placeholder="you@example.com"
-            className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          {error ? (
-            <p className="text-xs text-red-600 dark:text-red-400" role="alert">
-              {error}
-            </p>
-          ) : null}
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
+        {dialogStep === "email_entry" ? (
+          <form
+            className="flex flex-col gap-3 p-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const trimmed = email.trim();
+              if (!trimmed) {
+                setError("Email is required.");
+                return;
+              }
+              void submitDownload(trimmed);
+            }}
+          >
+            <div>
+              <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                Export Page to CSV
+              </h2>
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                Enter your email. We&apos;ll send a confirmation link — click
+                it, then your download will start.
+              </p>
+            </div>
+            <input
+              type="email"
+              required
+              autoComplete="email"
               disabled={pending}
-              className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              onClick={() => dialogRef.current?.close()}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={pending}
-              className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-            >
-              {pending ? "Submitting…" : "Export"}
-            </button>
+              value={email}
+              aria-label="Email address"
+              placeholder="you@example.com"
+              className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            {error ? (
+              <p className="text-xs text-red-600 dark:text-red-400" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={pending}
+                className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                onClick={() => dialogRef.current?.close()}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={pending}
+                className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              >
+                {pending ? "Submitting…" : "Continue"}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="flex flex-col gap-3 p-4">
+            <div className="flex flex-col items-center text-center">
+              <Mail
+                className="size-8 text-zinc-400 dark:text-zinc-500"
+                aria-hidden
+              />
+              <h2 className="mt-3 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                Confirm your email
+              </h2>
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                Check your inbox for a confirmation email from us, then click
+                the link. This page will detect when you&apos;re confirmed and
+                start your download automatically.
+              </p>
+              {pendingEmail ? (
+                <p className="mt-2 text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                  {pendingEmail}
+                </p>
+              ) : null}
+            </div>
+            {error ? (
+              <p className="text-xs text-red-600 dark:text-red-400" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={pending}
+                className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                onClick={() => dialogRef.current?.close()}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                onClick={() => {
+                  setError(null);
+                  void submitDownload(pendingEmail);
+                }}
+              >
+                {pending ? "Checking…" : "I've confirmed — try again"}
+              </button>
+            </div>
           </div>
-        </form>
+        )}
       </dialog>
 
       <dialog

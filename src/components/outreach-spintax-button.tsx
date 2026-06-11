@@ -10,6 +10,7 @@ import {
   filterSpintaxTemplatesForLeadChannel,
   type SpintaxAudience,
 } from "@/lib/spintax-audience";
+import type { CrmUsageAction } from "@/lib/crm-limits";
 import type { SpintaxTemplate } from "@/lib/spintax-templates";
 
 interface OutreachSpintaxButtonProps {
@@ -23,7 +24,10 @@ interface OutreachSpintaxButtonProps {
   templates: SpintaxTemplate[];
   facebookUrl?: string | null;
   outreachRemaining: number | null;
-  onOutreachRecorded?: (remaining: number | null) => void;
+  onOutreachRecorded?: (
+    remaining: number | null,
+    action: CrmUsageAction,
+  ) => void;
   onContactCountChange?: (next: number) => void;
 }
 
@@ -123,11 +127,11 @@ export function OutreachSpintaxButton({
     const usage = await recordOutreachUsage("dm", placeId);
     if (!usage.ok) {
       setLimitError(usage.error);
-      onOutreachRecorded?.(usage.remaining);
+      onOutreachRecorded?.(usage.remaining, "dm");
       return false;
     }
 
-    onOutreachRecorded?.(usage.remaining);
+    onOutreachRecorded?.(usage.remaining, "dm");
 
     const message = buildOutreachMessage(template.template, {
       name: businessName,

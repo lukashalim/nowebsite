@@ -1,6 +1,8 @@
 import {
+  EMPTY_CRM_USAGE_BY_ACTION,
   FREE_MONTHLY_OUTREACH_LIMIT,
   type CrmUsageAction,
+  type CrmUsageByAction,
   type CrmUsageSummary,
 } from "@/lib/crm-limits";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
@@ -20,13 +22,30 @@ function nextMonthStartUtc(): string {
   ).toISOString();
 }
 
-export async function getMonthlyUsageCount(userId: string): Promise<number> {
+function countUsageByAction(
+  rows: { action_type: string }[],
+): CrmUsageByAction {
+  const byAction: CrmUsageByAction = { ...EMPTY_CRM_USAGE_BY_ACTION };
+
+  for (const row of rows) {
+    const action = row.action_type;
+    if (action === "dm" || action === "sms" || action === "demo_click") {
+      byAction[action] += 1;
+    }
+  }
+
+  return byAction;
+}
+
+async function fetchMonthlyUsageEvents(
+  userId: string,
+): Promise<{ action_type: string }[]> {
   const supabase = createSupabaseAdmin();
   const monthStart = currentMonthStartUtc();
 
-  const { count, error } = await supabase
+  const { data, error } = await supabase
     .from("crm_usage_events")
-    .select("id", { count: "exact", head: true })
+    .select("action_type")
     .eq("user_id", userId)
     .gte("created_at", monthStart);
 
@@ -34,18 +53,27 @@ export async function getMonthlyUsageCount(userId: string): Promise<number> {
     throw new Error(error.message);
   }
 
-  return count ?? 0;
+  return data ?? [];
+}
+
+export async function getMonthlyUsageCount(userId: string): Promise<number> {
+  const rows = await fetchMonthlyUsageEvents(userId);
+  return rows.length;
 }
 
 export async function getCrmUsageSummary(
   userId: string,
 ): Promise<CrmUsageSummary> {
-  const used = await getMonthlyUsageCount(userId);
+  const rows = await fetchMonthlyUsageEvents(userId);
+  const byAction = countUsageByAction(rows);
+  const used = byAction.dm + byAction.sms + byAction.demo_click;
+
   return {
     used,
     remaining: Math.max(0, FREE_MONTHLY_OUTREACH_LIMIT - used),
     limit: FREE_MONTHLY_OUTREACH_LIMIT,
     periodEnd: nextMonthStartUtc(),
+    byAction,
   };
 }
 

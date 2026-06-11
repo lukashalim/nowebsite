@@ -6,7 +6,7 @@ import {
   getDirectoryCsvDownloadSummary,
   normalizeCsvDownloadEmail,
 } from "@/lib/csv-download-limits";
-import { addContactToList } from "@/lib/sendfox";
+import { addContactToList, isEmailConfirmed } from "@/lib/sendfox";
 import { getAuthenticatedUserProfile, isPro } from "@/lib/subscription";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 
@@ -33,13 +33,17 @@ export async function GET(request: Request) {
   if (rawEmail?.trim()) {
     const normalizedEmail = normalizeCsvDownloadEmail(rawEmail);
     try {
-      const summary = await getDirectoryCsvDownloadSummary(normalizedEmail);
+      const [summary, emailConfirmed] = await Promise.all([
+        getDirectoryCsvDownloadSummary(normalizedEmail),
+        isEmailConfirmed(normalizedEmail),
+      ]);
       return NextResponse.json({
         isPro: false,
         used: summary.used,
         remaining: summary.remaining,
         limit: summary.limit,
         periodEnd: summary.periodEnd,
+        emailConfirmed,
       });
     } catch (err) {
       const message =
@@ -130,6 +134,24 @@ export async function POST(request: Request) {
     const message =
       err instanceof Error ? err.message : "Failed to subscribe email";
     return NextResponse.json({ error: message }, { status: 502 });
+  }
+
+  if (!userIsPro) {
+    let confirmed: boolean;
+    try {
+      confirmed = await isEmailConfirmed(email);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Could not verify email confirmation";
+      return NextResponse.json({ error: message }, { status: 502 });
+    }
+
+    if (!confirmed) {
+      return NextResponse.json(
+        { code: "email_confirmation_required", confirmed: false },
+        { status: 403 },
+      );
+    }
   }
 
   try {

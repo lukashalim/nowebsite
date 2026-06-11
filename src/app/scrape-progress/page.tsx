@@ -286,6 +286,13 @@ export default async function ScrapeProgressPage({ searchParams }: PageProps) {
               >
                 Local scrape admin
               </Link>
+              {" · "}
+              <Link
+                href="/admin/usage"
+                className="text-zinc-700 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+              >
+                Usage by user type
+              </Link>
             </>
           ) : null}
           {" · "}

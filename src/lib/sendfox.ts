@@ -1,5 +1,15 @@
 const SENDFOX_API_BASE = "https://api.sendfox.com";
 
+export interface SendFoxContact {
+  id: number;
+  email: string;
+  confirmed_at: string | null;
+}
+
+interface SendFoxContactsResponse {
+  data?: SendFoxContact[];
+}
+
 function getSendFoxToken(): string {
   const token =
     process.env.SENDFOX_PERSIONAL_ACCESS_TOKEN ??
@@ -58,6 +68,54 @@ export async function addContactToList(email: string): Promise<void> {
   }
 
   throw new Error(body?.message ?? "Failed to subscribe email");
+}
+
+export async function getContactByEmail(
+  email: string,
+): Promise<SendFoxContact | null> {
+  const token = getSendFoxToken();
+  const url = new URL(`${SENDFOX_API_BASE}/contacts`);
+  url.searchParams.set("email", email);
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    throw new Error("SendFox authentication failed");
+  }
+
+  if (response.status >= 500) {
+    throw new Error("SendFox service unavailable");
+  }
+
+  if (!response.ok) {
+    throw new Error("Failed to look up contact");
+  }
+
+  const body = (await response.json()) as SendFoxContact | SendFoxContactsResponse;
+
+  if ("data" in body && Array.isArray(body.data)) {
+    return body.data[0] ?? null;
+  }
+
+  if ("id" in body && typeof body.id === "number") {
+    return body as SendFoxContact;
+  }
+
+  return null;
+}
+
+export async function isEmailConfirmed(email: string): Promise<boolean> {
+  const contact = await getContactByEmail(email);
+  return contact?.confirmed_at != null;
 }
 
 export async function addContactToListBestEffort(email: string): Promise<void> {

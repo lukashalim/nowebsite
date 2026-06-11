@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { listSpintaxTemplates } from "@/app/actions/spintax-templates";
 import { CrmLogin } from "@/components/crm-login";
 import { CrmNav } from "@/components/crm-nav";
+import { CrmUsageBanner } from "@/components/crm-usage-banner";
 import { SpintaxTemplateEditor } from "@/components/spintax-template-editor";
+import { getCrmUsageSummary } from "@/lib/crm-usage";
 import { getUserProfile, isPro } from "@/lib/subscription";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -27,6 +29,7 @@ export default async function CrmSpintaxPage() {
 
   const profile = await getUserProfile(user.id);
   const userIsPro = isPro(profile);
+  const usageSummary = userIsPro ? null : await getCrmUsageSummary(user.id);
   const result = await listSpintaxTemplates();
 
   return (
@@ -41,6 +44,8 @@ export default async function CrmSpintaxPage() {
           {"{a|b|c}"} for variations and [Name] / [category] for lead tokens.
         </p>
       </header>
+
+      {usageSummary ? <CrmUsageBanner usage={usageSummary} /> : null}
 
       {!result.ok ? (
         <div

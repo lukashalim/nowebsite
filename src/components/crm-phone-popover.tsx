@@ -10,6 +10,7 @@ import {
   filterSpintaxTemplatesForLeadChannel,
   type SpintaxAudience,
 } from "@/lib/spintax-audience";
+import type { CrmUsageAction } from "@/lib/crm-limits";
 import type { SpintaxTemplate } from "@/lib/spintax-templates";
 
 interface CrmPhonePopoverProps {
@@ -23,7 +24,10 @@ interface CrmPhonePopoverProps {
   leadAudience: SpintaxAudience;
   templates: SpintaxTemplate[];
   outreachRemaining: number | null;
-  onOutreachRecorded?: (remaining: number | null) => void;
+  onOutreachRecorded?: (
+    remaining: number | null,
+    action: CrmUsageAction,
+  ) => void;
 }
 
 type SmsFlowState = "idle" | "checking" | "confirm_landline" | "confirm_unverified";
@@ -124,10 +128,10 @@ export function CrmPhonePopover({
     const usage = await recordOutreachUsage("sms", placeId);
     if (!usage.ok) {
       setLimitError(usage.error);
-      onOutreachRecorded?.(usage.remaining);
+      onOutreachRecorded?.(usage.remaining, "sms");
       return false;
     }
-    onOutreachRecorded?.(usage.remaining);
+    onOutreachRecorded?.(usage.remaining, "sms");
     setLimitError(null);
     return true;
   }

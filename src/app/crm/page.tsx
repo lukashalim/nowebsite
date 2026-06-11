@@ -2,22 +2,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { listSpintaxTemplates } from "@/app/actions/spintax-templates";
 import { CheckoutSuccessBanner } from "@/components/checkout-success-banner";
-import {
-  CrmExportButton,
-} from "@/components/crm-export-button";
-import { CrmFilters, CrmPagination } from "@/components/crm-filters";
-import { CrmLeadsTableBody } from "@/components/crm-leads-table-body";
+import { CrmExportButton } from "@/components/crm-export-button";
+import { CrmFilters } from "@/components/crm-filters";
+import { CrmFreeUsageLayout } from "@/components/crm-free-usage-layout";
+import { CrmLeadsTableShell } from "@/components/crm-leads-table-shell";
+import { CrmLoadError } from "@/components/crm-load-error";
 import { CrmLogin } from "@/components/crm-login";
 import { CrmNav } from "@/components/crm-nav";
-import { CrmUsageBanner } from "@/components/crm-usage-banner";
 import { fetchCrmBusinessRows, fetchCrmFilterOptions } from "@/lib/crm-cohort";
 import { getCrmUsageSummary } from "@/lib/crm-usage";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
 import { tryParseCrmSearchParams } from "@/lib/crm-params";
-import {
-  getUserProfile,
-  isPro,
-} from "@/lib/subscription";
+import { getUserProfile, isPro } from "@/lib/subscription";
 import { syncProForUser } from "@/lib/stripe-subscription";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -103,6 +99,33 @@ export default async function CrmPage({ searchParams }: PageProps) {
   const loadError = loadErr;
   const spintaxTemplates = spintaxResult.ok ? spintaxResult.templates : [];
 
+  const filters = (
+    <CrmFilters
+      params={p}
+      categories={filterOptions.categories}
+      states={filterOptions.states}
+      exportSlot={<CrmExportButton params={p} isPro={userIsPro} />}
+    />
+  );
+
+  const tableShell = (onOutreachRecorded?: Parameters<
+    Parameters<typeof CrmFreeUsageLayout>[0]["children"]
+  >[0]) =>
+    loadError ? (
+      <CrmLoadError message={loadError} />
+    ) : (
+      <CrmLeadsTableShell
+        rows={rows}
+        userId={user.id}
+        params={p}
+        total={total}
+        spintaxTemplates={spintaxTemplates}
+        isPro={userIsPro}
+        initialOutreachRemaining={usageSummary?.remaining ?? null}
+        onOutreachRecorded={onOutreachRecorded}
+      />
+    );
+
   return (
     <div className="mx-auto flex min-h-0 flex-1 flex-col gap-6 p-4 sm:p-6 lg:max-w-[1400px]">
       <header className="space-y-2">
@@ -120,80 +143,21 @@ export default async function CrmPage({ searchParams }: PageProps) {
       <CheckoutSuccessBanner show={checkoutSuccess} isPro={userIsPro} />
 
       {usageSummary ? (
-        <CrmUsageBanner
-          usage={usageSummary}
+        <CrmFreeUsageLayout
+          initialUsage={usageSummary}
           limitReached={outreachLimitReached}
-        />
-      ) : null}
-
-      <CrmFilters
-        params={p}
-        categories={filterOptions.categories}
-        states={filterOptions.states}
-        exportSlot={
-          <CrmExportButton params={p} isPro={userIsPro} />
-        }
-      />
-
-      {loadError ? (
-        <div
-          className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
-          role="alert"
         >
-          <p className="font-medium">Could not load data</p>
-          <p className="mt-1 opacity-90">{loadError}</p>
-          <p className="mt-2 text-xs opacity-80">
-            Set{" "}
-            <code className="rounded bg-amber-100/80 px-1 dark:bg-amber-900/50">
-              NEXT_PUBLIC_SUPABASE_URL
-            </code>{" "}
-            and{" "}
-            <code className="rounded bg-amber-100/80 px-1 dark:bg-amber-900/50">
-              SUPABASE_SERVICE_ROLE_KEY
-            </code>{" "}
-            in{" "}
-            <code className="rounded bg-amber-100/80 px-1 dark:bg-amber-900/50">
-              .env.local
-            </code>
-            .
-          </p>
-        </div>
+          {(onOutreachRecorded) => (
+            <>
+              {filters}
+              {tableShell(onOutreachRecorded)}
+            </>
+          )}
+        </CrmFreeUsageLayout>
       ) : (
         <>
-          <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-            <table className="w-full min-w-[1080px] border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-zinc-200 bg-zinc-50 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-                  <th className="px-3 py-3">Business</th>
-                  <th className="px-3 py-3">Location</th>
-                  <th className="px-3 py-3">Rating</th>
-                  <th className="px-3 py-3">Reviews</th>
-                  <th className="px-3 py-3">Phone</th>
-                  <th className="px-3 py-3">DM Spintax</th>
-                  <th className="px-3 py-3">Demo</th>
-                  <th className="px-3 py-3">Stage</th>
-                  <th className="px-3 py-3">Owner</th>
-                  <th className="px-3 py-3">Notes</th>
-                  <th className="px-3 py-3">Bad Lead</th>
-                  <th className="px-3 py-3">Contacted</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                <CrmLeadsTableBody
-                  rows={rows}
-                  userId={user.id}
-                  webPresence={p.webPresence}
-                  spintaxTemplates={spintaxTemplates}
-                  isPro={userIsPro}
-                  initialOutreachRemaining={
-                    userIsPro ? null : (usageSummary?.remaining ?? 0)
-                  }
-                />
-              </tbody>
-            </table>
-          </div>
-
-          <CrmPagination params={p} total={total} />
+          {filters}
+          {tableShell()}
         </>
       )}
     </div>

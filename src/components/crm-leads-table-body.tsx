@@ -14,7 +14,9 @@ import { NotesCell } from "@/components/notes-cell";
 import { OutreachSpintaxButton } from "@/components/outreach-spintax-button";
 import { OwnerNameInput } from "@/components/owner-name-input";
 import { StageSelect } from "@/components/stage-select";
+import type { CrmOutreachRecordedHandler } from "@/components/crm-free-usage-layout";
 import type { BusinessLead } from "@/lib/business";
+import type { CrmUsageAction } from "@/lib/crm-limits";
 import type { CrmWebPresence } from "@/lib/crm-params";
 import {
   isEligibleForCrmSpintax,
@@ -30,6 +32,7 @@ interface CrmLeadsTableBodyProps {
   spintaxTemplates: SpintaxTemplate[];
   isPro: boolean;
   initialOutreachRemaining: number | null;
+  onOutreachRecorded?: CrmOutreachRecordedHandler;
 }
 
 function initialContactCounts(rows: BusinessLead[]): Record<string, number> {
@@ -45,6 +48,7 @@ export function CrmLeadsTableBody({
   spintaxTemplates,
   isPro,
   initialOutreachRemaining,
+  onOutreachRecorded,
 }: CrmLeadsTableBodyProps) {
   const [contactCounts, setContactCounts] = useState(() =>
     initialContactCounts(rows),
@@ -57,10 +61,14 @@ export function CrmLeadsTableBody({
     setContactCounts((prev) => ({ ...prev, [placeId]: next }));
   }
 
-  function handleOutreachRecorded(remaining: number | null) {
+  function handleOutreachRecorded(
+    remaining: number | null,
+    action: CrmUsageAction,
+  ) {
     if (!isPro && remaining !== null) {
       setOutreachRemaining(remaining);
     }
+    onOutreachRecorded?.(remaining, action);
   }
 
   const outreachBlocked = !isPro && outreachRemaining === 0;
