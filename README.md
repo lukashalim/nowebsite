@@ -43,10 +43,12 @@ public/       # Static assets
 ## Local Development
 
 1. Copy `.env.local.example` to `.env.local` and fill in Supabase credentials.
-2. Optional: add `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` for SMS line-type lookup in the CRM.
-3. Optional: add `TELNYX_API_KEY` for batch phone-type enrichment (see below).
-4. Run SQL migrations in `scrape/sql/` against your Supabase project as needed.
-5. Start the dev server:
+2. Optional: add `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` for platform SMS line-type lookup in the CRM.
+3. Optional: configure **Pro communications** in Settings (`/dashboard/settings`) with your own Twilio Account SID, Auth Token, business phone number, and forwarding number. When saved, CRM call/SMS use your Twilio line; otherwise they fall back to native `tel:` / `sms:` links.
+4. Optional: add `TELNYX_API_KEY` for batch phone-type enrichment (see below).
+5. Set `NEXT_PUBLIC_SITE_URL` in production so Twilio voice webhooks resolve correctly.
+6. Run SQL migrations in `scrape/sql/` against your Supabase project as needed.
+7. Start the dev server:
 
 ```bash
 npm install

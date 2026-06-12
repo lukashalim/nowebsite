@@ -1,9 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { USERNAME_PATTERN } from "@/lib/profile-username";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-const USERNAME_PATTERN = /^[a-z0-9][a-z0-9_-]{2,31}$/;
 
 function isValidPaymentLink(value: string): boolean {
   try {

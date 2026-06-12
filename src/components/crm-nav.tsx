@@ -7,7 +7,7 @@ import { shouldShowLocalDevTools } from "@/lib/dev-host";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
 
 interface CrmNavProps {
-  active?: "leads" | "spintax";
+  active?: "leads" | "spintax" | "settings";
   isPro?: boolean;
 }
 
@@ -38,14 +38,14 @@ export async function CrmNav({ active, isPro = false }: CrmNavProps) {
         Home
       </Link>
       <BreadcrumbSeparator />
-      {active === "spintax" ? (
-        <Link href={CRM_BASE_PATH} className={breadcrumbLinkClass}>
-          Leads
-        </Link>
-      ) : (
+      {active === "leads" ? (
         <span className={breadcrumbActiveClass} aria-current="page">
           Leads
         </span>
+      ) : (
+        <Link href={CRM_BASE_PATH} className={breadcrumbLinkClass}>
+          Leads
+        </Link>
       )}
       <BreadcrumbSeparator />
       {active === "spintax" ? (
@@ -61,9 +61,15 @@ export async function CrmNav({ active, isPro = false }: CrmNavProps) {
         </Link>
       )}
       <BreadcrumbSeparator />
-      <Link href="/dashboard/settings" className={breadcrumbLinkClass}>
-        Settings
-      </Link>
+      {active === "settings" ? (
+        <span className={breadcrumbActiveClass} aria-current="page">
+          Settings
+        </span>
+      ) : (
+        <Link href="/dashboard/settings" className={breadcrumbLinkClass}>
+          Settings
+        </Link>
+      )}
       {showScrapeQueue ? (
         <>
           <BreadcrumbSeparator />

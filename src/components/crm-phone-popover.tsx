@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { MessageSquare, Phone } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { recordOutreachUsage } from "@/app/actions/crm-usage";
+import {
+  initiateOutboundCall,
+  sendOutboundSMS,
+} from "@/lib/actions/outreach";
 import { buildOutreachMessage } from "@/lib/outreach-spintax";
 import { normalizePhoneE164, type PhoneCountry } from "@/lib/phone-lookup";
 import {
@@ -70,6 +73,7 @@ export function CrmPhonePopover({
   const [smsFlowState, setSmsFlowState] = useState<SmsFlowState>("idle");
   const [pendingSms, setPendingSms] = useState<PendingSms | null>(null);
   const [limitError, setLimitError] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const outreachBlocked = outreachRemaining === 0;
@@ -124,22 +128,37 @@ export function CrmPhonePopover({
   const selectedTemplate =
     matchingTemplates.find((t) => t.id === selectedId) ?? matchingTemplates[0];
 
-  async function recordSmsUsage(): Promise<boolean> {
-    const usage = await recordOutreachUsage("sms", placeId);
-    if (!usage.ok) {
-      setLimitError(usage.error);
-      onOutreachRecorded?.(usage.remaining, "sms");
-      return false;
-    }
-    onOutreachRecorded?.(usage.remaining, "sms");
-    setLimitError(null);
-    return true;
-  }
+  useEffect(() => {
+    if (!toastMessage) return;
+    const timer = window.setTimeout(() => setToastMessage(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [toastMessage]);
 
   async function openSmsLink(pending: PendingSms) {
-    const ok = await recordSmsUsage();
-    if (!ok) return;
-    window.location.href = `sms:${pending.e164}?body=${encodeURIComponent(pending.message)}`;
+    const result = await sendOutboundSMS(
+      userId,
+      pending.e164,
+      pending.message,
+      placeId,
+    );
+
+    if (result.type === "ERROR") {
+      setLimitError(result.error);
+      if (typeof result.remaining === "number") {
+        onOutreachRecorded?.(result.remaining, "sms");
+      }
+      return;
+    }
+
+    onOutreachRecorded?.(result.remaining, "sms");
+    setLimitError(null);
+
+    if (result.type === "FALLBACK") {
+      window.location.href = `sms:${result.e164}?body=${encodeURIComponent(result.message)}`;
+    } else {
+      setToastMessage("SMS sent via business line");
+    }
+
     setOpen(false);
     setSmsFlowState("idle");
     setPendingSms(null);
@@ -217,6 +236,29 @@ export function CrmPhonePopover({
     void openSmsLink(pendingSms);
   }
 
+  async function handleCall() {
+    if (!smsPhoneE164) {
+      window.location.href = telHref;
+      setOpen(false);
+      return;
+    }
+
+    const result = await initiateOutboundCall(userId, smsPhoneE164);
+
+    if (result.type === "ERROR") {
+      setLimitError(result.error);
+      return;
+    }
+
+    if (result.type === "FALLBACK") {
+      window.location.href = telHref;
+    } else {
+      setToastMessage("Connecting via business line...");
+    }
+
+    setOpen(false);
+  }
+
   return (
     <div ref={containerRef} className="relative inline-block">
       <button
@@ -237,14 +279,14 @@ export function CrmPhonePopover({
           className="absolute left-0 top-full z-50 mt-1 w-72 rounded-lg border border-zinc-200 bg-white p-3 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
         >
           <div className="space-y-3">
-            <a
-              href={telHref}
-              onClick={() => setOpen(false)}
+            <button
+              type="button"
+              onClick={() => void handleCall()}
               className="flex w-full items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
             >
               <Phone className="size-4 shrink-0" aria-hidden />
               Call
-            </a>
+            </button>
 
             <div className="space-y-2 border-t border-zinc-100 pt-3 dark:border-zinc-800">
               <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
@@ -343,6 +385,16 @@ export function CrmPhonePopover({
               )}
             </div>
           </div>
+        </div>
+      ) : null}
+
+      {toastMessage ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white shadow-lg dark:bg-zinc-100 dark:text-zinc-900"
+        >
+          {toastMessage}
         </div>
       ) : null}
     </div>

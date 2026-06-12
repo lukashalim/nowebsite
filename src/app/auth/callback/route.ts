@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
 import { getRequestOrigin } from "@/lib/auth-redirect";
+import { ensureProfileUsername } from "@/lib/profile-username";
 import { syncSendFoxProfileForUser } from "@/lib/sendfox-profile-sync";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/route-handler";
 
@@ -34,9 +35,10 @@ export async function GET(request: Request) {
         data: { user },
       } = await supabase.auth.getUser();
       if (user?.email) {
-        await syncSendFoxProfileForUser(user.id, user.email).catch(() => {
-          // Non-blocking: sign-in must succeed even if SendFox or profile sync fails.
-        });
+        await Promise.all([
+          ensureProfileUsername(user.id, user.email).catch(() => null),
+          syncSendFoxProfileForUser(user.id, user.email).catch(() => null),
+        ]);
       }
 
       const response = NextResponse.redirect(`${redirectOrigin}${next}`);

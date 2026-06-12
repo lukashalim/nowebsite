@@ -1,0 +1,65 @@
+---
+description: Hybrid Twilio/standard outreach architecture for multi-tenant CRM call and SMS
+globs:
+  - src/lib/actions/outreach.ts
+  - src/lib/actions/twilio-settings.ts
+  - src/lib/twilio-credentials.ts
+  - src/components/crm-phone-popover.tsx
+  - src/components/twilio-settings-form.tsx
+  - src/app/dashboard/settings/**
+  - src/app/api/twilio/**
+---
+
+# Twilio Hybrid Outreach Architecture
+
+Multi-tenant CRM with hybrid Call and SMS: standard device deeplinks by default, optional Pro Twilio path when the user configures credentials.
+
+## 1. Configuration UI
+
+**Location:** `/dashboard/settings` → [`TwilioSettingsForm`](src/components/twilio-settings-form.tsx)
+
+Users input:
+- `twilio_account_sid`
+- `twilio_auth_token` (never returned to client after save)
+- `twilio_phone_number` (E.164, caller ID / SMS From)
+- `forwarding_number` (E.164, rings first on outbound calls)
+
+**Save:** [`updateTwilioSettings`](src/lib/actions/twilio-settings.ts) validates credentials with Twilio API before persisting to `profiles`.
+
+**Pro framing:** BYOT for all signed-in users. "Pro communications" is UX branding when credentials are active — not gated behind `is_pro` subscription.
+
+## 2. Service Layer
+
+[`src/lib/actions/outreach.ts`](src/lib/actions/outreach.ts):
+
+### `initiateOutboundCall(userId, targetPhoneNumber)`
+1. Fetch creds via `getUserTwilioCredentials(userId)`.
+2. **If creds exist:** Twilio Voice bridge via `/api/twilio/voice-handler` → `{ type: "TWILIO" }`.
+3. **Else:** `{ type: "FALLBACK" }`.
+
+### `sendOutboundSMS(userId, targetPhoneNumber, messageBody, placeId)`
+1. Fetch creds from profile.
+2. **If creds exist:** Twilio Messages API → `{ type: "TWILIO" }`.
+3. **Else:** `sendStandardSMS` → `{ type: "FALLBACK", e164, message }`.
+
+Both paths record SMS usage for free-tier limits.
+
+## 3. UI Component Logic
+
+[`CrmPhonePopover`](src/components/crm-phone-popover.tsx):
+
+- **Call:** On click, call `initiateOutboundCall`. If `FALLBACK`, `window.location.href = tel:...`. Else toast "Connecting via business line...".
+- **SMS:** Call `sendOutboundSMS` after line-type check. Backend chooses Twilio or standard transparently.
+
+## 4. Voice Webhook
+
+[`/api/twilio/voice-handler`](src/app/api/twilio/voice-handler/route.ts): TwiML `<Dial callerId={twilio_phone_number}>{target}</Dial>` after signature validation.
+
+## 5. Platform vs Per-User Twilio
+
+- **Platform** `TWILIO_*` env vars: line-type lookup only (`/api/lookup-phone`).
+- **Per-user** profile creds: outbound call/SMS in CRM.
+
+## Goal
+
+Unified UX in CRM. Users who populate Twilio credentials in Settings automatically gain branded Pro communication without changing their workflow.

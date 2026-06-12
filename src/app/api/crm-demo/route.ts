@@ -3,6 +3,7 @@ import { demoPathSegment, tenantDemoPublicPath } from "@/lib/demo-slug";
 import { recordCrmUsage } from "@/lib/crm-usage";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
 import { DEMO_DETAIL_COLUMNS } from "@/lib/crm-cohort";
+import { ensureProfileUsername } from "@/lib/profile-username";
 import { getUserProfile, isPro } from "@/lib/subscription";
 import { materializeTenantLeadByPlaceId } from "@/lib/tenant-lead-sync";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
@@ -29,11 +30,15 @@ export async function GET(request: Request) {
   }
 
   const profile = await getUserProfile(user.id);
-  const username = profile?.username?.trim();
+  const username =
+    profile?.username?.trim() ||
+    (await ensureProfileUsername(
+      user.id,
+      profile?.email ?? user.email ?? "",
+    ));
   if (!username) {
-    return NextResponse.json(
-      { error: "Set a username on your profile before opening demo links" },
-      { status: 400 },
+    return NextResponse.redirect(
+      new URL("/dashboard/settings?setup=username", request.url),
     );
   }
 
