@@ -59,8 +59,17 @@ import {
   totalDirectoryPages,
 } from "@/lib/directory/pagination";
 import {
+  fetchUsCategoryFacetOptions,
+  fetchUsFacebookFacetOptions,
+  fetchUsStateFacetOptions,
+} from "@/lib/directory/scoped-facets";
+import {
+  fetchScopedListingPage,
+  fetchScopedUnfilteredCount,
+  type DirectoryListingScope,
+} from "@/lib/directory/scoped-listings";
+import {
   bumpFreshnessIso,
-  fetchAllNoWebsiteRows,
   groupBusinessesByCity,
   maxFreshnessIso,
   rowToBusiness,
@@ -71,13 +80,13 @@ import {
   fetchDirectoryRowsForCategorySlug,
   fetchDirectoryRowsForCity,
   fetchDirectoryRowsForStateAbbr,
+  stateValuesForQuery,
 } from "@/lib/directory/scoped-rows";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 
 const BATCH = 1000;
 
 export {
-  fetchAllNoWebsiteRows,
   groupBusinessesByCity,
   rowToBusiness,
 } from "@/lib/directory/rows";
@@ -143,6 +152,76 @@ function countDistinctCitySlugs(businesses: DirectoryBusiness[]): number {
   ).size;
 }
 
+function countCitiesFromFilterOptions(
+  options: DirectoryFilterOptions,
+  filters: DirectoryListingFilters,
+): number {
+  if (filters.stateSlug) {
+    return (options.citiesByStateSlug[filters.stateSlug] ?? []).length;
+  }
+  return Object.values(options.citiesByStateSlug).reduce(
+    (sum, cities) => sum + cities.length,
+    0,
+  );
+}
+
+async function buildDirectoryListingsPageSlice(
+  scope: DirectoryListingScope,
+  loadFilterOptions: () => Promise<DirectoryFilterOptions>,
+  opts: {
+    page?: number;
+    pageSize: number;
+    filters?: DirectoryListingFilters;
+    filterMode?: "full" | "stateFixed" | "reviewsOnly";
+    fixedStateSlug?: string | null;
+  },
+): Promise<DirectoryListingsPageSlice> {
+  const filterOptions = await loadFilterOptions();
+  const filters = sanitizeDirectoryListingFilters(
+    opts.filters ?? DEFAULT_DIRECTORY_LISTING_FILTERS,
+    filterOptions,
+    { mode: opts.filterMode, fixedStateSlug: opts.fixedStateSlug },
+  );
+
+  const [unfilteredCount, provisionalCount] = await Promise.all([
+    fetchScopedUnfilteredCount(scope),
+    fetchScopedListingPage(scope, {
+      page: opts.page ?? 1,
+      pageSize: opts.pageSize,
+      filters,
+      fixedStateSlug: opts.fixedStateSlug,
+    }).then((r) => r.totalCount),
+  ]);
+
+  const totalCount = provisionalCount;
+  const pageSize = opts.pageSize;
+  const totalPages = totalDirectoryPages(totalCount, pageSize);
+  const page = clampDirectoryPage(opts.page ?? 1, totalPages);
+
+  const { rows } = await fetchScopedListingPage(scope, {
+    page,
+    pageSize,
+    filters,
+    fixedStateSlug: opts.fixedStateSlug,
+  });
+
+  const businesses = rows.map(rowToBusiness);
+
+  return {
+    businesses,
+    cityGroups: totalPages > 1 ? [] : groupBusinessesByCity(businesses),
+    cityCount: countCitiesFromFilterOptions(filterOptions, filters),
+    totalCount,
+    unfilteredCount,
+    page,
+    pageSize,
+    totalPages,
+    filters,
+    filterOptions,
+  };
+}
+
+/** Full in-memory pagination for CSV export cohorts. */
 function paginateDirectoryCohort(
   allBusinesses: DirectoryBusiness[],
   opts: {
@@ -194,18 +273,23 @@ export const fetchFacebookDirectoryPageData = cache(
     pageSize?: number;
     filters?: DirectoryListingFilters;
   }): Promise<FacebookDirectoryPageData> => {
-    const rows = await fetchAllFacebookSurfaceRows();
-    const allBusinesses = rows.map(rowToBusiness).sort(sortByReviewsDesc);
-    const slice = paginateDirectoryCohort(allBusinesses, {
-      page: opts?.page,
-      pageSize: opts?.pageSize ?? DIRECTORY_FACEBOOK_PAGE_SIZE,
-      filters: opts?.filters,
-      filterMode: "full",
-    });
+    const scope: DirectoryListingScope = { kind: "facebook" };
+    const slice = await buildDirectoryListingsPageSlice(
+      scope,
+      fetchUsFacebookFacetOptions,
+      {
+        page: opts?.page,
+        pageSize: opts?.pageSize ?? DIRECTORY_FACEBOOK_PAGE_SIZE,
+        filters: opts?.filters,
+        filterMode: "full",
+      },
+    );
+
+    const freshnessMax = await fetchDirectoryFreshnessMax();
 
     return {
       ...slice,
-      lastUpdatedLabel: formatLastUpdatedMonthYear(maxFreshnessIso(rows)),
+      lastUpdatedLabel: formatLastUpdatedMonthYear(freshnessMax),
     };
   },
 );
@@ -399,17 +483,40 @@ export async function fetchCityListings(
   const cityRef = cities.find((c) => c.citySlug === citySlug.toLowerCase());
   if (!cityRef) return null;
 
-  const rows = await fetchDirectoryRowsForCity(cityRef.city, cityRef.state);
+  const abbr = stateToAbbr(cityRef.state);
+  const stateValues = abbr
+    ? stateValuesForQuery(abbr)
+    : [cityRef.state, cityRef.state.toLowerCase(), cityRef.state.toUpperCase()];
+
+  const unfilteredCount = await fetchScopedUnfilteredCount({
+    kind: "city",
+    city: cityRef.city,
+    stateValues,
+  });
+
+  if (unfilteredCount === 0) return null;
+
+  const { rows } = await fetchScopedListingPage(
+    { kind: "city", city: cityRef.city, stateValues },
+    {
+      page: 1,
+      pageSize: Math.max(unfilteredCount, 1),
+      filters: sanitizeDirectoryListingFilters(
+        opts?.filters ?? DEFAULT_DIRECTORY_LISTING_FILTERS,
+        { states: [], citiesByStateSlug: {} },
+        { mode: "reviewsOnly" },
+      ),
+    },
+  );
+
   const allBusinesses = rows.map(rowToBusiness).sort(sortByReviewsDesc);
 
-  const slice = paginateDirectoryCohort(allBusinesses, {
+  return paginateDirectoryCohort(allBusinesses, {
     page: 1,
     pageSize: allBusinesses.length || 1,
     filters: opts?.filters,
     filterMode: "reviewsOnly",
   });
-
-  return slice;
 }
 
 export async function fetchCityHub(citySlug: string): Promise<{
@@ -511,29 +618,32 @@ export async function fetchNationwideCategoryListings(
     return null;
   }
 
-  const [matched, content] = await Promise.all([
-    fetchDirectoryRowsForCategorySlug(slug),
+  const [content, slice] = await Promise.all([
     fetchCategoryContent(slug),
+    buildDirectoryListingsPageSlice(
+      { kind: "category", categorySlug: slug },
+      () => fetchUsCategoryFacetOptions(slug),
+      {
+        page: opts?.page,
+        pageSize,
+        filters: opts?.filters,
+        filterMode: "full",
+      },
+    ),
   ]);
-  const allBusinesses = matched.map(rowToBusiness).sort(sortByReviewsDesc);
 
-  if (allBusinesses.length < DIRECTORY_MIN_CATEGORY_LISTINGS) return null;
-
-  const slice = paginateDirectoryCohort(allBusinesses, {
-    page: opts?.page,
-    pageSize,
-    filters: opts?.filters,
-    filterMode: "full",
-  });
+  if (slice.unfilteredCount < DIRECTORY_MIN_CATEGORY_LISTINGS) return null;
 
   const categoryLabel =
     content?.displayName?.trim() ||
     categoryRef.categoryLabel ||
     directoryCategoryLabel(
-      matched[0]?.main_category,
-      matched[0]?.business_type,
+      slice.businesses[0]?.main_category,
+      slice.businesses[0]?.business_type,
     ) ||
     slug;
+
+  const freshnessMax = await fetchDirectoryFreshnessMax();
 
   return {
     categoryLabel,
@@ -545,7 +655,7 @@ export async function fetchNationwideCategoryListings(
     page: slice.page,
     pageSize: slice.pageSize,
     totalPages: slice.totalPages,
-    lastUpdatedLabel: formatLastUpdatedMonthYear(maxFreshnessIso(matched)),
+    lastUpdatedLabel: formatLastUpdatedMonthYear(freshnessMax),
     publishedCitySlugs: index.publishedCitySlugs,
     content,
     filters: slice.filters,
@@ -582,8 +692,7 @@ export async function fetchNationwideCategoryAllListings(
 
 async function fetchStateMatchedBusinesses(stateSlug: string): Promise<{
   state: string;
-  allBusinesses: DirectoryBusiness[];
-  matchedRows: RawDirectoryRow[];
+  stateValues: string[];
   publishedCitySlugs: Set<string>;
 } | null> {
   const parsed = parseStateSlug(stateSlug);
@@ -595,15 +704,17 @@ async function fetchStateMatchedBusinesses(stateSlug: string): Promise<{
   );
   if (!stateRef) return null;
 
-  const matched = await fetchDirectoryRowsForStateAbbr(parsed.stateAbbr);
-  const allBusinesses = matched.map(rowToBusiness).sort(sortByReviewsDesc);
+  const stateValues = stateValuesForQuery(parsed.stateAbbr);
+  const unfilteredCount = await fetchScopedUnfilteredCount({
+    kind: "state",
+    stateValues,
+  });
 
-  if (allBusinesses.length < DIRECTORY_MIN_STATE_LISTINGS) return null;
+  if (unfilteredCount < DIRECTORY_MIN_STATE_LISTINGS) return null;
 
   return {
     state: stateRef.state,
-    allBusinesses,
-    matchedRows: matched,
+    stateValues,
     publishedCitySlugs: index.publishedCitySlugs,
   };
 }
@@ -633,13 +744,19 @@ export async function fetchStateListings(
   const base = await fetchStateMatchedBusinesses(stateSlug);
   if (!base) return null;
 
-  const slice = paginateDirectoryCohort(base.allBusinesses, {
-    page: opts?.page,
-    pageSize: opts?.pageSize ?? DIRECTORY_STATE_PAGE_SIZE,
-    filters: opts?.filters,
-    filterMode: "stateFixed",
-    fixedStateSlug: stateSlug.toLowerCase(),
-  });
+  const slice = await buildDirectoryListingsPageSlice(
+    { kind: "state", stateValues: base.stateValues },
+    () => fetchUsStateFacetOptions(base.stateValues),
+    {
+      page: opts?.page,
+      pageSize: opts?.pageSize ?? DIRECTORY_STATE_PAGE_SIZE,
+      filters: opts?.filters,
+      filterMode: "stateFixed",
+      fixedStateSlug: stateSlug.toLowerCase(),
+    },
+  );
+
+  const freshnessMax = await fetchDirectoryFreshnessMax();
 
   return {
     state: base.state,
@@ -651,9 +768,7 @@ export async function fetchStateListings(
     page: slice.page,
     pageSize: slice.pageSize,
     totalPages: slice.totalPages,
-    lastUpdatedLabel: formatLastUpdatedMonthYear(
-      maxFreshnessIso(base.matchedRows),
-    ),
+    lastUpdatedLabel: formatLastUpdatedMonthYear(freshnessMax),
     publishedCitySlugs: base.publishedCitySlugs,
     filters: slice.filters,
     filterOptions: slice.filterOptions,
@@ -669,9 +784,12 @@ export async function fetchStateAllListings(
   const base = await fetchStateMatchedBusinesses(stateSlug);
   if (!base) return null;
 
+  const matched = await fetchDirectoryRowsForStateAbbr(
+    parseStateSlug(stateSlug)!.stateAbbr,
+  );
   return {
     state: base.state,
-    businesses: base.allBusinesses,
+    businesses: matched.map(rowToBusiness).sort(sortByReviewsDesc),
   };
 }
 

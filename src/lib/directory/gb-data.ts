@@ -11,11 +11,13 @@ import {
   fetchGbCityIndex,
   fetchGbRegionIndex,
 } from "@/lib/directory/aggregate-queries";
+import { gbRegionFilterOr } from "@/lib/directory/gb-scoped-rows";
+import { DEFAULT_DIRECTORY_LISTING_FILTERS } from "@/lib/directory/listing-filters";
+import { fetchGbRegionFacetOptions } from "@/lib/directory/scoped-facets";
 import {
-  fetchGbDirectoryRowsForCity,
-  fetchGbDirectoryRowsForCityCategory,
-  fetchGbDirectoryRowsForRegion,
-} from "@/lib/directory/gb-scoped-rows";
+  fetchScopedListingPage,
+  fetchScopedUnfilteredCount,
+} from "@/lib/directory/scoped-listings";
 import { sortCategoriesByPriority } from "@/lib/directory/category-priority";
 import {
   groupBusinessesByCity,
@@ -232,19 +234,36 @@ export async function fetchGbRegionListings(regionSlug: string): Promise<{
   const regionRef = regions.find((r) => r.regionSlug === regionSlug.toLowerCase());
   if (!regionRef) return null;
 
-  const matched = await fetchGbDirectoryRowsForRegion(regionRef.regionSlug);
-  const businesses = matched.map(rowToBusiness).sort(sortByReviewsDesc);
-  if (businesses.length < DIRECTORY_MIN_UK_REGION_LISTINGS) return null;
+  const regionFilter = gbRegionFilterOr(regionRef.regionSlug);
+  if (!regionFilter) return null;
+
+  const scope = {
+    kind: "gb_region" as const,
+    regionSlug: regionRef.regionSlug,
+    regionFilter,
+  };
+
+  const unfilteredCount = await fetchScopedUnfilteredCount(scope);
+  if (unfilteredCount < DIRECTORY_MIN_UK_REGION_LISTINGS) return null;
+
+  const [{ rows }, facetOptions] = await Promise.all([
+    fetchScopedListingPage(scope, {
+      page: 1,
+      pageSize: Math.max(unfilteredCount, 1),
+      filters: DEFAULT_DIRECTORY_LISTING_FILTERS,
+    }),
+    fetchGbRegionFacetOptions(regionRef.regionSlug),
+  ]);
+
+  const businesses = rows.map(rowToBusiness).sort(sortByReviewsDesc);
 
   return {
     region: regionRef.region,
     businesses,
     cityGroups: groupBusinessesByCity(businesses),
-    cityCount: new Set(
-      matched.map((r) => cityNameToSlug(r.city ?? "")).filter(Boolean),
-    ).size,
+    cityCount: facetOptions.cities.length,
     listingCount: businesses.length,
-    lastUpdatedLabel: formatLastUpdatedMonthYear(maxFreshnessIso(matched)),
+    lastUpdatedLabel: formatLastUpdatedMonthYear(maxFreshnessIso(rows)),
     publishedCitySlugs,
   };
 }
@@ -256,11 +275,24 @@ export async function fetchGbCityListings(
   const cityRef = await resolveGbCityRef(citySlug, regionSlug);
   if (!cityRef?.regionSlug) return null;
 
-  const rows = await fetchGbDirectoryRowsForCity(
-    cityRef.city,
-    cityRef.regionSlug,
-  );
-  if (rows.length === 0) return null;
+  const regionFilter = gbRegionFilterOr(cityRef.regionSlug);
+  if (!regionFilter) return null;
+
+  const scope = {
+    kind: "gb_city" as const,
+    city: cityRef.city,
+    regionSlug: cityRef.regionSlug,
+    regionFilter,
+  };
+
+  const unfilteredCount = await fetchScopedUnfilteredCount(scope);
+  if (unfilteredCount === 0) return null;
+
+  const { rows } = await fetchScopedListingPage(scope, {
+    page: 1,
+    pageSize: Math.max(unfilteredCount, 1),
+    filters: DEFAULT_DIRECTORY_LISTING_FILTERS,
+  });
 
   return rows.map(rowToBusiness).sort(sortByReviewsDesc);
 }
@@ -357,11 +389,25 @@ export async function fetchGbCityCategoryListings(
   const cat = hub.categories.find((c) => c.categorySlug === slug);
   if (!cat || cat.listingCount < 1) return null;
 
-  const matched = await fetchGbDirectoryRowsForCityCategory(
-    cityRef.city,
-    cityRef.regionSlug,
-    slug,
-  );
+  const regionFilter = gbRegionFilterOr(cityRef.regionSlug);
+  if (!regionFilter) return null;
+
+  const scope = {
+    kind: "gb_city_category" as const,
+    city: cityRef.city,
+    regionSlug: cityRef.regionSlug,
+    regionFilter,
+    categorySlug: slug,
+  };
+
+  const unfilteredCount = await fetchScopedUnfilteredCount(scope);
+  if (unfilteredCount === 0) return null;
+
+  const { rows: matched } = await fetchScopedListingPage(scope, {
+    page: 1,
+    pageSize: Math.max(unfilteredCount, 1),
+    filters: DEFAULT_DIRECTORY_LISTING_FILTERS,
+  });
   const businesses = matched.map(rowToBusiness).sort(sortByReviewsDesc);
   if (businesses.length === 0) return null;
 

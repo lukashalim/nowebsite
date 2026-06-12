@@ -2,18 +2,15 @@ import {
   EMPTY_CRM_USAGE_BY_ACTION,
   FREE_MONTHLY_OUTREACH_LIMIT,
   type CrmUsageAction,
-  type CrmUsageByAction,
   type CrmUsageSummary,
 } from "@/lib/crm-limits";
+import {
+  crmUsageSummaryFromRows,
+  fetchCrmUsageMonthlySummary,
+  fetchCrmUsageMonthlyTotal,
+} from "@/lib/crm-aggregate-queries";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { isPro, type UserProfile } from "@/lib/subscription";
-
-function currentMonthStartUtc(): string {
-  const now = new Date();
-  return new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
-  ).toISOString();
-}
 
 function nextMonthStartUtc(): string {
   const now = new Date();
@@ -22,50 +19,15 @@ function nextMonthStartUtc(): string {
   ).toISOString();
 }
 
-function countUsageByAction(
-  rows: { action_type: string }[],
-): CrmUsageByAction {
-  const byAction: CrmUsageByAction = { ...EMPTY_CRM_USAGE_BY_ACTION };
-
-  for (const row of rows) {
-    const action = row.action_type;
-    if (action === "dm" || action === "sms" || action === "demo_click") {
-      byAction[action] += 1;
-    }
-  }
-
-  return byAction;
-}
-
-async function fetchMonthlyUsageEvents(
-  userId: string,
-): Promise<{ action_type: string }[]> {
-  const supabase = createSupabaseAdmin();
-  const monthStart = currentMonthStartUtc();
-
-  const { data, error } = await supabase
-    .from("crm_usage_events")
-    .select("action_type")
-    .eq("user_id", userId)
-    .gte("created_at", monthStart);
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return data ?? [];
-}
-
 export async function getMonthlyUsageCount(userId: string): Promise<number> {
-  const rows = await fetchMonthlyUsageEvents(userId);
-  return rows.length;
+  return fetchCrmUsageMonthlyTotal(userId);
 }
 
 export async function getCrmUsageSummary(
   userId: string,
 ): Promise<CrmUsageSummary> {
-  const rows = await fetchMonthlyUsageEvents(userId);
-  const byAction = countUsageByAction(rows);
+  const rows = await fetchCrmUsageMonthlySummary(userId);
+  const byAction = crmUsageSummaryFromRows(rows);
   const used = byAction.dm + byAction.sms + byAction.demo_click;
 
   return {

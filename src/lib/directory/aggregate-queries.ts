@@ -9,17 +9,6 @@ export interface UsIndexBucket {
   last_modified_at: string | null;
 }
 
-export interface GbIndexBucket {
-  city: string;
-  state: string;
-  region: string | null;
-  region_code: string | null;
-  main_category: string | null;
-  business_type: string | null;
-  listing_count: number;
-  last_modified_at: string | null;
-}
-
 export interface UsCityIndexRow {
   city: string;
   state: string;
@@ -74,21 +63,6 @@ function toTimestamp(value: unknown): string | null {
 }
 
 const INDEX_BUCKET_BATCH = 1000;
-
-function mapGbIndexBucket(row: Record<string, unknown>): GbIndexBucket {
-  return {
-    city: String(row.city ?? ""),
-    state: String(row.state ?? ""),
-    region: typeof row.region === "string" ? row.region : null,
-    region_code: typeof row.region_code === "string" ? row.region_code : null,
-    main_category:
-      typeof row.main_category === "string" ? row.main_category : null,
-    business_type:
-      typeof row.business_type === "string" ? row.business_type : null,
-    listing_count: toNumber(row.listing_count),
-    last_modified_at: toTimestamp(row.last_modified_at),
-  };
-}
 
 function mapUsCityIndexRow(row: Record<string, unknown>): UsCityIndexRow {
   return {
@@ -282,10 +256,6 @@ export async function fetchGbCityCategoryIndex(
   );
 }
 
-/** @deprecated Prefer fetchGbCityIndex / fetchGbRegionIndex */
-export async function fetchGbIndexBuckets(): Promise<GbIndexBucket[]> {
-  return fetchRpcRowsBatched("directory_gb_index_buckets", mapGbIndexBucket);
-}
 
 export async function fetchDirectoryUsListingTotal(): Promise<number> {
   const supabase = createSupabaseAdmin();

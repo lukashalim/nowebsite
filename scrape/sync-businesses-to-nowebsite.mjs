@@ -13,6 +13,7 @@
  */
 
 import { loadEnvLocal, getSupabase } from "./lib/scrape-pipeline/index.mjs";
+import { directoryCategorySlugForRow } from "../src/lib/directory/resolve-category-slug.ts";
 
 const DEFAULT_SELECT =
   "place_id, name, address, city, state, country, postal_code, latitude, longitude, main_category, business_type, rating, reviews, is_spending_on_ads, can_claim, has_website, phone, google_maps_link, facebook_url, contact_count, competitive_weakness, contact_enrichment, enriched_at, scraped_at";
@@ -41,6 +42,10 @@ function stampRows(rows) {
   const at = new Date().toISOString();
   return rows.map((r) => ({
     ...r,
+    directory_category_slug: directoryCategorySlugForRow(
+      r.main_category,
+      r.business_type,
+    ),
     contact_count:
       r.contact_count != null && Number.isFinite(Number(r.contact_count))
         ? Number(r.contact_count)

@@ -440,48 +440,6 @@ export interface DemoBusiness
   enrichment?: ContactEnrichment | null;
 }
 
-/** Public `/demo/...` paths for the default demo cohort (for sitemaps). */
-export async function fetchAllDemoCohortPublicDemoPaths(): Promise<string[]> {
-  const c = defaultCrmDemoCohortFilters();
-  const supabase = createSupabaseAdmin();
-  const paths: string[] = [];
-  let offset = 0;
-
-  for (;;) {
-    let q = supabase
-      .from("businesses_nowebsite")
-      .select("place_id, demo_slug")
-      .eq("is_invalid", false)
-      .gte("reviews", c.minReviews)
-      .lte("reviews", c.maxReviews)
-      .gte("rating", c.minRating);
-    q = applyWebPresenceFilter(q, c.webPresence);
-    q = applyReviewExcerptsExtractedFilter(q);
-    const { data, error } = await q
-      .order("place_id", { ascending: true })
-      .range(offset, offset + BATCH - 1);
-
-    if (error) {
-      throw new Error(error.message);
-    }
-    const rows = data ?? [];
-    for (const row of rows) {
-      const placeId = row.place_id as string | undefined;
-      if (!placeId) continue;
-      paths.push(
-        demoPublicPath({
-          place_id: placeId,
-          demo_slug: (row.demo_slug as string | null | undefined) ?? null,
-        }),
-      );
-    }
-    if (rows.length < BATCH) break;
-    offset += BATCH;
-  }
-
-  return paths;
-}
-
 /**
  * Load a demo detail row by URL segment: Google `place_id` (legacy) or `demo_slug`.
  * Intentionally avoids demo-cohort filters so shared links keep working.

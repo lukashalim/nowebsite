@@ -1,10 +1,12 @@
 import { cache } from "react";
 import { FREE_MONTHLY_OUTREACH_LIMIT } from "@/lib/crm-limits";
 import { FREE_MONTHLY_DIRECTORY_CSV_LIMIT } from "@/lib/directory-csv-limits";
-import { normalizeCsvDownloadEmail } from "@/lib/csv-download-limits";
-import { createSupabaseAdmin } from "@/lib/supabase/admin";
-
-const BATCH = 1000;
+import {
+  fetchAdminCrmUsageStats,
+  fetchAdminCsvDownloadStats,
+  fetchAdminUsageAudienceCounts,
+  isUsageSegment,
+} from "@/lib/admin/admin-aggregate-queries";
 
 export type UsageSegment = "email_signup" | "free_logged_in" | "paid";
 
@@ -41,12 +43,6 @@ export interface AdminUsageReport {
   audience: AdminUsageAudience;
   services: ServiceUsageRow[];
   error: string | null;
-}
-
-interface ProfileRow {
-  id: string;
-  email: string | null;
-  is_pro: boolean;
 }
 
 function currentMonthStartUtc(): string {
@@ -91,197 +87,59 @@ function finalizeSegment(
   };
 }
 
-async function fetchAllProfiles(): Promise<ProfileRow[]> {
-  const supabase = createSupabaseAdmin();
-  const rows: ProfileRow[] = [];
-  let from = 0;
-
-  while (true) {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id, email, is_pro")
-      .order("id", { ascending: true })
-      .range(from, from + BATCH - 1);
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    const batch = (data ?? []) as ProfileRow[];
-    rows.push(...batch);
-    if (batch.length < BATCH) break;
-    from += BATCH;
-  }
-
-  return rows;
-}
-
-function classifyEmailSegment(
-  email: string,
-  profileByEmail: Map<string, ProfileRow>,
-): UsageSegment {
-  const profile = profileByEmail.get(normalizeCsvDownloadEmail(email));
-  if (!profile) return "email_signup";
-  if (profile.is_pro) return "paid";
-  return "free_logged_in";
-}
-
-function classifyUserSegment(
-  userId: string,
-  profileById: Map<string, ProfileRow>,
-): UsageSegment {
-  const profile = profileById.get(userId);
-  if (!profile) return "free_logged_in";
-  if (profile.is_pro) return "paid";
-  return "free_logged_in";
-}
-
-async function aggregateCsvDownloads(
-  periodStart: string | null,
-  profileByEmail: Map<string, ProfileRow>,
-): Promise<{
-  bySegment: Record<UsageSegment, SegmentUtilization>;
-}> {
-  const supabase = createSupabaseAdmin();
-  const segmentCounts: Record<UsageSegment, Map<string, number>> = {
+function emptySegmentCounts(): Record<UsageSegment, Map<string, number>> {
+  return {
     email_signup: new Map(),
     free_logged_in: new Map(),
     paid: new Map(),
   };
-  let from = 0;
+}
 
-  while (true) {
-    let q = supabase
-      .from("csv_downloads")
-      .select("email, downloaded_at")
-      .order("id", { ascending: true });
+function aggregateCsvStatsFromRows(
+  rows: Awaited<ReturnType<typeof fetchAdminCsvDownloadStats>>,
+): Record<UsageSegment, SegmentUtilization> {
+  const segmentCounts = emptySegmentCounts();
 
-    if (periodStart) {
-      q = q.gte("downloaded_at", periodStart);
-    }
-
-    const { data, error } = await q.range(from, from + BATCH - 1);
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    const batch = data ?? [];
-    for (const row of batch) {
-      const email = normalizeCsvDownloadEmail(String(row.email ?? ""));
-      if (!email) continue;
-
-      const segment = classifyEmailSegment(email, profileByEmail);
-      const bucket = segmentCounts[segment];
-      bucket.set(email, (bucket.get(email) ?? 0) + 1);
-    }
-
-    if (batch.length < BATCH) break;
-    from += BATCH;
+  for (const row of rows) {
+    if (!isUsageSegment(row.segment) || !row.actor_key) continue;
+    const bucket = segmentCounts[row.segment];
+    bucket.set(row.actor_key, (bucket.get(row.actor_key) ?? 0) + row.download_count);
   }
 
   return {
-    bySegment: {
-      email_signup: finalizeSegment(
-        segmentCounts.email_signup,
-        FREE_MONTHLY_DIRECTORY_CSV_LIMIT,
-      ),
-      free_logged_in: finalizeSegment(
-        segmentCounts.free_logged_in,
-        FREE_MONTHLY_DIRECTORY_CSV_LIMIT,
-      ),
-      paid: finalizeSegment(segmentCounts.paid, null),
-    },
+    email_signup: finalizeSegment(
+      segmentCounts.email_signup,
+      FREE_MONTHLY_DIRECTORY_CSV_LIMIT,
+    ),
+    free_logged_in: finalizeSegment(
+      segmentCounts.free_logged_in,
+      FREE_MONTHLY_DIRECTORY_CSV_LIMIT,
+    ),
+    paid: finalizeSegment(segmentCounts.paid, null),
   };
 }
 
-async function countCsvOnlyEmails(
-  profileByEmail: Map<string, ProfileRow>,
-): Promise<number> {
-  const supabase = createSupabaseAdmin();
-  const allCsvEmails = new Set<string>();
-  let from = 0;
-
-  while (true) {
-    const { data, error } = await supabase
-      .from("csv_downloads")
-      .select("email")
-      .order("id", { ascending: true })
-      .range(from, from + BATCH - 1);
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    const batch = data ?? [];
-    for (const row of batch) {
-      const email = normalizeCsvDownloadEmail(String(row.email ?? ""));
-      if (email) allCsvEmails.add(email);
-    }
-
-    if (batch.length < BATCH) break;
-    from += BATCH;
-  }
-
-  let csvOnlyEmails = 0;
-  for (const email of allCsvEmails) {
-    if (!profileByEmail.has(email)) {
-      csvOnlyEmails += 1;
-    }
-  }
-
-  return csvOnlyEmails;
-}
-
-async function aggregateCrmUsage(
-  periodStart: string | null,
-  profileById: Map<string, ProfileRow>,
-): Promise<{
+function aggregateCrmStatsFromRows(
+  rows: Awaited<ReturnType<typeof fetchAdminCrmUsageStats>>,
+): {
   bySegment: Record<UsageSegment, SegmentUtilization>;
   actionBreakdown: Record<string, number>;
-}> {
-  const supabase = createSupabaseAdmin();
-  const segmentCounts: Record<UsageSegment, Map<string, number>> = {
-    email_signup: new Map(),
-    free_logged_in: new Map(),
-    paid: new Map(),
-  };
+} {
+  const segmentCounts = emptySegmentCounts();
   const actionBreakdown: Record<string, number> = {
     dm: 0,
     sms: 0,
     demo_click: 0,
   };
-  let from = 0;
 
-  while (true) {
-    let q = supabase
-      .from("crm_usage_events")
-      .select("user_id, action_type, created_at")
-      .order("id", { ascending: true });
+  for (const row of rows) {
+    if (!isUsageSegment(row.segment) || !row.user_id) continue;
 
-    if (periodStart) {
-      q = q.gte("created_at", periodStart);
-    }
+    actionBreakdown[row.action_type] =
+      (actionBreakdown[row.action_type] ?? 0) + row.event_count;
 
-    const { data, error } = await q.range(from, from + BATCH - 1);
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    const batch = data ?? [];
-    for (const row of batch) {
-      const userId = String(row.user_id ?? "");
-      const action = String(row.action_type ?? "unknown");
-      if (!userId) continue;
-
-      actionBreakdown[action] = (actionBreakdown[action] ?? 0) + 1;
-
-      const segment = classifyUserSegment(userId, profileById);
-      const bucket = segmentCounts[segment];
-      bucket.set(userId, (bucket.get(userId) ?? 0) + 1);
-    }
-
-    if (batch.length < BATCH) break;
-    from += BATCH;
+    const bucket = segmentCounts[row.segment];
+    bucket.set(row.user_id, (bucket.get(row.user_id) ?? 0) + row.event_count);
   }
 
   return {
@@ -306,35 +164,20 @@ export const fetchAdminUsageReport = cache(
         : "All time";
 
     try {
-      const profiles = await fetchAllProfiles();
-      const profileByEmail = new Map<string, ProfileRow>();
-      const profileById = new Map<string, ProfileRow>();
-      let registeredFree = 0;
-      let registeredPro = 0;
-
-      for (const profile of profiles) {
-        profileById.set(profile.id, profile);
-        if (profile.is_pro) {
-          registeredPro += 1;
-        } else {
-          registeredFree += 1;
-        }
-        if (profile.email?.trim()) {
-          profileByEmail.set(normalizeCsvDownloadEmail(profile.email), profile);
-        }
-      }
-
-      const [csvStats, crmStats, csvOnlyEmails] = await Promise.all([
-        aggregateCsvDownloads(periodStart, profileByEmail),
-        aggregateCrmUsage(periodStart, profileById),
-        countCsvOnlyEmails(profileByEmail),
+      const [audience, csvRows, crmRows] = await Promise.all([
+        fetchAdminUsageAudienceCounts(),
+        fetchAdminCsvDownloadStats(periodStart),
+        fetchAdminCrmUsageStats(periodStart),
       ]);
+
+      const csvStats = aggregateCsvStatsFromRows(csvRows);
+      const crmStats = aggregateCrmStatsFromRows(crmRows);
 
       const directoryCsv: ServiceUsageRow = {
         id: "directory_csv",
         label: "Directory CSV export",
         limitLabel: `${FREE_MONTHLY_DIRECTORY_CSV_LIMIT} page exports / month (free)`,
-        bySegment: csvStats.bySegment,
+        bySegment: csvStats,
       };
 
       const crmOutreach: ServiceUsageRow = {
@@ -364,9 +207,9 @@ export const fetchAdminUsageReport = cache(
         periodStart,
         generatedAt: new Date().toISOString(),
         audience: {
-          registeredFree,
-          registeredPro,
-          csvOnlyEmails,
+          registeredFree: audience.registered_free,
+          registeredPro: audience.registered_pro,
+          csvOnlyEmails: audience.csv_only_emails,
         },
         services: [directoryCsv, crmOutreach, crmCsvExport],
         error: null,

@@ -39,7 +39,7 @@ function applyUsDirectoryBase(q: DirectoryQuery): DirectoryQuery {
     .or(`country.eq.${COUNTRY_US},country.is.null`);
 }
 
-function stateValuesForQuery(stateAbbr: string): string[] {
+export function stateValuesForQuery(stateAbbr: string): string[] {
   const abbr = stateAbbr.trim().toLowerCase();
   const displayName = stateAbbrToDisplayName(abbr);
   return [...new Set([abbr, abbr.toUpperCase(), displayName])];
@@ -104,6 +104,18 @@ export const fetchDirectoryRowsForCity = cache(
 export const fetchDirectoryRowsForCategorySlug = cache(
   async (categorySlug: string): Promise<RawDirectoryRow[]> => {
     const slug = canonicalCategorySlug(categorySlug.trim().toLowerCase());
+
+    const bySlugColumn = await fetchDirectoryRowsBatched((q) =>
+      q.eq("directory_category_slug", slug),
+    );
+    if (bySlugColumn.length > 0) {
+      return bySlugColumn.filter(
+        (row) =>
+          parseDirectoryCountry(row.country) === COUNTRY_US &&
+          categoryMatchesSlug(row.main_category, row.business_type, slug),
+      );
+    }
+
     const tokens = businessTypeTokensForCategorySlug(slug);
     const mainCategoryPattern = slug.replace(/-/g, " ");
 

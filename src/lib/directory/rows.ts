@@ -1,12 +1,7 @@
-import { cache } from "react";
 import { parseDirectoryCountry } from "@/lib/directory/country";
 import { cityNameToSlug, cityStateToSlug } from "@/lib/directory/slugs";
 import { COUNTRY_AU, COUNTRY_GB } from "@/lib/directory/country";
 import type { DirectoryBusiness, DirectoryCityGroup } from "@/lib/directory/types";
-import { DIRECTORY_LIST_COLUMNS } from "@/lib/directory/types";
-import { createSupabaseAdmin } from "@/lib/supabase/admin";
-
-const BATCH = 1000;
 
 export interface RawDirectoryRow {
   name: string | null;
@@ -80,37 +75,6 @@ export function bumpFreshnessIso(
 export function sortByReviewsDesc(a: DirectoryBusiness, b: DirectoryBusiness): number {
   return (b.reviews ?? 0) - (a.reviews ?? 0);
 }
-
-export const fetchAllNoWebsiteRows = cache(async (): Promise<RawDirectoryRow[]> => {
-  const supabase = createSupabaseAdmin();
-  const rows: RawDirectoryRow[] = [];
-  let from = 0;
-
-  while (true) {
-    const { data, error } = await supabase
-      .from("businesses_nowebsite")
-      .select(DIRECTORY_LIST_COLUMNS)
-      .eq("has_website", false)
-      .not("city", "is", null)
-      .not("state", "is", null)
-      .order("reviews", { ascending: false })
-      .order("place_id", { ascending: true })
-      .range(from, from + BATCH - 1);
-
-    if (error) {
-      const hint = /country|region|schema cache/i.test(error.message)
-        ? " Run scrape/sql migrations for businesses_nowebsite (country, region)."
-        : "";
-      throw new Error(error.message + hint);
-    }
-    const batch = (data ?? []) as RawDirectoryRow[];
-    rows.push(...batch);
-    if (batch.length < BATCH) break;
-    from += BATCH;
-  }
-
-  return rows;
-});
 
 export function groupBusinessesByCity(
   businesses: DirectoryBusiness[],
