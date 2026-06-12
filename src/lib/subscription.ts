@@ -4,10 +4,14 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 export interface UserProfile {
   id: string;
   email: string | null;
+  username: string | null;
+  user_payment_link: string | null;
   is_pro: boolean;
   stripe_customer_id: string | null;
   subscription_price: string | null;
   subscription_started_at: string | null;
+  sendfox_subscribed_at: string | null;
+  sendfox_confirmed_at: string | null;
 }
 
 export function isPro(profile: UserProfile | null | undefined): boolean {
@@ -19,7 +23,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "id, email, is_pro, stripe_customer_id, subscription_price, subscription_started_at",
+      "id, email, username, user_payment_link, is_pro, stripe_customer_id, subscription_price, subscription_started_at, sendfox_subscribed_at, sendfox_confirmed_at",
     )
     .eq("id", userId)
     .maybeSingle();
@@ -31,6 +35,9 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
   return {
     id: String(data.id),
     email: typeof data.email === "string" ? data.email : null,
+    username: typeof data.username === "string" ? data.username : null,
+    user_payment_link:
+      typeof data.user_payment_link === "string" ? data.user_payment_link : null,
     is_pro: data.is_pro === true,
     stripe_customer_id:
       typeof data.stripe_customer_id === "string"
@@ -43,6 +50,14 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
     subscription_started_at:
       typeof data.subscription_started_at === "string"
         ? data.subscription_started_at
+        : null,
+    sendfox_subscribed_at:
+      typeof data.sendfox_subscribed_at === "string"
+        ? data.sendfox_subscribed_at
+        : null,
+    sendfox_confirmed_at:
+      typeof data.sendfox_confirmed_at === "string"
+        ? data.sendfox_confirmed_at
         : null,
   };
 }

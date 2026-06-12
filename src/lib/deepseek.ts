@@ -1,3 +1,5 @@
+import "server-only";
+
 import { loadSharedEnvLocal } from "@/lib/load-shared-env";
 
 export interface DeepSeekMessage {

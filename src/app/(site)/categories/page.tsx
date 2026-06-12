@@ -1,11 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { CategoryGroupIcon } from "@/components/category-group-icon";
 import { CategoryIcon } from "@/components/category-icon";
 import { DirectoryLastUpdated } from "@/components/directory-last-updated";
 import {
   fetchAllPublishedCategoryLinks,
   fetchDirectoryLastUpdatedLabel,
 } from "@/lib/directory/data";
+import {
+  groupPublishedCategories,
+  fetchCategoryGroupTaxonomy,
+  fallbackCategoryGroupTaxonomy,
+} from "@/lib/directory/category-groups";
 import { categoryGridLabel } from "@/lib/directory/labels";
 import { directoryBreadcrumbLinkClass, directoryCardLinkClass } from "@/lib/directory/ui-classes";
 import { DIRECTORY_MIN_CATEGORY_LISTINGS } from "@/lib/directory/types";
@@ -33,15 +39,19 @@ export default async function CategoriesIndexPage() {
     [];
   let lastUpdatedLabel: string | null = null;
   let loadError: string | null = null;
+  let taxonomy = fallbackCategoryGroupTaxonomy();
 
   try {
-    [categories, lastUpdatedLabel] = await Promise.all([
+    [categories, lastUpdatedLabel, taxonomy] = await Promise.all([
       fetchAllPublishedCategoryLinks(),
       fetchDirectoryLastUpdatedLabel(),
+      fetchCategoryGroupTaxonomy(),
     ]);
   } catch (e) {
     loadError = e instanceof Error ? e.message : "Could not load categories.";
   }
+
+  const grouped = groupPublishedCategories(categories, taxonomy);
 
   return (
     <div className="space-y-8">
@@ -70,26 +80,44 @@ export default async function CategoriesIndexPage() {
       ) : categories.length === 0 ? (
         <p className="text-sm text-zinc-500">No category directories yet.</p>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {categories.map((cat) => (
-            <li key={cat.categorySlug}>
-              <Link href={cat.href} className={directoryCardLinkClass}>
-                <CategoryIcon
-                  categoryLabel={cat.categoryLabel}
-                  className="mt-0.5 size-5 shrink-0 text-zinc-500"
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block font-medium text-zinc-900 dark:text-zinc-100">
-                    {categoryGridLabel(cat.categoryLabel)}
-                  </span>
-                  <span className="tabular-nums text-xs text-zinc-500">
-                    {cat.count.toLocaleString()} nationwide
-                  </span>
-                </span>
-              </Link>
-            </li>
+        <div className="space-y-10">
+          {grouped.map(({ group, items }) => (
+            <section key={group.id} id={group.id} className="scroll-mt-6 space-y-4">
+              <div className="space-y-1">
+                <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                  <CategoryGroupIcon
+                    groupId={group.id}
+                    className="size-5 shrink-0 text-zinc-500"
+                  />
+                  {group.label}
+                </h2>
+                <p className="max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
+                  {group.description}
+                </p>
+              </div>
+              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {items.map((cat) => (
+                  <li key={cat.categorySlug}>
+                    <Link href={cat.href} className={directoryCardLinkClass}>
+                      <CategoryIcon
+                        categoryLabel={cat.categoryLabel}
+                        className="mt-0.5 size-5 shrink-0 text-zinc-500"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-medium text-zinc-900 dark:text-zinc-100">
+                          {categoryGridLabel(cat.categoryLabel)}
+                        </span>
+                        <span className="tabular-nums text-xs text-zinc-500">
+                          {cat.count.toLocaleString()} nationwide
+                        </span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );

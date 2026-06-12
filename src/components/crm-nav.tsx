@@ -60,6 +60,10 @@ export async function CrmNav({ active, isPro = false }: CrmNavProps) {
           DM Spintax Templates
         </Link>
       )}
+      <BreadcrumbSeparator />
+      <Link href="/dashboard/settings" className={breadcrumbLinkClass}>
+        Settings
+      </Link>
       {showScrapeQueue ? (
         <>
           <BreadcrumbSeparator />

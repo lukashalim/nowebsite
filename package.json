@@ -10,6 +10,8 @@
     "deploy-workers": "node deploy-workers.mjs",
     "demo:sync": "npx tsx ./scrape/sync-businesses-to-nowebsite.mjs",
     "backfill-directory-category-slug": "npx tsx scripts/backfill-directory-category-slug.ts",
+    "generate-category-group-mapping": "npx tsx scripts/generate-category-group-mapping.ts",
+    "sync-category-group-members": "npx tsx scripts/sync-category-group-members-from-db.ts",
     "demo:backfill-seo": "node --import ./scrape/env-nowebsite-queue.mjs ./scrape/backfill-demo-seo-dispatch.mjs",
     "demo:pipeline": "node --import ./scrape/env-nowebsite-pipeline-cohort.mjs ./scrape/pipeline.mjs",
     "demo:poller": "node --import ./scrape/env-nowebsite-queue.mjs ./scrape/poller.mjs",
@@ -25,6 +27,7 @@
     "next": "16.2.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "server-only": "^0.0.1",
     "stripe": "^22.2.0",
     "zod": "^4.3.6"
   },

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LayoutTemplate, Search, Workflow } from "lucide-react";
+import { CategoryGroupIcon } from "@/components/category-group-icon";
 import { CategoryIcon } from "@/components/category-icon";
 import { categoryGridLabel, cityPath, statePath } from "@/lib/directory/labels";
 import { stateAbbrToDisplayName, stateToAbbr } from "@/lib/directory/slugs";
@@ -18,6 +19,7 @@ import {
   DIRECTORY_MIN_CITY_LISTINGS,
   DIRECTORY_MIN_STATE_LISTINGS,
 } from "@/lib/directory/types";
+import { fetchCategoryGroupTaxonomy, fallbackCategoryGroupTaxonomy } from "@/lib/directory/category-groups";
 import { absoluteUrl } from "@/lib/site-url";
 import {
   directoryCardLinkClass,
@@ -89,9 +91,10 @@ export default async function HomePage() {
   let facebookCount: number | null = null;
   let ukCount: number | null = null;
   let loadError: string | null = null;
+  let industryGroups = fallbackCategoryGroupTaxonomy().groups;
 
   try {
-    [cities, summary, publishedCategories, topStates, facebookCount, ukCount] =
+    const [citiesResult, summaryResult, publishedCategoriesResult, topStatesResult, facebookCountResult, ukCountResult, taxonomyResult] =
       await Promise.all([
         fetchAllDirectoryCities(),
         fetchDirectorySummary(),
@@ -99,7 +102,15 @@ export default async function HomePage() {
         fetchTopStates(HOME_TOP_STATES),
         fetchFacebookDirectoryListingTotal(),
         fetchUkListingCount(),
+        fetchCategoryGroupTaxonomy(),
       ]);
+    cities = citiesResult;
+    summary = summaryResult;
+    publishedCategories = publishedCategoriesResult;
+    topStates = topStatesResult;
+    facebookCount = facebookCountResult;
+    ukCount = ukCountResult;
+    industryGroups = taxonomyResult.groups;
   } catch (e) {
     loadError = e instanceof Error ? e.message : "Could not load directory data.";
   }
@@ -212,6 +223,21 @@ export default async function HomePage() {
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
               Categories
             </h2>
+            <div className="flex flex-wrap gap-2">
+              {industryGroups.map((group) => (
+                <Link
+                  key={group.id}
+                  href={`/categories#${group.id}`}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900/50"
+                >
+                  <CategoryGroupIcon
+                    groupId={group.id}
+                    className="size-3.5 shrink-0 text-zinc-500"
+                  />
+                  {group.label}
+                </Link>
+              ))}
+            </div>
             {topCategories.length === 0 ? (
               <p className="text-sm text-zinc-500">
                 No category pages yet (need {DIRECTORY_MIN_CATEGORY_LISTINGS}+

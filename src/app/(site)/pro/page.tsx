@@ -10,7 +10,7 @@ import { UpgradeToProButton } from "@/components/upgrade-to-pro-button";
 import { ManageSubscriptionButton } from "@/components/manage-subscription-button";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
 import { FREE_MONTHLY_OUTREACH_LIMIT } from "@/lib/crm-limits";
-import { FREE_MONTHLY_DIRECTORY_CSV_LIMIT } from "@/lib/directory-csv-limits";
+import { FREE_DIRECTORY_CSV_MAX_PAGES } from "@/lib/directory-csv-limits";
 import { absoluteUrl } from "@/lib/site-url";
 import { getUserProfile, isPro } from "@/lib/subscription";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -19,7 +19,7 @@ export const revalidate = 86400;
 
 export const metadata: Metadata = {
   title: "Pro CRM for Web Designers | No Website Business Leads",
-  description: `Free CRM for no-website local business leads (25 outreach actions/month, ${FREE_MONTHLY_DIRECTORY_CSV_LIMIT} directory page CSV exports/month). Pro adds unlimited outreach and unlimited directory CSV export.`,
+  description: `Free CRM for no-website local business leads (25 outreach actions/month, directory CSV capped at ${FREE_DIRECTORY_CSV_MAX_PAGES} pages per export). Pro adds unlimited outreach and full directory CSV export.`,
   alternates: { canonical: absoluteUrl("/pro") },
 };
 
@@ -66,10 +66,10 @@ export default async function ProPage() {
           Pro CRM for web designers & agencies
         </h1>
         <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
-          Start free with {FREE_MONTHLY_OUTREACH_LIMIT} outreach actions and{" "}
-          {FREE_MONTHLY_DIRECTORY_CSV_LIMIT} directory CSV downloads per month,
-          then upgrade when you need unlimited DMs, SMS, demo links, and
-          unlimited directory CSV export — all on the same no-website lead
+          Start free with {FREE_MONTHLY_OUTREACH_LIMIT} outreach actions and
+          directory CSV exports capped at {FREE_DIRECTORY_CSV_MAX_PAGES} pages
+          per download, then upgrade when you need unlimited DMs, SMS, demo
+          links, and full directory CSV export — all on the same no-website lead
           dataset as this public directory.
         </p>
       </section>
@@ -118,8 +118,8 @@ export default async function ProPage() {
               <li>Browse and filter all no-website leads</li>
               <li>Contact stage tracking & review excerpts</li>
               <li>
-                {FREE_MONTHLY_DIRECTORY_CSV_LIMIT} directory CSV downloads per
-                month
+                Directory CSV export (first {FREE_DIRECTORY_CSV_MAX_PAGES} pages
+                per download)
               </li>
               <li>CSV export for the current CRM page</li>
             </ul>
@@ -158,7 +158,7 @@ export default async function ProPage() {
             <ul className="mt-4 flex-1 space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
               <li>Everything in Free</li>
               <li>Unlimited DMs, SMS, and demo link clicks</li>
-              <li>Unlimited directory CSV downloads</li>
+              <li>Unlimited full directory CSV export</li>
               <li>Full-filter CRM CSV export (all matching leads)</li>
               <li>Spintax template editor</li>
             </ul>

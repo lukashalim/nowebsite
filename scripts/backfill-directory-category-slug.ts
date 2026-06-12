@@ -26,7 +26,6 @@ async function main() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  let offset = 0;
   let updated = 0;
   let skipped = 0;
 
@@ -36,7 +35,7 @@ async function main() {
       .select("place_id, main_category, business_type, directory_category_slug")
       .is("directory_category_slug", null)
       .order("place_id", { ascending: true })
-      .range(offset, offset + BATCH - 1);
+      .range(0, BATCH - 1);
 
     if (error) {
       throw new Error(error.message);
@@ -73,7 +72,6 @@ async function main() {
     );
 
     if (rows.length < BATCH) break;
-    offset += BATCH;
   }
 
   console.log(`backfill: done. ${updated} row(s) updated, ${skipped} unresolved.`);

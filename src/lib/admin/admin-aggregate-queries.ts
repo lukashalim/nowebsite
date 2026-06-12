@@ -1,6 +1,6 @@
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 
-export type AdminUsageSegment = "email_signup" | "free_logged_in" | "paid";
+export type AdminUsageSegment = "anonymous" | "free_logged_in" | "paid";
 
 export interface AdminUsageAudienceRow {
   registered_free: number;
@@ -72,7 +72,7 @@ export async function fetchAdminCrmUsageStats(
 
 export function isUsageSegment(value: string): value is AdminUsageSegment {
   return (
-    value === "email_signup" ||
+    value === "anonymous" ||
     value === "free_logged_in" ||
     value === "paid"
   );

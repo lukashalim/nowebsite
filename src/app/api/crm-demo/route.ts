@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
-import { demoPublicPath } from "@/lib/demo-slug";
+import { demoPathSegment, tenantDemoPublicPath } from "@/lib/demo-slug";
 import { recordCrmUsage } from "@/lib/crm-usage";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
+import { DEMO_DETAIL_COLUMNS } from "@/lib/crm-cohort";
 import { getUserProfile, isPro } from "@/lib/subscription";
+import { materializeTenantLeadByPlaceId } from "@/lib/tenant-lead-sync";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -26,10 +28,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "placeId is required" }, { status: 400 });
   }
 
+  const profile = await getUserProfile(user.id);
+  const username = profile?.username?.trim();
+  if (!username) {
+    return NextResponse.json(
+      { error: "Set a username on your profile before opening demo links" },
+      { status: 400 },
+    );
+  }
+
   const admin = createSupabaseAdmin();
   const { data: row, error } = await admin
     .from("businesses_nowebsite")
-    .select("place_id, demo_slug")
+    .select(DEMO_DETAIL_COLUMNS)
     .eq("place_id", placeId)
     .maybeSingle();
 
@@ -41,7 +52,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Business not found" }, { status: 404 });
   }
 
-  const profile = await getUserProfile(user.id);
+  await materializeTenantLeadByPlaceId(user.id, placeId).catch(() => {});
+
   if (!isPro(profile)) {
     const usage = await recordCrmUsage(
       user.id,
@@ -56,11 +68,15 @@ export async function GET(request: Request) {
     }
   }
 
-  const demoPath = demoPublicPath({
+  const slug = demoPathSegment({
     place_id: String(row.place_id),
     demo_slug:
       typeof row.demo_slug === "string" ? row.demo_slug : null,
   });
+  const demoPath = tenantDemoPublicPath(
+    username,
+    decodeURIComponent(slug),
+  );
 
   return NextResponse.redirect(new URL(demoPath, request.url));
 }

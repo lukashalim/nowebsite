@@ -19,6 +19,7 @@ import { COUNTRY_GB } from "@/lib/directory/country";
 import { resolveGbPath } from "@/lib/directory/resolve-gb-path";
 import { categoryPath } from "@/lib/directory/labels";
 import { absoluteUrl } from "@/lib/site-url";
+import { getAuthenticatedUserProfile, isPro } from "@/lib/subscription";
 import { gbCityPath, gbRegionPath } from "@/lib/directory/paths";
 import {
   directoryBreadcrumbLinkClass,
@@ -27,7 +28,6 @@ import {
 } from "@/lib/directory/ui-classes";
 import { createDirectoryContactAccess } from "@/lib/directory/contact-access";
 import { listingScopeForGbCity } from "@/lib/directory/listing-scope";
-import { stripContactFieldsList } from "@/lib/directory/contact-fields";
 
 export const revalidate = 3600;
 export const dynamicParams = true;
@@ -106,6 +106,9 @@ export default async function UnitedKingdomNestedPage({ params }: PageProps) {
   if (resolved.kind === "notFound") {
     notFound();
   }
+
+  const auth = await getAuthenticatedUserProfile();
+  const userIsPro = isPro(auth?.profile);
 
   if (resolved.kind === "region") {
     const { data } = resolved;
@@ -242,9 +245,11 @@ export default async function UnitedKingdomNestedPage({ params }: PageProps) {
 
         {businesses.length > 0 ? (
           <DownloadCsvButton
-            businesses={stripContactFieldsList(businesses)}
-            contactAccess={contactAccess}
+            exportAccess={contactAccess}
             pagePath={gbCityPath(citySlug)}
+            pageSize={businesses.length || 1}
+            totalPages={1}
+            isPro={userIsPro}
           />
         ) : null}
       </div>

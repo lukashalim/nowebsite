@@ -97,7 +97,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error }, { status: 400 });
   }
 
-  const csv = buildCrmLeadsCsv(rows, getSiteOrigin());
+  const csv = buildCrmLeadsCsv(rows, getSiteOrigin(), profile?.username);
   const filename = crmExportFilename();
 
   return new NextResponse(csv, {

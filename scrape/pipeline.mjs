@@ -23,6 +23,7 @@ import {
   shouldRecordConversion,
 } from "./lib/conversion-tracking.mjs";
 import { truncateForJson, sanitizeJsonColumn } from "./lib/json-column-sanitize.mjs";
+import { directoryCategorySlugForRow } from "../src/lib/directory/resolve-category-slug.ts";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const BUSINESSES_UPSERT_BATCH_SIZE = Math.max(
@@ -744,6 +745,11 @@ async function main() {
             mergeTrackingIntoPayload(
               {
                 ...base,
+                directory_category_slug:
+                  directoryCategorySlugForRow(
+                    base.main_category,
+                    base.business_type,
+                  ) ?? undefined,
                 facebook_url: base.facebook_url ?? undefined,
                 competitive_weakness,
                 review_highlights: sanitizeJsonColumn(

@@ -11,27 +11,14 @@ STABLE
 SECURITY DEFINER
 SET search_path TO 'public'
 AS $function$
-  WITH profile_emails AS (
-    SELECT
-      lower(btrim(email)) AS email_norm,
-      is_pro
-    FROM public.profiles
-    WHERE email IS NOT NULL AND btrim(email) <> ''
-  ),
-  csv_emails AS (
-    SELECT DISTINCT lower(btrim(email)) AS email_norm
-    FROM public.csv_downloads
-    WHERE email IS NOT NULL AND btrim(email) <> ''
-  )
   SELECT
     (SELECT count(*)::bigint FROM public.profiles WHERE NOT is_pro) AS registered_free,
     (SELECT count(*)::bigint FROM public.profiles WHERE is_pro) AS registered_pro,
     (
       SELECT count(*)::bigint
-      FROM csv_emails c
-      WHERE NOT EXISTS (
-        SELECT 1 FROM profile_emails p WHERE p.email_norm = c.email_norm
-      )
+      FROM public.csv_downloads d
+      WHERE d.user_id IS NULL
+        AND (d.email IS NULL OR btrim(d.email) = '')
     ) AS csv_only_emails;
 $function$;
 
@@ -48,15 +35,17 @@ SET search_path TO 'public'
 AS $function$
   SELECT
     CASE
-      WHEN p.id IS NULL THEN 'email_signup'
+      WHEN d.user_id IS NULL THEN 'anonymous'
       WHEN p.is_pro THEN 'paid'
       ELSE 'free_logged_in'
     END AS segment,
-    lower(btrim(d.email)) AS actor_key,
+    CASE
+      WHEN d.user_id IS NOT NULL THEN d.user_id::text
+      ELSE 'anon:' || d.page_url
+    END AS actor_key,
     count(*)::bigint AS download_count
   FROM public.csv_downloads d
-  LEFT JOIN public.profiles p
-    ON lower(btrim(p.email)) = lower(btrim(d.email))
+  LEFT JOIN public.profiles p ON p.id = d.user_id
   WHERE p_period_start IS NULL OR d.downloaded_at >= p_period_start
   GROUP BY segment, actor_key
   ORDER BY segment, actor_key;

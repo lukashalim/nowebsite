@@ -14,7 +14,10 @@ const RESERVED_FIRST_SEGMENTS = new Set([
   "sign-in",
   "demo",
   "crm",
+  "dashboard",
   "admin",
+  "privacy",
+  "terms",
   "_next",
   "favicon.ico",
   "robots.txt",
@@ -34,9 +37,12 @@ const DIRECTORY_EXACT = new Set([
 const SKIP_RATE_LIMIT_PREFIXES = [
   "/api/",
   "/crm",
+  "/dashboard",
   "/auth",
   "/sign-in",
   "/demo",
+  "/privacy",
+  "/terms",
   "/admin",
   "/_next",
   "/scrape-progress",
@@ -92,14 +98,25 @@ export async function middleware(request: NextRequest) {
   let sessionResponse: NextResponse | null = null;
   if (
     pathname.startsWith("/crm") ||
+    pathname.startsWith("/dashboard") ||
     pathname.startsWith("/auth") ||
     pathname.startsWith("/sign-in")
   ) {
     sessionResponse = await updateSession(request);
   }
 
+  if (pathname.startsWith("/demo")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/crm";
+    const redirect = NextResponse.redirect(url, 308);
+    if (sessionResponse) {
+      copyCookies(sessionResponse, redirect);
+    }
+    return withRobotsHeader(redirect);
+  }
+
   const match = /^\/([^/]+)\/([^/]+)\/?$/.exec(pathname);
-  if (!match) {
+  if (!match || isRingReady) {
     return withRobotsHeader(sessionResponse ?? NextResponse.next());
   }
 

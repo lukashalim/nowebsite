@@ -15,6 +15,8 @@ export interface BusinessLead {
   rating: number | null;
   reviews: number | null;
   phone: string | null;
+  /** Telnyx carrier lookup bucket (home-services backfill). */
+  phone_line_type?: "mobile" | "landline_or_voip" | "unknown" | null;
   google_maps_link: string | null;
   facebook_url: string | null;
   /** Maps "website" field when stored (e.g. wa.me); may be null for older rows. */

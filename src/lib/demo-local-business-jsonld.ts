@@ -5,6 +5,7 @@ import { absoluteUrl } from "@/lib/site-url";
 
 export function buildLocalBusinessJsonLd(
   b: DemoBusiness,
+  publicPath?: string,
 ): Record<string, unknown> {
   const name = b.name?.trim() || "Local business";
   const service =
@@ -32,7 +33,7 @@ export function buildLocalBusinessJsonLd(
     "@type": "LocalBusiness",
     name,
     description,
-    url: absoluteUrl(demoPublicPath(b)),
+    url: absoluteUrl(publicPath ?? demoPublicPath(b)),
   };
 
   const areaServed = [city, region, postal].filter(Boolean);

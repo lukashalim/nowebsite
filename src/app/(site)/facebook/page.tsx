@@ -22,9 +22,9 @@ import {
 } from "@/lib/directory/pagination";
 import { DIRECTORY_MIN_CITY_LISTINGS } from "@/lib/directory/types";
 import { absoluteUrl } from "@/lib/site-url";
+import { getAuthenticatedUserProfile, isPro } from "@/lib/subscription";
 import { createDirectoryContactAccess } from "@/lib/directory/contact-access";
 import { listingScopeForFacebook } from "@/lib/directory/listing-scope";
-import { stripContactFieldsList } from "@/lib/directory/contact-fields";
 
 export const revalidate = 3600;
 
@@ -109,6 +109,15 @@ export default async function FacebookDirectoryPage({
         data.filters,
       )
     : null;
+  const exportAccess = data
+    ? createDirectoryContactAccess(
+        listingScopeForFacebook(),
+        1,
+        data.filters,
+      )
+    : null;
+  const auth = await getAuthenticatedUserProfile();
+  const userIsPro = isPro(auth?.profile);
 
   const jsonLd = data
     ? buildDirectoryListJsonLd(data.businesses, PAGE_PATH, PAGE_TITLE)
@@ -270,11 +279,13 @@ export default async function FacebookDirectoryPage({
             />
           ) : null}
 
-          {paginated && range && contactAccess ? (
+          {data && data.totalCount > 0 && exportAccess ? (
             <DownloadCsvButton
-              businesses={stripContactFieldsList(data.businesses)}
-              contactAccess={contactAccess}
+              exportAccess={exportAccess}
               pagePath={PAGE_PATH}
+              pageSize={data.pageSize}
+              totalPages={data.totalPages}
+              isPro={userIsPro}
               className="inline-flex items-center justify-center gap-2 rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
             />
           ) : null}

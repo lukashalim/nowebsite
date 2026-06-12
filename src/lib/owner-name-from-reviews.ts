@@ -1,3 +1,5 @@
+import "server-only";
+
 import { z } from "zod";
 import type { DemoReviewHighlight } from "@/lib/demo-review-types";
 import { deepseekChat } from "@/lib/deepseek";

@@ -10,6 +10,7 @@ import {
   sanitizeJsonColumn,
   truncateForJson,
 } from "./json-column-sanitize.mjs";
+import { directoryCategorySlugForRow } from "../../src/lib/directory/resolve-category-slug.ts";
 
 /**
  * @param {number|string} longitude
@@ -219,6 +220,9 @@ export function buildBusinessUpsertPayload(raw, base) {
   const hoursData = extractHoursData(raw);
   return omitUndefined({
     ...core,
+    directory_category_slug:
+      directoryCategorySlugForRow(base.main_category, base.business_type) ??
+      undefined,
     review_highlights: sanitizeJsonColumn(extractReviewHighlights(raw, limit)),
     services_offered: extractServicesOffered(raw, base),
     hours: sanitizeJsonColumn(hoursData.hours),

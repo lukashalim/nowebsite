@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import {
   ExternalLink,
   Mail,
@@ -11,12 +10,8 @@ import {
   Star,
   Clock3,
 } from "lucide-react";
-import {
-  fetchDemoBusinessByUrlSegment,
-  type DemoBusiness,
-} from "@/lib/crm-cohort";
-import { demoPublicPath, isLikelyGooglePlaceId } from "@/lib/demo-slug";
 import { DemoReviewCarousel } from "@/components/demo-review-carousel";
+import { TenantActivationBanner } from "@/components/tenant-activation-banner";
 import { buildLocalBusinessJsonLd } from "@/lib/demo-local-business-jsonld";
 import {
   enrichmentSocialLinksForUi,
@@ -26,12 +21,18 @@ import {
   truncateForMeta,
 } from "@/lib/demo-enrichment";
 import { absoluteUrl } from "@/lib/site-url";
+import {
+  fetchTenantDemoLead,
+  resolveTenantPaymentLink,
+  tenantDemoPublicPath,
+  type TenantDemoLead,
+} from "@/lib/tenant-demo-lead";
 
 export const revalidate = 3600;
 export const dynamicParams = true;
 
 interface PageProps {
-  params: Promise<{ placeId: string }>;
+  params: Promise<{ slug: string; leadSlug: string }>;
 }
 
 function serviceLabel(b: {
@@ -48,32 +49,32 @@ function serviceLabel(b: {
   return b.main_category?.trim() || "Local services";
 }
 
-function formatTitle(b: DemoBusiness | null) {
-  if (!b) return "Demo not found";
-  const name = b.name?.trim() || "Local business";
-  const service = serviceLabel(b);
-  const city = b.city?.trim();
-  const state = b.state?.trim();
+function formatTitle(lead: TenantDemoLead | null): string {
+  if (!lead) return "Site not found";
+  const name = lead.name?.trim() || "Local business";
+  const service = serviceLabel(lead);
+  const city = lead.city?.trim();
+  const state = lead.state?.trim();
   const loc = [city, state].filter(Boolean).join(", ");
   return loc ? `${name} | ${service} in ${loc}` : `${name} | ${service}`;
 }
 
-function formatDescription(b: NonNullable<DemoBusiness>): string {
-  const summary = b.enrichment?.sales_summary?.trim();
+function formatDescription(lead: TenantDemoLead): string {
+  const summary = lead.enrichment?.sales_summary?.trim();
   if (summary) {
     return truncateForMeta(summary.replace(/\s+/g, " "));
   }
-  const name = b.name?.trim() || "This business";
-  const service = serviceLabel(b);
+  const name = lead.name?.trim() || "This business";
+  const service = serviceLabel(lead);
   const parts = [
     `${name} — ${service}.`,
-    b.address ? ` ${b.address}.` : "",
-    [b.city, b.state, b.postal_code].filter(Boolean).length
-      ? ` Serving ${[b.city, b.state, b.postal_code].filter(Boolean).join(", ")}.`
+    lead.address ? ` ${lead.address}.` : "",
+    [lead.city, lead.state, lead.postal_code].filter(Boolean).length
+      ? ` Serving ${[lead.city, lead.state, lead.postal_code].filter(Boolean).join(", ")}.`
       : "",
   ];
-  if (b.rating != null && b.reviews != null) {
-    parts.push(` Rated ${Number(b.rating).toFixed(1)} from ${b.reviews} reviews.`);
+  if (lead.rating != null && lead.reviews != null) {
+    parts.push(` Rated ${Number(lead.rating).toFixed(1)} from ${lead.reviews} reviews.`);
   }
   return parts.join("").replace(/\s+/g, " ").trim();
 }
@@ -81,22 +82,23 @@ function formatDescription(b: NonNullable<DemoBusiness>): string {
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  const { placeId } = await params;
-  const b = await fetchDemoBusinessByUrlSegment(placeId);
-  if (!b) {
-    return { title: "Demo not found" };
+  const { slug: username, leadSlug } = await params;
+  const result = await fetchTenantDemoLead(username, leadSlug);
+  if (!result) {
+    return { title: "Site not found" };
   }
-  const path = demoPublicPath(b);
+  const path = tenantDemoPublicPath(username, leadSlug);
   return {
-    title: formatTitle(b),
-    description: formatDescription(b),
+    title: formatTitle(result.lead),
+    description: formatDescription(result.lead),
     alternates: { canonical: path },
     openGraph: {
-      title: formatTitle(b),
-      description: formatDescription(b),
+      title: formatTitle(result.lead),
+      description: formatDescription(result.lead),
       url: absoluteUrl(path),
       type: "website",
     },
+    robots: { index: false, follow: false },
   };
 }
 
@@ -141,27 +143,16 @@ function formatBusinessDisplayName(name: string | null, service: string): string
   return toTitleCaseWords(base);
 }
 
-export default async function DemoBusinessPage({ params }: PageProps) {
-  const { placeId } = await params;
-  const b = await fetchDemoBusinessByUrlSegment(placeId);
-  if (!b) {
+export default async function TenantDemoLeadPage({ params }: PageProps) {
+  const { slug: username, leadSlug } = await params;
+  const result = await fetchTenantDemoLead(username, leadSlug);
+  if (!result) {
     notFound();
   }
 
-  const decodedSegment = (() => {
-    try {
-      return decodeURIComponent(placeId.trim());
-    } catch {
-      return placeId.trim();
-    }
-  })();
-  if (
-    b.demo_slug &&
-    isLikelyGooglePlaceId(decodedSegment) &&
-    decodedSegment === b.place_id
-  ) {
-    redirect(demoPublicPath(b));
-  }
+  const { lead: b, userPaymentLink } = result;
+  const paymentLink = resolveTenantPaymentLink(userPaymentLink);
+  const publicPath = tenantDemoPublicPath(username, leadSlug);
 
   const service = serviceLabel(b);
   const displayName = formatBusinessDisplayName(b.name, service);
@@ -169,7 +160,7 @@ export default async function DemoBusinessPage({ params }: PageProps) {
     [b.city, b.state, b.postal_code].filter(Boolean).join(", ") ||
     b.address ||
     "";
-  const jsonLd = buildLocalBusinessJsonLd(b);
+  const jsonLd = buildLocalBusinessJsonLd(b, publicPath);
   const salesSummary = b.enrichment?.sales_summary?.trim() ?? null;
   const summaryShort =
     salesSummary && salesSummary.length > SUMMARY_PREVIEW_LEN
@@ -202,18 +193,9 @@ export default async function DemoBusinessPage({ params }: PageProps) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <article
-        className="mx-auto min-h-screen max-w-3xl flex-1 bg-white px-5 py-12 text-zinc-900 sm:px-8 sm:py-14"
+        className="mx-auto min-h-screen max-w-3xl flex-1 bg-white px-5 py-12 pb-28 text-zinc-900 sm:px-8 sm:py-14 sm:pb-32"
         style={{ fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}
       >
-        <p className="mb-4 text-sm">
-          <Link
-            href="/demo"
-            className="font-medium text-blue-600 hover:underline"
-          >
-            ← All demo sites
-          </Link>
-        </p>
-
         <header className="mb-16 space-y-4 border-b border-zinc-200 pb-10">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">
             {service}
@@ -246,7 +228,7 @@ export default async function DemoBusinessPage({ params }: PageProps) {
             <div className="flex flex-col gap-3 pt-1 sm:flex-row sm:items-center sm:justify-start">
               {b.rating != null ? (
                 <p className="inline-flex items-center gap-2 py-3 text-zinc-900">
-              <Star className="size-5 fill-amber-500 text-amber-500" aria-hidden />
+                  <Star className="size-5 fill-amber-500 text-amber-500" aria-hidden />
                   <span className="tabular-nums">
                     {Number(b.rating).toFixed(1)} stars
                     {b.reviews != null ? ` · ${b.reviews} reviews` : ""}
@@ -502,6 +484,7 @@ export default async function DemoBusinessPage({ params }: PageProps) {
           {b.name?.trim() || "this business"}.
         </p>
       </article>
+      <TenantActivationBanner paymentLink={paymentLink} />
     </>
   );
 }

@@ -44,8 +44,9 @@ public/       # Static assets
 
 1. Copy `.env.local.example` to `.env.local` and fill in Supabase credentials.
 2. Optional: add `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` for SMS line-type lookup in the CRM.
-3. Run SQL migrations in `scrape/sql/` against your Supabase project as needed.
-4. Start the dev server:
+3. Optional: add `TELNYX_API_KEY` for batch phone-type enrichment (see below).
+4. Run SQL migrations in `scrape/sql/` against your Supabase project as needed.
+5. Start the dev server:
 
 ```bash
 npm install
@@ -53,6 +54,21 @@ npm run dev
 ```
 
 Sign in at `/sign-in` or `/crm` with Google OAuth. Configure Supabase **Site URL** and **Redirect URLs** for your environment (e.g. `https://nowebsitebusinessleads.com/auth/callback` in production).
+
+### Phone line type backfill (Telnyx)
+
+Home-services businesses can be enriched with carrier line type (`mobile`, `landline_or_voip`, `unknown`) for CRM filtering.
+
+1. Run [`scrape/sql/add-phone-line-type.sql`](scrape/sql/add-phone-line-type.sql) in Supabase.
+2. Set `TELNYX_API_KEY` in `.env.local` (Telnyx Mission Control → API Keys).
+3. Dry run, then backfill:
+
+```bash
+node --import ./scrape/env-nowebsite-queue.mjs ./scrape/backfill-phone-line-type.mjs --dry-run --limit 20
+node --import ./scrape/env-nowebsite-queue.mjs ./scrape/backfill-phone-line-type.mjs --limit 500
+```
+
+Use `--force` to re-lookup rows that already have `phone_line_type`. Optional env: `PHONE_LINE_BACKFILL_BATCH` (default 25), `PHONE_LINE_BACKFILL_SLEEP_MS` (default 300).
 
 ## Related
 

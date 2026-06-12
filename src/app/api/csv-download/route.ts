@@ -1,175 +1,142 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { isScriptUserAgent } from "@/lib/bot-detection";
 import {
-  FREE_MONTHLY_DIRECTORY_CSV_LIMIT,
-  getDirectoryCsvDownloadCount,
-  getDirectoryCsvDownloadSummary,
-  normalizeCsvDownloadEmail,
-} from "@/lib/csv-download-limits";
-import { addContactToList, isEmailConfirmed } from "@/lib/sendfox";
+  buildDirectoryBusinessesCsv,
+  csvFilenameFromPagePath,
+} from "@/lib/directory/csv-export";
+import { fetchDirectoryPageExportBusinesses } from "@/lib/directory/page-export";
+import { verifyListingAccessToken } from "@/lib/directory/listing-access-token";
+import { parseDirectoryListingFilters } from "@/lib/directory/listing-filters";
+import { parseListingScope } from "@/lib/directory/listing-scope";
+import {
+  checkRateLimit,
+  getClientIp,
+  rateLimitHeaders,
+} from "@/lib/rate-limit";
 import { getAuthenticatedUserProfile, isPro } from "@/lib/subscription";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const csvDownloadSchema = z.object({
-  email: z.email(),
+const querySchema = z.object({
+  scope: z.string().min(3).max(200),
+  token: z.string().min(10).max(500),
+  pageSize: z.coerce.number().int().min(1).max(500),
+  totalPages: z.coerce.number().int().min(1).max(10_000),
   pageUrl: z.string().min(1).max(500),
-  mode: z.literal("page"),
+  state: z.string().optional(),
+  city: z.string().optional(),
+  minReviews: z.string().optional(),
 });
 
-export async function GET(request: Request) {
-  const auth = await getAuthenticatedUserProfile();
-  const userIsPro = isPro(auth?.profile);
-
-  if (userIsPro) {
-    return NextResponse.json({ isPro: true });
-  }
-
-  const { searchParams } = new URL(request.url);
-  const rawEmail = searchParams.get("email");
-
-  if (rawEmail?.trim()) {
-    const normalizedEmail = normalizeCsvDownloadEmail(rawEmail);
-    try {
-      const [summary, emailConfirmed] = await Promise.all([
-        getDirectoryCsvDownloadSummary(normalizedEmail),
-        isEmailConfirmed(normalizedEmail),
-      ]);
-      return NextResponse.json({
-        isPro: false,
-        used: summary.used,
-        remaining: summary.remaining,
-        limit: summary.limit,
-        periodEnd: summary.periodEnd,
-        emailConfirmed,
-      });
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Could not load download status";
-      return NextResponse.json({ error: message }, { status: 500 });
-    }
-  }
-
-  return NextResponse.json({
-    isPro: false,
-    used: 0,
-    remaining: FREE_MONTHLY_DIRECTORY_CSV_LIMIT,
-    limit: FREE_MONTHLY_DIRECTORY_CSV_LIMIT,
-  });
-}
-
-async function logCsvDownload(email: string, pageUrl: string): Promise<void> {
+async function logCsvDownload(
+  pageUrl: string,
+  userId: string | null,
+): Promise<void> {
   const supabase = createSupabaseAdmin();
   const { error } = await supabase.from("csv_downloads").insert({
-    email: normalizeCsvDownloadEmail(email),
     page_url: pageUrl,
+    user_id: userId,
+    email: null,
   });
   if (error) {
     throw new Error(error.message);
   }
 }
 
-export async function POST(request: Request) {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+export async function GET(request: Request) {
+  const userAgent = request.headers.get("user-agent");
+  if (isScriptUserAgent(userAgent)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const parsed = csvDownloadSchema.safeParse(body);
+  const ip = getClientIp(request);
+  const rateLimit = await checkRateLimit("directoryPage", ip, userAgent);
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: rateLimitHeaders(rateLimit) },
+    );
+  }
+
+  const url = new URL(request.url);
+  const parsed = querySchema.safeParse({
+    scope: url.searchParams.get("scope"),
+    token: url.searchParams.get("token"),
+    pageSize: url.searchParams.get("pageSize"),
+    totalPages: url.searchParams.get("totalPages"),
+    pageUrl: url.searchParams.get("pageUrl"),
+    state: url.searchParams.get("state") ?? undefined,
+    city: url.searchParams.get("city") ?? undefined,
+    minReviews: url.searchParams.get("minReviews") ?? undefined,
+  });
+
   if (!parsed.success) {
-    const legacyFull =
-      typeof body === "object" &&
-      body !== null &&
-      (body as { mode?: string }).mode === "full";
-    if (legacyFull) {
-      return NextResponse.json(
-        { error: "Full directory CSV export is not available" },
-        { status: 403 },
-      );
-    }
     return NextResponse.json(
       { error: "Invalid request", details: parsed.error.flatten() },
       { status: 400 },
     );
   }
 
-  const { email, pageUrl } = parsed.data;
-  const normalizedEmail = normalizeCsvDownloadEmail(email);
+  const scope = parseListingScope(parsed.data.scope);
+  if (!scope) {
+    return NextResponse.json({ error: "Invalid scope" }, { status: 400 });
+  }
+
+  const filters = parseDirectoryListingFilters({
+    state: parsed.data.state,
+    city: parsed.data.city,
+    minReviews: parsed.data.minReviews,
+  });
+
+  if (
+    !verifyListingAccessToken(parsed.data.token, scope, 1, filters)
+  ) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const auth = await getAuthenticatedUserProfile();
   const userIsPro = isPro(auth?.profile);
 
-  if (!userIsPro) {
-    let used: number;
-    try {
-      used = await getDirectoryCsvDownloadCount(normalizedEmail);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Could not verify download limit";
-      return NextResponse.json({ error: message }, { status: 500 });
-    }
-
-    if (used >= FREE_MONTHLY_DIRECTORY_CSV_LIMIT) {
-      const summary = await getDirectoryCsvDownloadSummary(normalizedEmail);
-      return NextResponse.json(
-        {
-          error: "Monthly CSV download limit reached.",
-          code: "csv_limit_reached",
-          used: summary.used,
-          limit: summary.limit,
-          periodEnd: summary.periodEnd,
-        },
-        { status: 403 },
-      );
-    }
-  }
-
   try {
-    await addContactToList(email);
+    const businesses = await fetchDirectoryPageExportBusinesses(
+      scope,
+      filters,
+      parsed.data.pageSize,
+      parsed.data.totalPages,
+      userIsPro,
+    );
+
+    await logCsvDownload(parsed.data.pageUrl, auth?.userId ?? null);
+
+    const csv = buildDirectoryBusinessesCsv(businesses);
+    const filename = csvFilenameFromPagePath(parsed.data.pageUrl);
+
+    return new NextResponse(csv, {
+      status: 200,
+      headers: {
+        ...rateLimitHeaders(rateLimit),
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Cache-Control": "private, no-store",
+      },
+    });
   } catch (err) {
     const message =
-      err instanceof Error ? err.message : "Failed to subscribe email";
-    return NextResponse.json({ error: message }, { status: 502 });
-  }
-
-  if (!userIsPro) {
-    let confirmed: boolean;
-    try {
-      confirmed = await isEmailConfirmed(email);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Could not verify email confirmation";
-      return NextResponse.json({ error: message }, { status: 502 });
-    }
-
-    if (!confirmed) {
-      return NextResponse.json(
-        { code: "email_confirmation_required", confirmed: false },
-        { status: 403 },
-      );
-    }
-  }
-
-  try {
-    await logCsvDownload(normalizedEmail, pageUrl);
-  } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Failed to log CSV download";
+      err instanceof Error ? err.message : "Failed to generate CSV export";
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
 
-  if (userIsPro) {
-    return NextResponse.json({ ok: true, remaining: null, limit: null });
-  }
-
-  const summary = await getDirectoryCsvDownloadSummary(normalizedEmail);
-  return NextResponse.json({
-    ok: true,
-    remaining: summary.remaining,
-    limit: summary.limit,
-  });
+/** Legacy POST handler — redirects clients to GET export flow. */
+export async function POST() {
+  return NextResponse.json(
+    {
+      error:
+        "Directory CSV export now downloads immediately. Refresh the page and click Download CSV again.",
+    },
+    { status: 410 },
+  );
 }

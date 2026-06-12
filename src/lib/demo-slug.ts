@@ -35,9 +35,22 @@ export function demoPathSegment(b: {
   return encodeURIComponent(b.place_id);
 }
 
-export function demoPublicPath(b: {
-  demo_slug?: string | null;
-  place_id: string;
-}): string {
-  return `/demo/${demoPathSegment(b)}`;
+export function tenantDemoPublicPath(username: string, slug: string): string {
+  return `/${encodeURIComponent(username.trim())}/${encodeURIComponent(slug.trim())}`;
+}
+
+/** Legacy global demo path — prefer tenantDemoPublicPath when username is known. */
+export function demoPublicPath(
+  b: {
+    demo_slug?: string | null;
+    place_id: string;
+  },
+  username?: string | null,
+): string {
+  const segment = demoPathSegment(b);
+  const slug = b.demo_slug?.trim() || decodeURIComponent(segment);
+  if (username?.trim()) {
+    return tenantDemoPublicPath(username, slug);
+  }
+  return `/demo/${segment}`;
 }

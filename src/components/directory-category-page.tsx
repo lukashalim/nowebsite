@@ -27,7 +27,6 @@ import {
 import type { DirectoryCityGroup } from "@/lib/directory/types";
 import type { DirectoryBusiness } from "@/lib/directory/types";
 import type { DirectoryContactAccess } from "@/lib/directory/contact-fields";
-import { stripContactFieldsList } from "@/lib/directory/contact-fields";
 
 interface DirectoryCategoryPageProps {
   categorySlug: string;
@@ -46,6 +45,8 @@ interface DirectoryCategoryPageProps {
   filters: DirectoryListingFiltersState;
   filterOptions: DirectoryFilterOptions;
   contactAccess: DirectoryContactAccess;
+  exportAccess: DirectoryContactAccess;
+  isPro?: boolean;
 }
 
 export function DirectoryCategoryPage({
@@ -65,6 +66,8 @@ export function DirectoryCategoryPage({
   filters,
   filterOptions,
   contactAccess,
+  exportAccess,
+  isPro = false,
 }: DirectoryCategoryPageProps) {
   const title = nationwideCategoryPageTitle(categoryLabel);
   const path = `/${categorySlug}`;
@@ -215,11 +218,15 @@ export function DirectoryCategoryPage({
         />
       ) : null}
 
-      <DownloadCsvButton
-        businesses={stripContactFieldsList(businesses)}
-        contactAccess={contactAccess}
-        pagePath={path}
-      />
+      {totalCount > 0 ? (
+        <DownloadCsvButton
+          exportAccess={exportAccess}
+          pagePath={path}
+          pageSize={pageSize}
+          totalPages={totalPages}
+          isPro={isPro}
+        />
+      ) : null}
     </div>
   );
 }

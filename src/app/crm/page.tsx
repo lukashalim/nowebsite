@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { listSpintaxTemplates } from "@/app/actions/spintax-templates";
 import { CheckoutSuccessBanner } from "@/components/checkout-success-banner";
-import { CrmExportButton } from "@/components/crm-export-button";
 import { CrmFilters } from "@/components/crm-filters";
 import { CrmFreeUsageLayout } from "@/components/crm-free-usage-layout";
 import { CrmLeadsTableShell } from "@/components/crm-leads-table-shell";
@@ -10,10 +9,12 @@ import { CrmLoadError } from "@/components/crm-load-error";
 import { CrmLogin } from "@/components/crm-login";
 import { CrmNav } from "@/components/crm-nav";
 import { fetchCrmBusinessRows, fetchCrmFilterOptions } from "@/lib/crm-cohort";
+import { fetchCategoryGroupTaxonomy } from "@/lib/directory/category-groups";
 import { getCrmUsageSummary } from "@/lib/crm-usage";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
 import { tryParseCrmSearchParams } from "@/lib/crm-params";
 import { getUserProfile, isPro } from "@/lib/subscription";
+import { refreshSendFoxConfirmationForUser, syncSendFoxProfileForUser } from "@/lib/sendfox-profile-sync";
 import { syncProForUser } from "@/lib/stripe-subscription";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -70,6 +71,17 @@ export default async function CrmPage({ searchParams }: PageProps) {
 
   const p = parsed.data;
   let profile = await getUserProfile(user.id);
+  if (profile?.email) {
+    if (!profile.sendfox_subscribed_at) {
+      await syncSendFoxProfileForUser(user.id, profile.email).catch(() => {});
+      profile = await getUserProfile(user.id);
+    } else if (!profile.sendfox_confirmed_at) {
+      await refreshSendFoxConfirmationForUser(user.id, profile.email).catch(
+        () => {},
+      );
+      profile = await getUserProfile(user.id);
+    }
+  }
   const checkoutSuccess = raw.checkout === "success";
   const checkoutSessionId =
     typeof raw.session_id === "string" ? raw.session_id.trim() : undefined;
@@ -90,11 +102,12 @@ export default async function CrmPage({ searchParams }: PageProps) {
     raw.limit === "outreach" ||
     (!userIsPro && usageSummary !== null && usageSummary.remaining === 0);
 
-  const [{ rows, total, error: loadErr }, spintaxResult, filterOptions] =
+  const [{ rows, total, error: loadErr }, spintaxResult, filterOptions, taxonomy] =
     await Promise.all([
       fetchCrmBusinessRows(p, user.id),
       listSpintaxTemplates(),
       fetchCrmFilterOptions(),
+      fetchCategoryGroupTaxonomy(),
     ]);
   const loadError = loadErr;
   const spintaxTemplates = spintaxResult.ok ? spintaxResult.templates : [];
@@ -102,9 +115,10 @@ export default async function CrmPage({ searchParams }: PageProps) {
   const filters = (
     <CrmFilters
       params={p}
+      groups={taxonomy.groups}
       categories={filterOptions.categories}
       states={filterOptions.states}
-      exportSlot={<CrmExportButton params={p} isPro={userIsPro} />}
+      isPro={userIsPro}
     />
   );
 

@@ -1,17 +1,26 @@
+"use client";
+
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useMemo, useState } from "react";
 import {
   buildCrmQueryString,
   type CrmSearchParams,
 } from "@/lib/crm-params";
-import type { CrmFilterOption } from "@/lib/crm-cohort";
+import type { CrmCategoryFilterOption, CrmStateFilterOption } from "@/lib/crm-filter-options";
+import {
+  categoryAllowedForGroup,
+  filterCrmCategoriesByGroup,
+} from "@/lib/crm-filter-options";
+import type { CategoryGroup, CategoryGroupId } from "@/lib/directory/category-group-ids";
+import { CrmExportButton } from "@/components/crm-export-button";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
 
 interface CrmFiltersProps {
   params: CrmSearchParams;
-  categories: CrmFilterOption[];
-  states: CrmFilterOption[];
-  exportSlot?: ReactNode;
+  groups: readonly CategoryGroup[];
+  categories: CrmCategoryFilterOption[];
+  states: CrmStateFilterOption[];
+  isPro: boolean;
 }
 
 const fieldClass =
@@ -19,12 +28,56 @@ const fieldClass =
 
 const labelClass = "flex shrink-0 flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400";
 
+function categoryValidForGroup(
+  category: string,
+  categoryGroup: CategoryGroupId | "",
+  categories: CrmCategoryFilterOption[],
+): boolean {
+  return categoryAllowedForGroup(
+    category,
+    categoryGroup || undefined,
+    categories,
+  );
+}
+
 export function CrmFilters({
   params,
+  groups,
   categories,
   states,
-  exportSlot,
+  isPro,
 }: CrmFiltersProps) {
+  const [categoryGroup, setCategoryGroup] = useState<CategoryGroupId | "">(
+    params.categoryGroup ?? "",
+  );
+  const [category, setCategory] = useState(() => {
+    const initial = params.category ?? "";
+    if (
+      initial &&
+      !categoryValidForGroup(initial, params.categoryGroup ?? "", categories)
+    ) {
+      return "";
+    }
+    return initial;
+  });
+
+  const visibleCategories = useMemo(
+    () => filterCrmCategoriesByGroup(categories, categoryGroup || undefined),
+    [categories, categoryGroup],
+  );
+
+  function handleIndustryChange(next: CategoryGroupId | "") {
+    setCategoryGroup(next);
+    if (next && category) {
+      const stillValid = categories.some(
+        (c) => c.value === category && c.groupId === next,
+      );
+      if (!stillValid) {
+        setCategory("");
+      }
+    }
+  }
+
   return (
     <section
       className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-3 dark:border-zinc-800 dark:bg-zinc-900/40"
@@ -88,6 +141,22 @@ export function CrmFilters({
         </label>
 
         <label className={labelClass}>
+          Phone type
+          <select
+            name="phoneLineType"
+            defaultValue={params.phoneLineType}
+            className={`${fieldClass} min-w-[9rem]`}
+            title="Filter by Telnyx carrier lookup (home-services backfill). Not looked up = no stored type yet."
+          >
+            <option value="all">All</option>
+            <option value="mobile">Mobile</option>
+            <option value="landline_or_voip">Landline / VoIP</option>
+            <option value="unknown">Unknown</option>
+            <option value="not_checked">Not looked up</option>
+          </select>
+        </label>
+
+        <label className={labelClass}>
           Stage
           <select
             name="stage"
@@ -104,14 +173,35 @@ export function CrmFilters({
         </label>
 
         <label className={labelClass}>
+          Industry
+          <select
+            name="categoryGroup"
+            value={categoryGroup}
+            onChange={(e) =>
+              handleIndustryChange(e.target.value as CategoryGroupId | "")
+            }
+            className={`${fieldClass} min-w-[10rem]`}
+          >
+            <option value="">All industries</option>
+            {groups.map((group) => (
+              <option key={group.id} value={group.id}>
+                {group.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className={labelClass}>
           Category
           <select
             name="category"
-            defaultValue={params.category ?? ""}
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
             className={`${fieldClass} min-w-[10rem]`}
+            disabled={categoryGroup !== "" && visibleCategories.length === 0}
           >
             <option value="">All categories</option>
-            {categories.map((c) => (
+            {visibleCategories.map((c) => (
               <option key={c.value} value={c.value}>
                 {c.label}
               </option>
@@ -165,7 +255,7 @@ export function CrmFilters({
         </label>
 
         <div className="ml-auto flex shrink-0 items-center gap-2">
-          {exportSlot}
+          <CrmExportButton params={params} isPro={isPro} />
           <button
             type="submit"
             className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"

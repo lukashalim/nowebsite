@@ -1,4 +1,5 @@
 import type { BusinessLead } from "@/lib/business";
+import { tenantDemoPublicPath } from "@/lib/demo-slug";
 
 const CSV_COLUMNS = [
   "name",
@@ -8,6 +9,7 @@ const CSV_COLUMNS = [
   "rating",
   "reviews",
   "phone",
+  "phone_line_type",
   "main_category",
   "stage",
   "owner_name",
@@ -28,13 +30,19 @@ function cell(value: string | number | null | undefined): string {
   return escapeCsvField(String(value));
 }
 
-export function buildCrmLeadsCsv(rows: BusinessLead[], demoBaseUrl: string): string {
+export function buildCrmLeadsCsv(
+  rows: BusinessLead[],
+  demoBaseUrl: string,
+  username?: string | null,
+): string {
   const header = CSV_COLUMNS.join(",");
   const origin = demoBaseUrl.replace(/\/$/, "");
 
   const dataRows = rows.map((b) => {
-    const demoSegment = b.demo_slug?.trim() || b.place_id;
-    const demoUrl = `${origin}/demo/${demoSegment}`;
+    const slug = b.demo_slug?.trim() || b.place_id;
+    const demoUrl = username?.trim()
+      ? `${origin}${tenantDemoPublicPath(username, slug)}`
+      : `${origin}/demo/${encodeURIComponent(slug)}`;
 
     return [
       cell(b.name),
@@ -44,6 +52,7 @@ export function buildCrmLeadsCsv(rows: BusinessLead[], demoBaseUrl: string): str
       cell(b.rating),
       cell(b.reviews),
       cell(b.phone),
+      cell(b.phone_line_type),
       cell(b.main_category),
       cell(b.stage),
       cell(b.owner_name),

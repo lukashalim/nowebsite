@@ -1,3 +1,5 @@
+import "server-only";
+
 import { config as loadDotenv } from "dotenv";
 import fs from "node:fs";
 import path from "node:path";

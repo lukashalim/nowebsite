@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CRM_STAGE_VALUES, type CrmStage } from "@/lib/crm-stage";
+import { CATEGORY_GROUP_IDS } from "@/lib/directory/category-group-ids";
 
 function firstParam(
   value: string | string[] | undefined,
@@ -45,6 +46,15 @@ const optionalFilterString = z.preprocess((val) => {
   return s || undefined;
 }, z.string().min(1).optional());
 
+const optionalCategoryGroup = z.preprocess((val) => {
+  if (val === undefined || val === "") return undefined;
+  const s = String(val).trim().toLowerCase();
+  if ((CATEGORY_GROUP_IDS as readonly string[]).includes(s)) {
+    return s as (typeof CATEGORY_GROUP_IDS)[number];
+  }
+  return undefined;
+}, z.enum(CATEGORY_GROUP_IDS).optional());
+
 /** `plain` = legacy ?contactSurface=none (no FB/WA bucket only). `no` = legacy URL alias for `all`. */
 export const crmWebPresenceValues = [
   "all",
@@ -56,6 +66,15 @@ export const crmWebPresenceValues = [
 ] as const;
 export type CrmWebPresence = (typeof crmWebPresenceValues)[number];
 
+export const crmPhoneLineTypeValues = [
+  "all",
+  "mobile",
+  "landline_or_voip",
+  "unknown",
+  "not_checked",
+] as const;
+export type CrmPhoneLineType = (typeof crmPhoneLineTypeValues)[number];
+
 export const crmSearchParamsSchema = z
   .object({
     minReviews: intInRange(25, 0, 1_000_000),
@@ -63,11 +82,13 @@ export const crmSearchParamsSchema = z
     minRating: floatInRange(4, 0, 5),
     /** All = broad no-website cohort; Facebook / WhatsApp narrow by Maps listing; Yes = has a real site. */
     webPresence: z.enum(crmWebPresenceValues).default("all"),
+    phoneLineType: z.enum(crmPhoneLineTypeValues).default("all"),
     page: intInRange(1, 1, 1_000_000),
     pageSize: intInRange(50, 1, 100),
     contactMin: optionalInt,
     contactMax: optionalInt,
     stage: optionalStage,
+    categoryGroup: optionalCategoryGroup,
     category: optionalFilterString,
     state: optionalFilterString,
   })
@@ -140,11 +161,13 @@ function rawToFlat(raw: Record<string, string | string[] | undefined>) {
     maxReviews: firstParam(raw.maxReviews),
     minRating: firstParam(raw.minRating),
     webPresence: normalizeWebPresence(raw),
+    phoneLineType: firstParam(raw.phoneLineType),
     page: firstParam(raw.page),
     pageSize: firstParam(raw.pageSize),
     contactMin: firstParam(raw.contactMin),
     contactMax: firstParam(raw.contactMax),
     stage: firstParam(raw.stage),
+    categoryGroup: firstParam(raw.categoryGroup),
     category: firstParam(raw.category),
     state: firstParam(raw.state),
   };
@@ -172,11 +195,15 @@ function appendCrmFilterParams(sp: URLSearchParams, params: CrmSearchParams): vo
   if (params.minRating !== 4) sp.set("minRating", String(params.minRating));
   if (params.webPresence !== "all")
     sp.set("webPresence", params.webPresence);
+  if (params.phoneLineType !== "all")
+    sp.set("phoneLineType", params.phoneLineType);
   if (params.contactMin !== undefined)
     sp.set("contactMin", String(params.contactMin));
   if (params.contactMax !== undefined)
     sp.set("contactMax", String(params.contactMax));
   if (params.stage !== undefined) sp.set("stage", params.stage);
+  if (params.categoryGroup !== undefined)
+    sp.set("categoryGroup", params.categoryGroup);
   if (params.category !== undefined) sp.set("category", params.category);
   if (params.state !== undefined) sp.set("state", params.state);
 }

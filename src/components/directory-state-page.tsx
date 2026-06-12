@@ -21,7 +21,6 @@ import { stateAbbrToDisplayName, stateToAbbr } from "@/lib/directory/slugs";
 import type { DirectoryCityGroup } from "@/lib/directory/types";
 import type { DirectoryBusiness } from "@/lib/directory/types";
 import type { DirectoryContactAccess } from "@/lib/directory/contact-fields";
-import { stripContactFieldsList } from "@/lib/directory/contact-fields";
 
 interface DirectoryStatePageProps {
   stateSlug: string;
@@ -45,6 +44,8 @@ interface DirectoryStatePageProps {
   filters?: DirectoryListingFiltersState;
   filterOptions?: DirectoryFilterOptions;
   contactAccess?: DirectoryContactAccess;
+  exportAccess?: DirectoryContactAccess;
+  isPro?: boolean;
 }
 
 export function DirectoryStatePage({
@@ -69,6 +70,8 @@ export function DirectoryStatePage({
   filters,
   filterOptions,
   contactAccess,
+  exportAccess,
+  isPro = false,
 }: DirectoryStatePageProps) {
   const title = isUkRegion ? ukRegionHubTitle(state) : stateHubTitle(state);
   const path = pathPrefix
@@ -202,11 +205,13 @@ export function DirectoryStatePage({
         />
       ) : null}
 
-      {paginated && contactAccess ? (
+      {paginated && exportAccess ? (
         <DownloadCsvButton
-          businesses={stripContactFieldsList(businesses)}
-          contactAccess={contactAccess}
+          exportAccess={exportAccess}
           pagePath={path}
+          pageSize={pageSize}
+          totalPages={totalPages}
+          isPro={isPro}
         />
       ) : null}
     </div>

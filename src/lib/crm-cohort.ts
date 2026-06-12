@@ -11,7 +11,27 @@ import {
   type CrmWebPresence,
 } from "@/lib/crm-params";
 import { formatCategoryDisplayName } from "@/lib/directory/labels";
+import {
+  allNamedCategoryGroupSlugs,
+  categorySlugsForGroup,
+  fetchCategoryGroupTaxonomy,
+  type CategoryGroupId,
+  type CategoryGroupTaxonomy,
+} from "@/lib/directory/category-groups";
 import { stateAbbrToDisplayName } from "@/lib/directory/slugs";
+import {
+  type CrmCategoryFilterOption,
+  type CrmFilterOptions,
+  type CrmStateFilterOption,
+  mainCategoryGroupId,
+} from "@/lib/crm-filter-options";
+export type {
+  CrmCategoryFilterOption,
+  CrmFilterOption,
+  CrmFilterOptions,
+  CrmStateFilterOption,
+} from "@/lib/crm-filter-options";
+export { filterCrmCategoriesByGroup } from "@/lib/crm-filter-options";
 import { fetchCrmDistinctFilterValues } from "@/lib/directory/aggregate-queries";
 import {
   parseReviewHighlights,
@@ -24,7 +44,7 @@ import { cache } from "react";
 export type { DemoReviewHighlight } from "@/lib/demo-review-types";
 
 export const CRM_BUSINESS_LIST_COLUMNS =
-  "place_id, demo_slug, name, address, city, state, country, postal_code, business_type, main_category, rating, reviews, phone, google_maps_link, facebook_url, listing_website, crm_contact_surface" as const;
+  "place_id, demo_slug, name, address, city, state, country, postal_code, business_type, main_category, rating, reviews, phone, phone_line_type, google_maps_link, facebook_url, listing_website, crm_contact_surface" as const;
 
 const DEMO_CORE_COLUMNS =
   "place_id, demo_slug, name, address, city, state, postal_code, business_type, main_category, rating, reviews, phone, google_maps_link, facebook_url, listing_website, crm_contact_surface, contact_enrichment" as const;
@@ -137,7 +157,7 @@ function parseCrmContactSurface(
   return null;
 }
 
-function mapRowToDemoBusiness(
+export function mapRowToDemoBusiness(
   data: Record<string, unknown>,
   detail: boolean,
 ): DemoBusiness {
@@ -206,6 +226,55 @@ function parseUserContactStage(raw: unknown): CrmStage {
     return raw;
   }
   return "new";
+}
+
+function applyPhoneLineTypeFilter<
+  T extends {
+    eq: (column: string, value: unknown) => T;
+    is: (column: string, value: null) => T;
+  },
+>(q: T, phoneLineType: CrmSearchParams["phoneLineType"]): T {
+  switch (phoneLineType) {
+    case "all":
+      return q;
+    case "mobile":
+      return q.eq("phone_line_type", "mobile");
+    case "landline_or_voip":
+      return q.eq("phone_line_type", "landline_or_voip");
+    case "unknown":
+      return q.eq("phone_line_type", "unknown");
+    case "not_checked":
+      return q.is("phone_line_type", null);
+    default: {
+      const _x: never = phoneLineType;
+      return _x;
+    }
+  }
+}
+
+function applyCategoryGroupFilter<
+  T extends {
+    in: (column: string, values: string[]) => T;
+    or: (filters: string) => T;
+    is: (column: string, value: null) => T;
+    not: (column: string, operator: string, value: string) => T;
+  },
+>(q: T, categoryGroup: CategoryGroupId, taxonomy: CategoryGroupTaxonomy): T {
+  if (categoryGroup === "other") {
+    const named = allNamedCategoryGroupSlugs(taxonomy);
+    if (named.length === 0) {
+      return q;
+    }
+    return q.or(
+      `directory_category_slug.is.null,directory_category_slug.not.in.(${named.join(",")})`,
+    );
+  }
+
+  const slugs = categorySlugsForGroup(categoryGroup, taxonomy);
+  if (slugs.length === 0) {
+    return q;
+  }
+  return q.in("directory_category_slug", slugs);
 }
 
 function applyStageFilter<
@@ -279,6 +348,7 @@ export async function fetchCrmBusinessRows(
   userId: string,
 ): Promise<{ rows: BusinessLead[]; total: number; error: string | null }> {
   try {
+    const taxonomy = await fetchCategoryGroupTaxonomy();
     const supabase = createSupabaseAdmin();
 
     const { data: userContactsRaw, error: contactsError } = await supabase
@@ -336,11 +406,21 @@ export async function fetchCrmBusinessRows(
     q = stageFiltered;
 
     if (p.category) {
-      q = q.eq("main_category", p.category);
+      const categoryAllowed =
+        !p.categoryGroup ||
+        mainCategoryGroupId(p.category, taxonomy) === p.categoryGroup;
+      if (categoryAllowed) {
+        q = q.eq("main_category", p.category);
+      }
+    }
+    if (p.categoryGroup) {
+      q = applyCategoryGroupFilter(q, p.categoryGroup, taxonomy);
     }
     if (p.state) {
       q = q.eq("state", p.state);
     }
+
+    q = applyPhoneLineTypeFilter(q, p.phoneLineType);
 
     q = applyReviewExcerptsExtractedFilter(q);
 
@@ -353,8 +433,10 @@ export async function fetchCrmBusinessRows(
 
     if (error) {
       const hint =
-        /crm_contact_surface|listing_website|schema cache/i.test(error.message)
-          ? " Run scrape/sql/add-listing-website-crm-contact-surface.sql in Supabase, then refresh."
+        /crm_contact_surface|listing_website|phone_line_type|schema cache/i.test(
+          error.message,
+        )
+          ? " Run scrape/sql migrations in Supabase (e.g. add-listing-website-crm-contact-surface.sql, add-phone-line-type.sql), then refresh."
           : "";
       return { rows: [], total: 0, error: error.message + hint };
     }
@@ -384,19 +466,12 @@ export async function fetchCrmBusinessRows(
   }
 }
 
-export interface CrmFilterOption {
-  value: string;
-  label: string;
-}
-
-export interface CrmFilterOptions {
-  categories: CrmFilterOption[];
-  states: CrmFilterOption[];
-}
-
 export const fetchCrmFilterOptions = cache(
   async (): Promise<CrmFilterOptions> => {
-    const rows = await fetchCrmDistinctFilterValues();
+    const [rows, taxonomy] = await Promise.all([
+      fetchCrmDistinctFilterValues(),
+      fetchCategoryGroupTaxonomy(),
+    ]);
     const categorySet = new Set<string>();
     const stateSet = new Set<string>();
 
@@ -409,6 +484,7 @@ export const fetchCrmFilterOptions = cache(
       .map((value) => ({
         value,
         label: formatCategoryDisplayName(value),
+        groupId: mainCategoryGroupId(value, taxonomy),
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
 

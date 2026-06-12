@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { FREE_MONTHLY_OUTREACH_LIMIT } from "@/lib/crm-limits";
-import { FREE_MONTHLY_DIRECTORY_CSV_LIMIT } from "@/lib/directory-csv-limits";
+import { FREE_DIRECTORY_CSV_MAX_PAGES } from "@/lib/directory-csv-limits";
 import {
   fetchAdminCrmUsageStats,
   fetchAdminCsvDownloadStats,
@@ -8,7 +8,7 @@ import {
   isUsageSegment,
 } from "@/lib/admin/admin-aggregate-queries";
 
-export type UsageSegment = "email_signup" | "free_logged_in" | "paid";
+export type UsageSegment = "anonymous" | "free_logged_in" | "paid";
 
 export type UsagePeriod = "month" | "all";
 
@@ -89,7 +89,7 @@ function finalizeSegment(
 
 function emptySegmentCounts(): Record<UsageSegment, Map<string, number>> {
   return {
-    email_signup: new Map(),
+    anonymous: new Map(),
     free_logged_in: new Map(),
     paid: new Map(),
   };
@@ -107,14 +107,8 @@ function aggregateCsvStatsFromRows(
   }
 
   return {
-    email_signup: finalizeSegment(
-      segmentCounts.email_signup,
-      FREE_MONTHLY_DIRECTORY_CSV_LIMIT,
-    ),
-    free_logged_in: finalizeSegment(
-      segmentCounts.free_logged_in,
-      FREE_MONTHLY_DIRECTORY_CSV_LIMIT,
-    ),
+    anonymous: finalizeSegment(segmentCounts.anonymous, null),
+    free_logged_in: finalizeSegment(segmentCounts.free_logged_in, null),
     paid: finalizeSegment(segmentCounts.paid, null),
   };
 }
@@ -144,7 +138,7 @@ function aggregateCrmStatsFromRows(
 
   return {
     bySegment: {
-      email_signup: finalizeSegment(segmentCounts.email_signup, null),
+      anonymous: finalizeSegment(segmentCounts.anonymous, null),
       free_logged_in: finalizeSegment(
         segmentCounts.free_logged_in,
         FREE_MONTHLY_OUTREACH_LIMIT,
@@ -176,7 +170,7 @@ export const fetchAdminUsageReport = cache(
       const directoryCsv: ServiceUsageRow = {
         id: "directory_csv",
         label: "Directory CSV export",
-        limitLabel: `${FREE_MONTHLY_DIRECTORY_CSV_LIMIT} page exports / month (free)`,
+        limitLabel: `Free: first ${FREE_DIRECTORY_CSV_MAX_PAGES} pages per export · Pro: full export`,
         bySegment: csvStats,
       };
 
@@ -194,7 +188,7 @@ export const fetchAdminUsageReport = cache(
         label: "CRM leads CSV export",
         limitLabel: "Free: current page only · Pro: full export",
         bySegment: {
-          email_signup: emptySegmentUtilization(null),
+          anonymous: emptySegmentUtilization(null),
           free_logged_in: emptySegmentUtilization(null),
           paid: emptySegmentUtilization(null),
         },
@@ -232,8 +226,8 @@ export const fetchAdminUsageReport = cache(
             label: "Directory CSV export",
             limitLabel: null,
             bySegment: {
-              email_signup: emptySegmentUtilization(5),
-              free_logged_in: emptySegmentUtilization(5),
+              anonymous: emptySegmentUtilization(null),
+              free_logged_in: emptySegmentUtilization(null),
               paid: emptySegmentUtilization(null),
             },
           },
@@ -242,7 +236,7 @@ export const fetchAdminUsageReport = cache(
             label: "CRM outreach (DM, SMS, demo link)",
             limitLabel: null,
             bySegment: {
-              email_signup: emptySegmentUtilization(null),
+              anonymous: emptySegmentUtilization(null),
               free_logged_in: emptySegmentUtilization(25),
               paid: emptySegmentUtilization(null),
             },
@@ -255,13 +249,13 @@ export const fetchAdminUsageReport = cache(
 );
 
 export const USAGE_SEGMENT_LABELS: Record<UsageSegment, string> = {
-  email_signup: "Email signup (no account)",
+  anonymous: "Anonymous (not signed in)",
   free_logged_in: "Free (signed in)",
   paid: "Pro (paid)",
 };
 
 export const USAGE_SEGMENT_ORDER: UsageSegment[] = [
-  "email_signup",
+  "anonymous",
   "free_logged_in",
   "paid",
 ];
