@@ -7,6 +7,33 @@ const ACTIVE_SUBSCRIPTION_STATUSES = new Set<Stripe.Subscription.Status>([
   "trialing",
 ]);
 
+function isStripeMissingResource(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const stripeError = error as Stripe.StripeRawError;
+  return (
+    stripeError.code === "resource_missing" ||
+    stripeError.statusCode === 404
+  );
+}
+
+async function clearStaleStripeCustomerId(userId: string): Promise<void> {
+  const supabase = createSupabaseAdmin();
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      stripe_customer_id: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId);
+
+  if (error) {
+    console.error("[stripe] failed to clear stale customer id", {
+      userId,
+      error: error.message,
+    });
+  }
+}
+
 function getSubscriptionId(
   session: Stripe.Checkout.Session,
 ): string | null {
@@ -161,38 +188,61 @@ export async function syncProForUser(
   const stripe = getStripe();
 
   if (options?.checkoutSessionId) {
-    const session = await stripe.checkout.sessions.retrieve(
-      options.checkoutSessionId,
-      { expand: ["subscription"] },
-    );
+    try {
+      const session = await stripe.checkout.sessions.retrieve(
+        options.checkoutSessionId,
+        { expand: ["subscription"] },
+      );
 
-    const sessionUserId = await resolveUserIdFromCheckoutSession(session);
-    if (sessionUserId !== userId) {
-      return false;
+      const sessionUserId = await resolveUserIdFromCheckoutSession(session);
+      if (sessionUserId !== userId) {
+        return false;
+      }
+
+      return activateProFromCheckoutSession(session);
+    } catch (error) {
+      if (isStripeMissingResource(error)) {
+        console.warn("[stripe] checkout session not found during pro sync", {
+          userId,
+          checkoutSessionId: options.checkoutSessionId,
+        });
+        return false;
+      }
+      throw error;
     }
-
-    return activateProFromCheckoutSession(session);
   }
 
   const customerId = options?.stripeCustomerId?.trim();
   if (customerId) {
-    const subscriptions = await stripe.subscriptions.list({
-      customer: customerId,
-      status: "all",
-      limit: 10,
-    });
+    try {
+      const subscriptions = await stripe.subscriptions.list({
+        customer: customerId,
+        status: "all",
+        limit: 10,
+      });
 
-    const active = subscriptions.data.find((subscription) =>
-      ACTIVE_SUBSCRIPTION_STATUSES.has(subscription.status),
-    );
-
-    if (active) {
-      const subscriptionPrice = active.items.data[0]?.price?.unit_amount;
-      return activateProProfile(
-        userId,
-        customerId,
-        subscriptionPrice != null ? String(subscriptionPrice) : null,
+      const active = subscriptions.data.find((subscription) =>
+        ACTIVE_SUBSCRIPTION_STATUSES.has(subscription.status),
       );
+
+      if (active) {
+        const subscriptionPrice = active.items.data[0]?.price?.unit_amount;
+        return activateProProfile(
+          userId,
+          customerId,
+          subscriptionPrice != null ? String(subscriptionPrice) : null,
+        );
+      }
+    } catch (error) {
+      if (isStripeMissingResource(error)) {
+        console.warn("[stripe] stale customer id during pro sync, clearing", {
+          userId,
+          customerId,
+        });
+        await clearStaleStripeCustomerId(userId);
+        return false;
+      }
+      throw error;
     }
   }
 
