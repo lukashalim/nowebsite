@@ -15,6 +15,7 @@ import { OutreachSpintaxButton } from "@/components/outreach-spintax-button";
 import { OwnerNameInput } from "@/components/owner-name-input";
 import { StageSelect } from "@/components/stage-select";
 import type { CrmOutreachRecordedHandler } from "@/components/crm-free-usage-layout";
+import { useCrmOutreachRecorded } from "@/components/crm-free-usage-layout";
 import type { BusinessLead } from "@/lib/business";
 import type { CrmUsageAction } from "@/lib/crm-limits";
 import type { CrmWebPresence } from "@/lib/crm-params";
@@ -48,8 +49,10 @@ export function CrmLeadsTableBody({
   spintaxTemplates,
   isPro,
   initialOutreachRemaining,
-  onOutreachRecorded,
+  onOutreachRecorded: onOutreachRecordedProp,
 }: CrmLeadsTableBodyProps) {
+  const onOutreachRecordedFromContext = useCrmOutreachRecorded();
+  const onOutreachRecorded = onOutreachRecordedProp ?? onOutreachRecordedFromContext;
   const [contactCounts, setContactCounts] = useState(() =>
     initialContactCounts(rows),
   );

@@ -108,23 +108,19 @@ export default async function CrmPage({ searchParams }: PageProps) {
     />
   );
 
-  const tableShell = (onOutreachRecorded?: Parameters<
-    Parameters<typeof CrmFreeUsageLayout>[0]["children"]
-  >[0]) =>
-    loadError ? (
-      <CrmLoadError message={loadError} />
-    ) : (
-      <CrmLeadsTableShell
-        rows={rows}
-        userId={user.id}
-        params={p}
-        total={total}
-        spintaxTemplates={spintaxTemplates}
-        isPro={userIsPro}
-        initialOutreachRemaining={usageSummary?.remaining ?? null}
-        onOutreachRecorded={onOutreachRecorded}
-      />
-    );
+  const tableShell = loadError ? (
+    <CrmLoadError message={loadError} />
+  ) : (
+    <CrmLeadsTableShell
+      rows={rows}
+      userId={user.id}
+      params={p}
+      total={total}
+      spintaxTemplates={spintaxTemplates}
+      isPro={userIsPro}
+      initialOutreachRemaining={usageSummary?.remaining ?? null}
+    />
+  );
 
   return (
     <div className="mx-auto flex min-h-0 flex-1 flex-col gap-6 p-4 sm:p-6 lg:max-w-[1400px]">
@@ -147,17 +143,13 @@ export default async function CrmPage({ searchParams }: PageProps) {
           initialUsage={usageSummary}
           limitReached={outreachLimitReached}
         >
-          {(onOutreachRecorded) => (
-            <>
-              {filters}
-              {tableShell(onOutreachRecorded)}
-            </>
-          )}
+          {filters}
+          {tableShell}
         </CrmFreeUsageLayout>
       ) : (
         <>
           {filters}
-          {tableShell()}
+          {tableShell}
         </>
       )}
     </div>
