@@ -1,5 +1,10 @@
 import { z } from "zod";
 import { CRM_STAGE_VALUES, type CrmStage } from "@/lib/crm-stage";
+import {
+  CRM_TIMEZONE_VALUES,
+  isCrmTimezone,
+  type CrmTimezone,
+} from "@/lib/crm-timezone";
 import { CATEGORY_GROUP_IDS } from "@/lib/directory/category-group-ids";
 
 function firstParam(
@@ -75,6 +80,28 @@ export const crmPhoneLineTypeValues = [
 ] as const;
 export type CrmPhoneLineType = (typeof crmPhoneLineTypeValues)[number];
 
+export { CRM_TIMEZONE_VALUES, type CrmTimezone };
+
+function parseTimezonesParam(
+  value: string | string[] | undefined,
+): CrmTimezone[] {
+  if (value === undefined || value === "") return [];
+  const parts = Array.isArray(value)
+    ? value.flatMap((v) => String(v).split(","))
+    : String(value).split(",");
+  const seen = new Set<CrmTimezone>();
+  for (const part of parts) {
+    const normalized = part.trim().toLowerCase();
+    if (isCrmTimezone(normalized)) seen.add(normalized);
+  }
+  return CRM_TIMEZONE_VALUES.filter((tz) => seen.has(tz));
+}
+
+const timezonesParam = z.preprocess(
+  (val) => parseTimezonesParam(val as string | string[] | undefined),
+  z.array(z.enum(CRM_TIMEZONE_VALUES)).default([]),
+);
+
 export const crmSearchParamsSchema = z
   .object({
     minReviews: intInRange(25, 0, 1_000_000),
@@ -91,6 +118,7 @@ export const crmSearchParamsSchema = z
     categoryGroup: optionalCategoryGroup,
     category: optionalFilterString,
     state: optionalFilterString,
+    timezones: timezonesParam,
   })
   .refine((d) => d.minReviews <= d.maxReviews, {
     message: "minReviews must be <= maxReviews",
@@ -170,6 +198,7 @@ function rawToFlat(raw: Record<string, string | string[] | undefined>) {
     categoryGroup: firstParam(raw.categoryGroup),
     category: firstParam(raw.category),
     state: firstParam(raw.state),
+    timezones: raw.timezones,
   };
 }
 
@@ -206,6 +235,9 @@ function appendCrmFilterParams(sp: URLSearchParams, params: CrmSearchParams): vo
     sp.set("categoryGroup", params.categoryGroup);
   if (params.category !== undefined) sp.set("category", params.category);
   if (params.state !== undefined) sp.set("state", params.state);
+  for (const tz of params.timezones) {
+    sp.append("timezones", tz);
+  }
 }
 
 export function buildCrmQueryString(params: CrmSearchParams): string {

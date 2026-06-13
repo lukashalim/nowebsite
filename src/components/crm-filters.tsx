@@ -6,6 +6,10 @@ import {
   buildCrmQueryString,
   type CrmSearchParams,
 } from "@/lib/crm-params";
+import {
+  CRM_TIMEZONE_LABELS,
+  CRM_TIMEZONE_VALUES,
+} from "@/lib/crm-timezone";
 import type { CrmCategoryFilterOption, CrmStateFilterOption } from "@/lib/crm-filter-options";
 import {
   categoryAllowedForGroup,
@@ -224,6 +228,29 @@ export function CrmFilters({
             ))}
           </select>
         </label>
+
+        <fieldset className={`${labelClass} min-w-[11rem]`}>
+          <legend className="text-xs text-zinc-600 dark:text-zinc-400">
+            Time zone
+          </legend>
+          <div className="flex flex-wrap gap-x-3 gap-y-1.5 pt-0.5">
+            {CRM_TIMEZONE_VALUES.map((tz) => (
+              <label
+                key={tz}
+                className="inline-flex items-center gap-1.5 text-sm text-zinc-800 dark:text-zinc-200"
+              >
+                <input
+                  type="checkbox"
+                  name="timezones"
+                  value={tz}
+                  defaultChecked={params.timezones.includes(tz)}
+                  className="size-3.5 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500 dark:border-zinc-600"
+                />
+                {CRM_TIMEZONE_LABELS[tz]}
+              </label>
+            ))}
+          </div>
+        </fieldset>
 
         <label className={labelClass}>
           Times Contacted

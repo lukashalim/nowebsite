@@ -18,7 +18,7 @@ import {
   type CategoryGroupId,
   type CategoryGroupTaxonomy,
 } from "@/lib/directory/category-groups";
-import { stateAbbrToDisplayName } from "@/lib/directory/slugs";
+import { stateAbbrToDisplayName, stateToAbbr } from "@/lib/directory/slugs";
 import {
   type CrmCategoryFilterOption,
   type CrmFilterOptions,
@@ -420,6 +420,10 @@ export async function fetchCrmBusinessRows(
       q = q.eq("state", p.state);
     }
 
+    if (p.timezones.length > 0) {
+      q = q.in("crm_timezone", p.timezones);
+    }
+
     q = applyPhoneLineTypeFilter(q, p.phoneLineType);
 
     q = applyReviewExcerptsExtractedFilter(q);
@@ -433,7 +437,7 @@ export async function fetchCrmBusinessRows(
 
     if (error) {
       const hint =
-        /crm_contact_surface|listing_website|phone_line_type|schema cache/i.test(
+        /crm_contact_surface|listing_website|phone_line_type|crm_timezone|schema cache/i.test(
           error.message,
         )
           ? " Run scrape/sql migrations in Supabase (e.g. add-listing-website-crm-contact-surface.sql, add-phone-line-type.sql), then refresh."
@@ -491,7 +495,7 @@ export const fetchCrmFilterOptions = cache(
     const states = [...stateSet]
       .map((value) => ({
         value,
-        label: stateAbbrToDisplayName(value),
+        label: stateAbbrToDisplayName(stateToAbbr(value) ?? value),
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
 
