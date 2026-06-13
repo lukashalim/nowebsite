@@ -4,10 +4,12 @@ import Link from "next/link";
 import { MessageSquare, Phone } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  resolveTenantDemoUrl,
   sendOutboundSMS,
 } from "@/lib/actions/outreach";
+import { buildCallScriptSteps } from "@/lib/call-script-steps";
 import {
-  CrmCallModal,
+  CallSessionOverlay,
   type CallLeadData,
   type CallModalPhase,
 } from "@/components/crm-call-modal";
@@ -268,31 +270,50 @@ export function CrmPhonePopover({
   }
 
   function handleCall() {
-    const hookScript = selectedCallTemplate
-      ? buildOutreachMessage(selectedCallTemplate.template, {
+    void (async () => {
+      if (!selectedCallTemplate) return;
+
+      const demoResult = await resolveTenantDemoUrl(userId, placeId);
+      if (!demoResult.ok) {
+        window.alert(demoResult.error);
+        return;
+      }
+
+      const pivotTemplate =
+        selectedCallTemplate.pivot_template?.trim() ||
+        "When mobile searchers tap through Google listings, businesses without a clear website link often get skipped.";
+      const offerTemplate =
+        selectedCallTemplate.offer_template?.trim() ||
+        "I put together a quick demo for your listing. Mind if I text you the link?";
+
+      const scriptSteps = buildCallScriptSteps(
+        selectedCallTemplate.template,
+        pivotTemplate,
+        offerTemplate,
+        {
           name: businessName,
           mainCategory,
           businessType,
-        })
-      : "";
+        },
+      );
 
-    if (selectedCallTemplate) {
       window.localStorage.setItem(
         lastCallTemplateStorageKey(userId),
         selectedCallTemplate.id,
       );
-    }
 
-    setCallLeadData({
-      placeId,
-      name: businessName,
-      phone,
-      company: businessName,
-      hook_script: hookScript,
-      existingNotes,
-    });
-    setCallPhase("CONNECTING");
-    setOpen(false);
+      setCallLeadData({
+        placeId,
+        name: businessName,
+        phone,
+        company: businessName,
+        scriptSteps,
+        demoUrl: demoResult.url,
+        existingNotes,
+      });
+      setCallPhase("CONNECTING");
+      setOpen(false);
+    })();
   }
 
   return (
@@ -458,13 +479,15 @@ export function CrmPhonePopover({
         ) : null}
       </div>
 
-      <CrmCallModal
+      <CallSessionOverlay
         userId={userId}
         phoneCountry={country}
         phase={callPhase}
         leadData={callLeadData}
+        outreachRemaining={outreachRemaining}
         onClose={closeCallModal}
         onPhaseChange={setCallPhase}
+        onOutreachRecorded={onOutreachRecorded}
       />
     </>
   );

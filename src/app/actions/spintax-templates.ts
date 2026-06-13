@@ -33,10 +33,16 @@ function mapTemplateRow(data: Record<string, unknown>): SpintaxTemplate {
   const channel: SpintaxChannel = isSpintaxChannel(channelRaw)
     ? channelRaw
     : "facebook";
+  const pivotRaw = data.pivot_template;
+  const offerRaw = data.offer_template;
   return {
     id: String(data.id),
     name: String(data.name),
     template: String(data.template),
+    pivot_template:
+      typeof pivotRaw === "string" && pivotRaw.trim() ? pivotRaw : null,
+    offer_template:
+      typeof offerRaw === "string" && offerRaw.trim() ? offerRaw : null,
     audience,
     channel,
     created_at: String(data.created_at),
@@ -72,6 +78,8 @@ export async function updateSpintaxTemplate(
   template: string,
   audience: SpintaxAudience,
   channel: SpintaxChannel,
+  pivotTemplate?: string | null,
+  offerTemplate?: string | null,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!id || typeof id !== "string") {
     return { ok: false, error: "Invalid template" };
@@ -82,6 +90,8 @@ export async function updateSpintaxTemplate(
     template,
     audience,
     channel,
+    pivotTemplate,
+    offerTemplate,
   );
   if (validationError) {
     return { ok: false, error: validationError };
@@ -101,6 +111,10 @@ export async function updateSpintaxTemplate(
     .update({
       name: name.trim(),
       template,
+      pivot_template:
+        channel === "call" ? (pivotTemplate?.trim() ?? null) : null,
+      offer_template:
+        channel === "call" ? (offerTemplate?.trim() ?? null) : null,
       audience,
       channel,
     })
@@ -120,6 +134,8 @@ export async function createSpintaxTemplate(
   template: string,
   audience: SpintaxAudience = "any",
   channel: SpintaxChannel = "facebook",
+  pivotTemplate?: string | null,
+  offerTemplate?: string | null,
 ): Promise<
   { ok: true; template: SpintaxTemplate } | { ok: false; error: string }
 > {
@@ -128,6 +144,8 @@ export async function createSpintaxTemplate(
     template,
     audience,
     channel,
+    pivotTemplate,
+    offerTemplate,
   );
   if (validationError) {
     return { ok: false, error: validationError };
@@ -148,10 +166,16 @@ export async function createSpintaxTemplate(
       user_id: user.id,
       name: name.trim(),
       template,
+      pivot_template:
+        channel === "call" ? (pivotTemplate?.trim() ?? null) : null,
+      offer_template:
+        channel === "call" ? (offerTemplate?.trim() ?? null) : null,
       audience,
       channel,
     })
-    .select("id, name, template, audience, channel, created_at")
+    .select(
+      "id, name, template, pivot_template, offer_template, audience, channel, created_at",
+    )
     .single();
 
   if (error || !data) {

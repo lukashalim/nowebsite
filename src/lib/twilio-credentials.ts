@@ -45,9 +45,39 @@ export async function validateTwilioCredentials(
   }
 }
 
-export function buildVoiceHandlerUrl(userId: string, targetPhoneNumber: string): string {
+export function buildVoiceHandlerUrl(
+  userId: string,
+  targetPhoneNumber: string,
+  roomId: string,
+): string {
   const url = new URL(absoluteUrl("/api/twilio/voice-handler"));
   url.searchParams.set("userId", userId);
   url.searchParams.set("target", targetPhoneNumber);
+  url.searchParams.set("roomId", roomId);
   return url.toString();
+}
+
+export function buildJoinConferenceUrl(userId: string, roomId: string): string {
+  const url = new URL(absoluteUrl("/api/twilio/join-conference"));
+  url.searchParams.set("userId", userId);
+  url.searchParams.set("roomId", roomId);
+  return url.toString();
+}
+
+export function validateTwilioWebhookRequest(
+  authToken: string,
+  signature: string,
+  webhookUrl: string,
+  params: Record<string, string>,
+): boolean {
+  return Twilio.validateRequest(authToken, signature, webhookUrl, params);
+}
+
+export function escapeXmlAttribute(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }

@@ -18,6 +18,8 @@ export interface SpintaxTemplate {
   id: string;
   name: string;
   template: string;
+  pivot_template: string | null;
+  offer_template: string | null;
   audience: SpintaxAudience;
   channel: SpintaxChannel;
   created_at: string;
@@ -28,10 +30,16 @@ function mapRow(row: Record<string, unknown>): SpintaxTemplate {
   const audience = isSpintaxAudience(audienceRaw) ? audienceRaw : "facebook";
   const channelRaw = String(row.channel ?? "facebook");
   const channel = isSpintaxChannel(channelRaw) ? channelRaw : "facebook";
+  const pivotRaw = row.pivot_template;
+  const offerRaw = row.offer_template;
   return {
     id: String(row.id),
     name: String(row.name),
     template: String(row.template),
+    pivot_template:
+      typeof pivotRaw === "string" && pivotRaw.trim() ? pivotRaw : null,
+    offer_template:
+      typeof offerRaw === "string" && offerRaw.trim() ? offerRaw : null,
     audience,
     channel,
     created_at: String(row.created_at),
@@ -48,10 +56,10 @@ export async function ensureDefaultSpintaxTemplates(
     .eq("user_id", userId);
 
   if (fetchError) {
-    const hint = /spintax_templates|schema cache|audience|channel/i.test(
+    const hint = /spintax_templates|schema cache|audience|channel|pivot_template|offer_template/i.test(
       fetchError.message,
     )
-      ? " Run scrape/sql/add-spintax-template-audience.sql and add-spintax-template-channel.sql in Supabase."
+      ? " Run scrape/sql/add-spintax-template-audience.sql, add-spintax-template-channel.sql, and add-spintax-call-script-steps.sql in Supabase."
       : "";
     return { ok: false, error: fetchError.message + hint };
   }
@@ -106,6 +114,8 @@ export async function ensureDefaultSpintaxTemplates(
           user_id: userId,
           name: t.name,
           template: t.template,
+          pivot_template: t.pivot_template ?? null,
+          offer_template: t.offer_template ?? null,
           audience: t.audience,
           channel: t.channel,
         }))),
@@ -137,7 +147,9 @@ export async function fetchSpintaxTemplatesForUser(
 
   const { data, error } = await supabase
     .from("spintax_templates")
-    .select("id, name, template, audience, channel, created_at")
+    .select(
+      "id, name, template, pivot_template, offer_template, audience, channel, created_at",
+    )
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
 
@@ -151,22 +163,51 @@ export async function fetchSpintaxTemplatesForUser(
   };
 }
 
+function validateTemplateField(
+  value: string,
+  label: string,
+): string | null {
+  if (!value.trim()) return `${label} is required`;
+  if (value.length > 4000) {
+    return `${label} must be 4000 characters or less`;
+  }
+  return null;
+}
+
 export function validateSpintaxTemplateInput(
   name: string,
   template: string,
   audience?: string,
   channel?: string,
+  pivotTemplate?: string | null,
+  offerTemplate?: string | null,
 ): string | null {
   const trimmedName = name.trim();
   if (!trimmedName) return "Name is required";
   if (trimmedName.length > 200) return "Name must be 200 characters or less";
-  if (!template.trim()) return "Template is required";
-  if (template.length > 4000) return "Template must be 4000 characters or less";
+
+  const hookError = validateTemplateField(template, "Hook template");
+  if (hookError) return hookError;
+
   if (audience !== undefined && !isSpintaxAudience(audience)) {
     return "Invalid lead type";
   }
   if (channel !== undefined && !isSpintaxChannel(channel)) {
     return "Invalid channel";
   }
+
+  if (channel === "call") {
+    const pivotError = validateTemplateField(
+      pivotTemplate ?? "",
+      "Pivot template",
+    );
+    if (pivotError) return pivotError;
+    const offerError = validateTemplateField(
+      offerTemplate ?? "",
+      "Offer template",
+    );
+    if (offerError) return offerError;
+  }
+
   return null;
 }

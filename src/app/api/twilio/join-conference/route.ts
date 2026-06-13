@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { getUserTwilioCredentials } from "@/lib/subscription";
 import {
-  buildJoinConferenceUrl,
-  createTwilioClient,
   escapeXmlAttribute,
   validateTwilioWebhookRequest,
 } from "@/lib/twilio-credentials";
@@ -20,10 +18,9 @@ function twimlResponse(body: string): NextResponse {
 export async function POST(request: Request) {
   const url = new URL(request.url);
   const userId = url.searchParams.get("userId")?.trim() ?? "";
-  const target = url.searchParams.get("target")?.trim() ?? "";
   const roomId = url.searchParams.get("roomId")?.trim() ?? "";
 
-  if (!userId || !target || !roomId) {
+  if (!userId || !roomId) {
     return twimlResponse(
       "<Response><Say>Invalid call configuration.</Say></Response>",
     );
@@ -55,16 +52,10 @@ export async function POST(request: Request) {
     return new NextResponse("Forbidden", { status: 403 });
   }
 
-  const client = createTwilioClient(credentials);
-  await client.calls.create({
-    to: target,
-    from: credentials.phoneNumber,
-    url: buildJoinConferenceUrl(userId, roomId),
-  });
-
+  const escapedCallerId = escapeXmlAttribute(credentials.phoneNumber);
   const escapedRoomId = escapeXmlAttribute(roomId);
 
   return twimlResponse(
-    `<Response><Dial><Conference beep="false" endConferenceOnExit="true" startConferenceOnEnter="true" waitUrl="">${escapedRoomId}</Conference></Dial></Response>`,
+    `<Response><Dial callerId="${escapedCallerId}"><Conference beep="false" endConferenceOnExit="true" startConferenceOnEnter="true">${escapedRoomId}</Conference></Dial></Response>`,
   );
 }

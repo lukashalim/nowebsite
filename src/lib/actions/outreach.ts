@@ -1,7 +1,12 @@
 "use server";
 
 import { recordOutreachUsage } from "@/app/actions/crm-usage";
-import { getUserTwilioCredentials } from "@/lib/subscription";
+import { DEMO_DETAIL_COLUMNS } from "@/lib/crm-cohort";
+import { demoPathSegment, tenantDemoPublicPath } from "@/lib/demo-slug";
+import { ensureProfileUsername } from "@/lib/profile-username";
+import { absoluteUrl } from "@/lib/site-url";
+import { getUserProfile, getUserTwilioCredentials } from "@/lib/subscription";
+import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   buildVoiceHandlerUrl,
@@ -14,7 +19,7 @@ export type OutboundSmsResult =
   | { type: "ERROR"; error: string; remaining?: number };
 
 export type OutboundCallResult =
-  | { type: "TWILIO"; ok: true }
+  | { type: "TWILIO"; ok: true; callSid: string; roomId: string }
   | { type: "FALLBACK" }
   | { type: "ERROR"; error: string };
 
@@ -33,6 +38,59 @@ async function requireSessionUser(userId: string): Promise<
     return { ok: false, error: "Unauthorized" };
   }
   return { ok: true };
+}
+
+export async function resolveTenantDemoUrl(
+  userId: string,
+  placeId: string,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  const auth = await requireSessionUser(userId);
+  if (!auth.ok) {
+    return { ok: false, error: auth.error };
+  }
+
+  const trimmedPlaceId = placeId.trim();
+  if (!trimmedPlaceId) {
+    return { ok: false, error: "placeId is required" };
+  }
+
+  const profile = await getUserProfile(userId);
+  const username =
+    profile?.username?.trim() ||
+    (await ensureProfileUsername(
+      userId,
+      profile?.email ?? "",
+    ));
+  if (!username) {
+    return { ok: false, error: "Set a username in Settings to generate demo links" };
+  }
+
+  const admin = createSupabaseAdmin();
+  const { data: row, error } = await admin
+    .from("businesses_nowebsite")
+    .select(DEMO_DETAIL_COLUMNS)
+    .eq("place_id", trimmedPlaceId)
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+  if (!row) {
+    return { ok: false, error: "Business not found" };
+  }
+
+  const slug = demoPathSegment({
+    place_id: String(row.place_id),
+    demo_slug:
+      typeof row.demo_slug === "string" ? row.demo_slug : null,
+  });
+
+  return {
+    ok: true,
+    url: absoluteUrl(
+      tenantDemoPublicPath(username, decodeURIComponent(slug)),
+    ),
+  };
 }
 
 export async function sendStandardSMS(
@@ -113,16 +171,86 @@ export async function initiateOutboundCall(
   }
 
   try {
+    const roomId = crypto.randomUUID();
     const client = createTwilioClient(credentials);
-    await client.calls.create({
+    const call = await client.calls.create({
       to: credentials.forwardingNumber,
       from: credentials.phoneNumber,
-      url: buildVoiceHandlerUrl(userId, targetPhoneNumber),
+      url: buildVoiceHandlerUrl(userId, targetPhoneNumber, roomId),
     });
-    return { type: "TWILIO", ok: true };
+    return { type: "TWILIO", ok: true, callSid: call.sid, roomId };
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to initiate call via Twilio";
     return { type: "ERROR", error: message };
   }
+}
+
+export async function terminateCall(
+  userId: string,
+  callSid: string,
+  roomId?: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const auth = await requireSessionUser(userId);
+  if (!auth.ok) {
+    return { ok: false, error: auth.error };
+  }
+
+  const credentials = await getUserTwilioCredentials(userId);
+  if (!credentials) {
+    return { ok: false, error: "Twilio credentials not configured" };
+  }
+
+  const sid = callSid.trim();
+  if (!sid) {
+    return { ok: false, error: "Invalid call SID" };
+  }
+
+  const client = createTwilioClient(credentials);
+  const errors: string[] = [];
+
+  const conferenceRoomId = roomId?.trim();
+  if (conferenceRoomId) {
+    try {
+      const conferences = await client.conferences.list({
+        friendlyName: conferenceRoomId,
+        status: "in-progress",
+        limit: 5,
+      });
+      await Promise.allSettled(
+        conferences.map((conference) =>
+          client.conferences(conference.sid).update({ status: "completed" }),
+        ),
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to end Twilio conference";
+      errors.push(message);
+    }
+  }
+
+  try {
+    await client.calls(sid).update({ status: "completed" });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to terminate call via Twilio";
+    errors.push(message);
+  }
+
+  if (errors.length > 0) {
+    return { ok: false, error: errors.join("; ") };
+  }
+
+  return { ok: true };
+}
+
+/** @deprecated Use terminateCall */
+export async function terminateOutboundCall(
+  userId: string,
+  callSid: string,
+  roomId?: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  return terminateCall(userId, callSid, roomId);
 }

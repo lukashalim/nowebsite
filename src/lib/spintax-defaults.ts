@@ -4,6 +4,8 @@ import type { SpintaxChannel } from "@/lib/spintax-channel";
 export interface DefaultSpintaxTemplate {
   name: string;
   template: string;
+  pivot_template?: string;
+  offer_template?: string;
   audience: SpintaxAudience;
   channel: SpintaxChannel;
 }
@@ -64,6 +66,10 @@ export const DEFAULT_SPINTAX_TEMPLATES: DefaultSpintaxTemplate[] = [
     audience: "any",
     template:
       "{Hi|Hey} [Name], I was looking at your Google listing for [category] and noticed something small that might be costing you calls. Do you have thirty seconds?",
+    pivot_template:
+      "It is a small thing on your Google listing that can quietly cost you calls from people searching on their phone.",
+    offer_template:
+      "{I can show you exactly what I mean with a quick demo link. Mind if I text it to you?|Want me to send a short link so you can see it?}",
   },
   {
     name: "Call — Mobile friction",
@@ -71,6 +77,10 @@ export const DEFAULT_SPINTAX_TEMPLATES: DefaultSpintaxTemplate[] = [
     audience: "facebook",
     template:
       "{Hi|Hey} [Name], I noticed your Google listing links to Facebook as the website. When someone taps it on their phone they land on Facebook instead of being able to call you directly. {Mind if I explain what I mean?|Can I walk you through it real quick?}",
+    pivot_template:
+      "When someone taps Website on Google from their phone, they land on Facebook instead of a page where they can call you right away. A lot of people just bounce and call the next listing.",
+    offer_template:
+      "{I put together a quick demo showing what a proper site looks like for your listing. Mind if I text you the link?|I made a short preview of what yours could look like. OK if I send it over?}",
   },
   {
     name: "Call — No website",
@@ -78,6 +88,10 @@ export const DEFAULT_SPINTAX_TEMPLATES: DefaultSpintaxTemplate[] = [
     audience: "no_facebook",
     template:
       "{Hi|Hey} [Name], I was searching for [category] in your area and noticed your Google listing {doesn't have a website|has no website link}. {A lot of|Many} mobile searchers skip businesses without a fast page to see services and hours. {Do you have a minute?|Got thirty seconds?}",
+    pivot_template:
+      "Your Google listing is missing a website link. When mobile searchers check listings, many skip businesses without a fast page to see services and hours.",
+    offer_template:
+      "{I put together a quick demo of what a simple site could look like for you. Mind if I text you the link?|I made a short preview you can check on your phone. OK if I send it?}",
   },
 ];
 

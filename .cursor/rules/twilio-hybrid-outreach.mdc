@@ -5,6 +5,7 @@ globs:
   - src/lib/actions/twilio-settings.ts
   - src/lib/twilio-credentials.ts
   - src/components/crm-phone-popover.tsx
+  - src/components/crm-call-modal.tsx
   - src/components/twilio-settings-form.tsx
   - src/app/dashboard/settings/**
   - src/app/api/twilio/**
@@ -34,8 +35,18 @@ Users input:
 
 ### `initiateOutboundCall(userId, targetPhoneNumber)`
 1. Fetch creds via `getUserTwilioCredentials(userId)`.
-2. **If creds exist:** Twilio Voice bridge via `/api/twilio/voice-handler` → `{ type: "TWILIO" }`.
+2. **If creds exist:** Generate a unique `roomId`, call forwarding cell via Twilio REST API with `/api/twilio/voice-handler` URL → `{ type: "TWILIO", callSid, roomId }`.
 3. **Else:** `{ type: "FALLBACK" }`.
+
+### `terminateCall(userId, callSid, roomId?)`
+Ends all active Twilio legs for an outbound call:
+1. If `roomId` is set, complete in-progress conference(s) by `friendlyName` (drops bridged + ringing lead legs).
+2. Complete the parent (cell) call leg via Twilio REST API.
+
+`terminateOutboundCall` is a deprecated alias for `terminateCall`.
+
+### `resolveTenantDemoUrl(userId, placeId)`
+Returns absolute tenant demo URL for in-call SMS (mirrors `/api/crm-demo` redirect target).
 
 ### `sendOutboundSMS(userId, targetPhoneNumber, messageBody, placeId)`
 1. Fetch creds from profile.
@@ -48,12 +59,30 @@ Both paths record SMS usage for free-tier limits.
 
 [`CrmPhonePopover`](src/components/crm-phone-popover.tsx):
 
-- **Call:** On click, call `initiateOutboundCall`. If `FALLBACK`, `window.location.href = tel:...`. Else toast "Connecting via business line...".
+- **Call:** Resolves demo URL + call script steps (Hook/Pivot/Offer from spintax), then opens [`CallSessionOverlay`](src/components/crm-call-modal.tsx) which calls `initiateOutboundCall`. If `FALLBACK`, `window.location.href = tel:...`.
 - **SMS:** Call `sendOutboundSMS` after line-type check. Backend chooses Twilio or standard transparently.
 
-## 4. Voice Webhook
+[`CallSessionOverlay`](src/components/crm-call-modal.tsx) (alias `CrmCallModal`):
 
-[`/api/twilio/voice-handler`](src/app/api/twilio/voice-handler/route.ts): TwiML `<Dial callerId={twilio_phone_number}>{target}</Dial>` after signature validation.
+- 400×500px high-contrast cockpit fixed bottom-right during active calls.
+- Stores `callSid` and `roomId` from `initiateOutboundCall` for Twilio calls.
+- **Script:** Stepper cycles Hook → Pivot → Offer (from call spintax `template`, `pivot_template`, `offer_template`).
+- **SMS:** In-call SMS below Notes; default body includes tenant demo URL. `/api/lookup-phone` must return `mobile` before send (no landline override).
+- **Hang Up:** Full-width button calls `terminateCall(userId, callSid, roomId)` immediately, then moves to notes/save phase.
+
+## 4. Voice Webhooks (Conference Bridge)
+
+Outbound calls use a **Conference bridge** so either party hanging up ends both legs.
+
+### [`/api/twilio/voice-handler`](src/app/api/twilio/voice-handler/route.ts)
+Called when forwarding cell answers. After signature validation:
+1. REST outbound call to lead with `/api/twilio/join-conference` URL.
+2. Return TwiML putting cell into conference: `<Conference endConferenceOnExit="true">`.
+
+### [`/api/twilio/join-conference`](src/app/api/twilio/join-conference/route.ts)
+Called when lead leg is created. Returns TwiML joining same conference room with `callerId` set to Twilio business number and `endConferenceOnExit="true"`.
+
+Both participants have `endConferenceOnExit="true"` — when either hangs up, the conference ends and all legs drop (including legs still ringing).
 
 ## 5. Platform vs Per-User Twilio
 

@@ -52,10 +52,18 @@ export function SpintaxTemplateEditor({
   const [template, setTemplate] = useState(
     firstTemplateInChannel(initialTemplates, "facebook")?.template ?? "",
   );
+  const [pivotTemplate, setPivotTemplate] = useState(
+    firstTemplateInChannel(initialTemplates, "facebook")?.pivot_template ?? "",
+  );
+  const [offerTemplate, setOfferTemplate] = useState(
+    firstTemplateInChannel(initialTemplates, "facebook")?.offer_template ?? "",
+  );
   const [audience, setAudience] = useState<SpintaxAudience>(
     firstTemplateInChannel(initialTemplates, "facebook")?.audience ?? "facebook",
   );
   const [preview, setPreview] = useState("");
+  const [previewPivot, setPreviewPivot] = useState("");
+  const [previewOffer, setPreviewOffer] = useState("");
   const [previewSeed, setPreviewSeed] = useState(0);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -87,20 +95,31 @@ export function SpintaxTemplateEditor({
     if (!selectedTemplate || selectedTemplate.channel !== activeChannel) return;
     setName(selectedTemplate.name);
     setTemplate(selectedTemplate.template);
+    setPivotTemplate(selectedTemplate.pivot_template ?? "");
+    setOfferTemplate(selectedTemplate.offer_template ?? "");
     setAudience(selectedTemplate.audience);
   }, [selectedTemplate, activeChannel]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setPreview(buildSpintaxPreview(template));
+      if (activeChannel === "call") {
+        setPreviewPivot(buildSpintaxPreview(pivotTemplate));
+        setPreviewOffer(buildSpintaxPreview(offerTemplate));
+      } else {
+        setPreviewPivot("");
+        setPreviewOffer("");
+      }
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [template, previewSeed]);
+  }, [template, pivotTemplate, offerTemplate, previewSeed, activeChannel]);
 
   function selectTemplate(next: SpintaxTemplate) {
     setSelectedId(next.id);
     setName(next.name);
     setTemplate(next.template);
+    setPivotTemplate(next.pivot_template ?? "");
+    setOfferTemplate(next.offer_template ?? "");
     setAudience(next.audience);
     setMessage(null);
     setError(null);
@@ -117,6 +136,8 @@ export function SpintaxTemplateEditor({
       setSelectedId("");
       setName("");
       setTemplate("");
+      setPivotTemplate("");
+      setOfferTemplate("");
       setAudience(defaultAudienceForChannel(nextChannel));
     }
   }
@@ -132,6 +153,8 @@ export function SpintaxTemplateEditor({
       template,
       audience,
       activeChannel,
+      pivotTemplate,
+      offerTemplate,
     );
     setPending(false);
     if (!res.ok) {
@@ -145,6 +168,10 @@ export function SpintaxTemplateEditor({
               ...t,
               name: name.trim(),
               template,
+              pivot_template:
+                activeChannel === "call" ? pivotTemplate.trim() || null : null,
+              offer_template:
+                activeChannel === "call" ? offerTemplate.trim() || null : null,
               audience,
               channel: activeChannel,
             }
@@ -159,11 +186,21 @@ export function SpintaxTemplateEditor({
     setPending(true);
     setMessage(null);
     setError(null);
+    const defaultPivot =
+      activeChannel === "call"
+        ? "When mobile searchers tap through Google listings, businesses without a clear website link often get skipped."
+        : null;
+    const defaultOffer =
+      activeChannel === "call"
+        ? "I put together a quick demo for your listing. Mind if I text you the link?"
+        : null;
     const res = await createSpintaxTemplate(
       "New template",
       "{Hey|Hi} [Name] - {your message here}.",
       defaultAudienceForChannel(activeChannel),
       activeChannel,
+      defaultPivot,
+      defaultOffer,
     );
     setPending(false);
     if (!res.ok) {
@@ -201,6 +238,8 @@ export function SpintaxTemplateEditor({
       setSelectedId("");
       setName("");
       setTemplate("");
+      setPivotTemplate("");
+      setOfferTemplate("");
       setAudience(defaultAudienceForChannel(activeChannel));
     }
     setMessage("Deleted");
@@ -363,10 +402,10 @@ export function SpintaxTemplateEditor({
 
               <label className="flex flex-col gap-1 text-sm">
                 <span className="font-medium text-zinc-800 dark:text-zinc-200">
-                  Template
+                  {activeChannel === "call" ? "Hook" : "Template"}
                 </span>
                 <textarea
-                  rows={10}
+                  rows={activeChannel === "call" ? 5 : 10}
                   value={template}
                   disabled={pending}
                   maxLength={4000}
@@ -378,6 +417,38 @@ export function SpintaxTemplateEditor({
                   lead tokens.
                 </span>
               </label>
+
+              {activeChannel === "call" ? (
+                <>
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="font-medium text-zinc-800 dark:text-zinc-200">
+                      Pivot
+                    </span>
+                    <textarea
+                      rows={5}
+                      value={pivotTemplate}
+                      disabled={pending}
+                      maxLength={4000}
+                      onChange={(e) => setPivotTemplate(e.target.value)}
+                      className="font-mono rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="font-medium text-zinc-800 dark:text-zinc-200">
+                      Offer
+                    </span>
+                    <textarea
+                      rows={5}
+                      value={offerTemplate}
+                      disabled={pending}
+                      maxLength={4000}
+                      onChange={(e) => setOfferTemplate(e.target.value)}
+                      className="font-mono rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+                    />
+                  </label>
+                </>
+              ) : null}
 
               <section className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/40">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -393,9 +464,32 @@ export function SpintaxTemplateEditor({
                     Refresh preview
                   </button>
                 </div>
-                <p className="whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-300">
-                  {preview || "…"}
-                </p>
+                {activeChannel === "call" ? (
+                  <div className="space-y-3 text-sm text-zinc-700 dark:text-zinc-300">
+                    <div>
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        Hook
+                      </p>
+                      <p className="whitespace-pre-wrap">{preview || "…"}</p>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        Pivot
+                      </p>
+                      <p className="whitespace-pre-wrap">{previewPivot || "…"}</p>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        Offer
+                      </p>
+                      <p className="whitespace-pre-wrap">{previewOffer || "…"}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-300">
+                    {preview || "…"}
+                  </p>
+                )}
               </section>
 
               <div className="flex flex-wrap items-center gap-3">
