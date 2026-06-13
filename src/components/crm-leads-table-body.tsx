@@ -167,6 +167,7 @@ export function CrmLeadsTableBody({
                   businessType={b.business_type}
                   leadAudience={spintaxLeadAudience}
                   templates={spintaxTemplates}
+                  existingNotes={b.notes}
                   outreachRemaining={outreachRemaining}
                   onOutreachRecorded={handleOutreachRecorded}
                 />

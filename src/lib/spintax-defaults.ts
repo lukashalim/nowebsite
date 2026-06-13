@@ -58,6 +58,27 @@ export const DEFAULT_SPINTAX_TEMPLATES: DefaultSpintaxTemplate[] = [
     template:
       "{Hey|Hi} [Name] - more and more people are asking AI to find {[category]|local [category]} and AI can't read Facebook pages. Your Google listing links to Facebook as the website. {Want me to show you how to fix it?|Should I send a quick video?}",
   },
+  {
+    name: "Call — Mystery hook",
+    channel: "call",
+    audience: "any",
+    template:
+      "{Hi|Hey} [Name], I was looking at your Google listing for [category] and noticed something small that might be costing you calls. Do you have thirty seconds?",
+  },
+  {
+    name: "Call — Mobile friction",
+    channel: "call",
+    audience: "facebook",
+    template:
+      "{Hi|Hey} [Name], I noticed your Google listing links to Facebook as the website. When someone taps it on their phone they land on Facebook instead of being able to call you directly. {Mind if I explain what I mean?|Can I walk you through it real quick?}",
+  },
+  {
+    name: "Call — No website",
+    channel: "call",
+    audience: "no_facebook",
+    template:
+      "{Hi|Hey} [Name], I was searching for [category] in your area and noticed your Google listing {doesn't have a website|has no website link}. {A lot of|Many} mobile searchers skip businesses without a fast page to see services and hours. {Do you have a minute?|Got thirty seconds?}",
+  },
 ];
 
 export const DEFAULT_FACEBOOK_SPINTAX_TEMPLATES = DEFAULT_SPINTAX_TEMPLATES.filter(
@@ -66,4 +87,8 @@ export const DEFAULT_FACEBOOK_SPINTAX_TEMPLATES = DEFAULT_SPINTAX_TEMPLATES.filt
 
 export const DEFAULT_SMS_SPINTAX_TEMPLATES = DEFAULT_SPINTAX_TEMPLATES.filter(
   (t) => t.channel === "sms",
+);
+
+export const DEFAULT_CALL_SPINTAX_TEMPLATES = DEFAULT_SPINTAX_TEMPLATES.filter(
+  (t) => t.channel === "call",
 );

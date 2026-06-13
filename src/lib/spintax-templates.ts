@@ -9,6 +9,7 @@ import {
   type SpintaxChannel,
 } from "@/lib/spintax-channel";
 import {
+  DEFAULT_CALL_SPINTAX_TEMPLATES,
   DEFAULT_FACEBOOK_SPINTAX_TEMPLATES,
   DEFAULT_SMS_SPINTAX_TEMPLATES,
 } from "@/lib/spintax-defaults";
@@ -57,6 +58,7 @@ export async function ensureDefaultSpintaxTemplates(
 
   const facebookAudiencesPresent = new Set<SpintaxAudience>();
   let hasSmsTemplates = false;
+  let hasCallTemplates = false;
 
   for (const row of rows ?? []) {
     const record = row as { audience?: string; channel?: string };
@@ -64,6 +66,10 @@ export async function ensureDefaultSpintaxTemplates(
     const channel = isSpintaxChannel(channelRaw) ? channelRaw : "facebook";
     if (channel === "sms") {
       hasSmsTemplates = true;
+      continue;
+    }
+    if (channel === "call") {
+      hasCallTemplates = true;
       continue;
     }
     const audienceRaw = String(record.audience ?? "facebook");
@@ -88,6 +94,15 @@ export async function ensureDefaultSpintaxTemplates(
     ...(hasSmsTemplates
       ? []
       : DEFAULT_SMS_SPINTAX_TEMPLATES.map((t) => ({
+          user_id: userId,
+          name: t.name,
+          template: t.template,
+          audience: t.audience,
+          channel: t.channel,
+        }))),
+    ...(hasCallTemplates
+      ? []
+      : DEFAULT_CALL_SPINTAX_TEMPLATES.map((t) => ({
           user_id: userId,
           name: t.name,
           template: t.template,

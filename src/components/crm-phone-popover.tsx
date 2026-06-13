@@ -4,9 +4,13 @@ import Link from "next/link";
 import { MessageSquare, Phone } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  initiateOutboundCall,
   sendOutboundSMS,
 } from "@/lib/actions/outreach";
+import {
+  CrmCallModal,
+  type CallLeadData,
+  type CallModalPhase,
+} from "@/components/crm-call-modal";
 import { buildOutreachMessage } from "@/lib/outreach-spintax";
 import { normalizePhoneE164, type PhoneCountry } from "@/lib/phone-lookup";
 import {
@@ -26,6 +30,7 @@ interface CrmPhonePopoverProps {
   businessType: string | null;
   leadAudience: SpintaxAudience;
   templates: SpintaxTemplate[];
+  existingNotes: string | null;
   outreachRemaining: number | null;
   onOutreachRecorded?: (
     remaining: number | null,
@@ -51,8 +56,8 @@ function lastSmsTemplateStorageKey(userId: string): string {
   return `crm:lastSmsSpintaxTemplateId:${userId}`;
 }
 
-function normalizePhoneForTel(phone: string): string {
-  return phone.replace(/\s/g, "");
+function lastCallTemplateStorageKey(userId: string): string {
+  return `crm:lastCallSpintaxTemplateId:${userId}`;
 }
 
 export function CrmPhonePopover({
@@ -65,36 +70,54 @@ export function CrmPhonePopover({
   businessType,
   leadAudience,
   templates,
+  existingNotes,
   outreachRemaining,
   onOutreachRecorded,
 }: CrmPhonePopoverProps) {
   const [open, setOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedSmsId, setSelectedSmsId] = useState("");
+  const [selectedCallId, setSelectedCallId] = useState("");
   const [smsFlowState, setSmsFlowState] = useState<SmsFlowState>("idle");
   const [pendingSms, setPendingSms] = useState<PendingSms | null>(null);
   const [limitError, setLimitError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [callPhase, setCallPhase] = useState<CallModalPhase>("IDLE");
+  const [callLeadData, setCallLeadData] = useState<CallLeadData | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const outreachBlocked = outreachRemaining === 0;
 
-  const matchingTemplates = useMemo(
+  const smsTemplates = useMemo(
     () => filterSpintaxTemplatesForLeadChannel(templates, "sms", leadAudience),
     [templates, leadAudience],
   );
 
-  const telHref = `tel:${normalizePhoneForTel(phone)}`;
+  const callTemplates = useMemo(
+    () => filterSpintaxTemplatesForLeadChannel(templates, "call", leadAudience),
+    [templates, leadAudience],
+  );
+
   const smsPhoneE164 = normalizePhoneE164(phone, country ?? "US");
 
   useEffect(() => {
-    if (matchingTemplates.length === 0) return;
+    if (smsTemplates.length === 0) return;
     const stored = window.localStorage.getItem(lastSmsTemplateStorageKey(userId));
-    if (stored && matchingTemplates.some((t) => t.id === stored)) {
-      setSelectedId(stored);
+    if (stored && smsTemplates.some((t) => t.id === stored)) {
+      setSelectedSmsId(stored);
       return;
     }
-    setSelectedId(matchingTemplates[0].id);
-  }, [matchingTemplates, userId]);
+    setSelectedSmsId(smsTemplates[0].id);
+  }, [smsTemplates, userId]);
+
+  useEffect(() => {
+    if (callTemplates.length === 0) return;
+    const stored = window.localStorage.getItem(lastCallTemplateStorageKey(userId));
+    if (stored && callTemplates.some((t) => t.id === stored)) {
+      setSelectedCallId(stored);
+      return;
+    }
+    setSelectedCallId(callTemplates[0].id);
+  }, [callTemplates, userId]);
 
   useEffect(() => {
     if (!open) return;
@@ -125,14 +148,22 @@ export function CrmPhonePopover({
     }
   }, [open]);
 
-  const selectedTemplate =
-    matchingTemplates.find((t) => t.id === selectedId) ?? matchingTemplates[0];
+  const selectedSmsTemplate =
+    smsTemplates.find((t) => t.id === selectedSmsId) ?? smsTemplates[0];
+
+  const selectedCallTemplate =
+    callTemplates.find((t) => t.id === selectedCallId) ?? callTemplates[0];
 
   useEffect(() => {
     if (!toastMessage) return;
     const timer = window.setTimeout(() => setToastMessage(null), 3000);
     return () => window.clearTimeout(timer);
   }, [toastMessage]);
+
+  function closeCallModal() {
+    setCallPhase("IDLE");
+    setCallLeadData(null);
+  }
 
   async function openSmsLink(pending: PendingSms) {
     const result = await sendOutboundSMS(
@@ -170,21 +201,21 @@ export function CrmPhonePopover({
   }
 
   async function startSendSms() {
-    if (!selectedTemplate || !smsPhoneE164) return;
+    if (!selectedSmsTemplate || !smsPhoneE164) return;
 
     if (outreachBlocked) {
       setLimitError("Monthly outreach limit reached.");
       return;
     }
 
-    const message = buildOutreachMessage(selectedTemplate.template, {
+    const message = buildOutreachMessage(selectedSmsTemplate.template, {
       name: businessName,
       mainCategory,
       businessType,
     });
     window.localStorage.setItem(
       lastSmsTemplateStorageKey(userId),
-      selectedTemplate.id,
+      selectedSmsTemplate.id,
     );
 
     setSmsFlowState("checking");
@@ -236,167 +267,205 @@ export function CrmPhonePopover({
     void openSmsLink(pendingSms);
   }
 
-  async function handleCall() {
-    if (!smsPhoneE164) {
-      window.location.href = telHref;
-      setOpen(false);
-      return;
+  function handleCall() {
+    const hookScript = selectedCallTemplate
+      ? buildOutreachMessage(selectedCallTemplate.template, {
+          name: businessName,
+          mainCategory,
+          businessType,
+        })
+      : "";
+
+    if (selectedCallTemplate) {
+      window.localStorage.setItem(
+        lastCallTemplateStorageKey(userId),
+        selectedCallTemplate.id,
+      );
     }
 
-    const result = await initiateOutboundCall(userId, smsPhoneE164);
-
-    if (result.type === "ERROR") {
-      setLimitError(result.error);
-      return;
-    }
-
-    if (result.type === "FALLBACK") {
-      window.location.href = telHref;
-    } else {
-      setToastMessage("Connecting via business line...");
-    }
-
+    setCallLeadData({
+      placeId,
+      name: businessName,
+      phone,
+      company: businessName,
+      hook_script: hookScript,
+      existingNotes,
+    });
+    setCallPhase("CONNECTING");
     setOpen(false);
   }
 
   return (
-    <div ref={containerRef} className="relative inline-block">
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className="inline-flex items-center gap-1 text-blue-600 hover:underline dark:text-blue-400"
-        aria-expanded={open}
-        aria-haspopup="dialog"
-      >
-        <Phone className="size-3.5" aria-hidden />
-        {phone}
-      </button>
-
-      {open ? (
-        <div
-          role="dialog"
-          aria-label="Phone actions"
-          className="absolute left-0 top-full z-50 mt-1 w-72 rounded-lg border border-zinc-200 bg-white p-3 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+    <>
+      <div ref={containerRef} className="relative inline-block">
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          className="inline-flex items-center gap-1 text-blue-600 hover:underline dark:text-blue-400"
+          aria-expanded={open}
+          aria-haspopup="dialog"
         >
-          <div className="space-y-3">
-            <button
-              type="button"
-              onClick={() => void handleCall()}
-              className="flex w-full items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
-            >
-              <Phone className="size-4 shrink-0" aria-hidden />
-              Call
-            </button>
+          <Phone className="size-3.5" aria-hidden />
+          {phone}
+        </button>
 
-            <div className="space-y-2 border-t border-zinc-100 pt-3 dark:border-zinc-800">
-              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                SMS
-              </p>
-              {outreachBlocked ? (
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Limit reached ·{" "}
-                  <Link
-                    href="/pro"
-                    className="text-blue-600 hover:underline dark:text-blue-400"
-                  >
-                    Upgrade
-                  </Link>
+        {open ? (
+          <div
+            role="dialog"
+            aria-label="Phone actions"
+            className="absolute left-0 top-full z-50 mt-1 w-72 rounded-lg border border-zinc-200 bg-white p-3 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+          >
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  Call
                 </p>
-              ) : matchingTemplates.length === 0 ? (
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  No SMS templates match this lead type.
-                </p>
-              ) : smsFlowState === "confirm_landline" ? (
-                <div className="space-y-2">
-                  <p className="text-xs text-amber-800 dark:text-amber-200">
-                    This appears to be a landline — SMS may not deliver. Send
-                    anyway?
+                {callTemplates.length === 0 ? (
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    No call scripts match this lead type.
                   </p>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={confirmSendAnyway}
-                      className="flex-1 rounded-md bg-accent px-2 py-1.5 text-xs font-semibold text-white hover:bg-accent-hover"
-                    >
-                      Send anyway
-                    </button>
-                    <button
-                      type="button"
-                      onClick={resetSmsFlow}
-                      className="flex-1 rounded-md border border-zinc-300 px-2 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : smsFlowState === "confirm_unverified" ? (
-                <div className="space-y-2">
-                  <p className="text-xs text-amber-800 dark:text-amber-200">
-                    Couldn&apos;t verify number type. Send anyway?
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={confirmSendAnyway}
-                      className="flex-1 rounded-md bg-accent px-2 py-1.5 text-xs font-semibold text-white hover:bg-accent-hover"
-                    >
-                      Send anyway
-                    </button>
-                    <button
-                      type="button"
-                      onClick={resetSmsFlow}
-                      className="flex-1 rounded-md border border-zinc-300 px-2 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <>
+                ) : (
                   <select
-                    value={selectedTemplate?.id ?? ""}
-                    disabled={smsFlowState === "checking"}
-                    onChange={(e) => setSelectedId(e.target.value)}
-                    className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
+                    value={selectedCallTemplate?.id ?? ""}
+                    onChange={(e) => setSelectedCallId(e.target.value)}
+                    className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
                   >
-                    {matchingTemplates.map((t) => (
+                    {callTemplates.map((t) => (
                       <option key={t.id} value={t.id}>
                         {t.name}
                       </option>
                     ))}
                   </select>
-                  {limitError ? (
-                    <p className="text-xs text-red-600 dark:text-red-400" role="alert">
-                      {limitError}
+                )}
+                <button
+                  type="button"
+                  onClick={handleCall}
+                  className="flex w-full items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                >
+                  <Phone className="size-4 shrink-0" aria-hidden />
+                  Call
+                </button>
+              </div>
+
+              <div className="space-y-2 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  SMS
+                </p>
+                {outreachBlocked ? (
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Limit reached ·{" "}
+                    <Link
+                      href="/pro"
+                      className="text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      Upgrade
+                    </Link>
+                  </p>
+                ) : smsTemplates.length === 0 ? (
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    No SMS templates match this lead type.
+                  </p>
+                ) : smsFlowState === "confirm_landline" ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-amber-800 dark:text-amber-200">
+                      This appears to be a landline — SMS may not deliver. Send
+                      anyway?
                     </p>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => void startSendSms()}
-                    disabled={
-                      !selectedTemplate || !smsPhoneE164 || smsFlowState === "checking"
-                    }
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
-                  >
-                    <MessageSquare className="size-4" aria-hidden />
-                    {smsFlowState === "checking" ? "Checking number..." : "Send SMS"}
-                  </button>
-                </>
-              )}
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={confirmSendAnyway}
+                        className="flex-1 rounded-md bg-accent px-2 py-1.5 text-xs font-semibold text-white hover:bg-accent-hover"
+                      >
+                        Send anyway
+                      </button>
+                      <button
+                        type="button"
+                        onClick={resetSmsFlow}
+                        className="flex-1 rounded-md border border-zinc-300 px-2 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : smsFlowState === "confirm_unverified" ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-amber-800 dark:text-amber-200">
+                      Couldn&apos;t verify number type. Send anyway?
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={confirmSendAnyway}
+                        className="flex-1 rounded-md bg-accent px-2 py-1.5 text-xs font-semibold text-white hover:bg-accent-hover"
+                      >
+                        Send anyway
+                      </button>
+                      <button
+                        type="button"
+                        onClick={resetSmsFlow}
+                        className="flex-1 rounded-md border border-zinc-300 px-2 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <select
+                      value={selectedSmsTemplate?.id ?? ""}
+                      disabled={smsFlowState === "checking"}
+                      onChange={(e) => setSelectedSmsId(e.target.value)}
+                      className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
+                    >
+                      {smsTemplates.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
+                      ))}
+                    </select>
+                    {limitError ? (
+                      <p className="text-xs text-red-600 dark:text-red-400" role="alert">
+                        {limitError}
+                      </p>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => void startSendSms()}
+                      disabled={
+                        !selectedSmsTemplate || !smsPhoneE164 || smsFlowState === "checking"
+                      }
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
+                    >
+                      <MessageSquare className="size-4" aria-hidden />
+                      {smsFlowState === "checking" ? "Checking number..." : "Send SMS"}
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      {toastMessage ? (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white shadow-lg dark:bg-zinc-100 dark:text-zinc-900"
-        >
-          {toastMessage}
-        </div>
-      ) : null}
-    </div>
+        {toastMessage ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white shadow-lg dark:bg-zinc-100 dark:text-zinc-900"
+          >
+            {toastMessage}
+          </div>
+        ) : null}
+      </div>
+
+      <CrmCallModal
+        userId={userId}
+        phoneCountry={country}
+        phase={callPhase}
+        leadData={callLeadData}
+        onClose={closeCallModal}
+        onPhaseChange={setCallPhase}
+      />
+    </>
   );
 }

@@ -33,6 +33,10 @@ function firstTemplateInChannel(
   return templates.find((t) => t.channel === channel) ?? null;
 }
 
+function defaultAudienceForChannel(channel: SpintaxChannel): SpintaxAudience {
+  return channel === "facebook" ? "facebook" : "any";
+}
+
 export function SpintaxTemplateEditor({
   initialTemplates,
 }: SpintaxTemplateEditorProps) {
@@ -113,7 +117,7 @@ export function SpintaxTemplateEditor({
       setSelectedId("");
       setName("");
       setTemplate("");
-      setAudience(nextChannel === "sms" ? "any" : "facebook");
+      setAudience(defaultAudienceForChannel(nextChannel));
     }
   }
 
@@ -158,7 +162,7 @@ export function SpintaxTemplateEditor({
     const res = await createSpintaxTemplate(
       "New template",
       "{Hey|Hi} [Name] - {your message here}.",
-      activeChannel === "sms" ? "any" : "facebook",
+      defaultAudienceForChannel(activeChannel),
       activeChannel,
     );
     setPending(false);
@@ -197,7 +201,7 @@ export function SpintaxTemplateEditor({
       setSelectedId("");
       setName("");
       setTemplate("");
-      setAudience(activeChannel === "sms" ? "any" : "facebook");
+      setAudience(defaultAudienceForChannel(activeChannel));
     }
     setMessage("Deleted");
     router.refresh();
@@ -337,7 +341,9 @@ export function SpintaxTemplateEditor({
                 <span className="text-xs text-zinc-500 dark:text-zinc-400">
                   {activeChannel === "facebook"
                     ? "Facebook listing templates show for leads using Facebook as their website. No Facebook templates show for plain no-website leads."
-                    : "SMS templates can target Facebook leads, no-Facebook leads, or any lead type."}
+                    : activeChannel === "sms"
+                      ? "SMS templates can target Facebook leads, no-Facebook leads, or any lead type."
+                      : "Call scripts can target Facebook leads, no-Facebook leads, or any lead type."}
                 </span>
               </label>
 
