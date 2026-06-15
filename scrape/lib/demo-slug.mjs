@@ -30,6 +30,59 @@ export function isLikelyGooglePlaceId(s) {
   return /^ChIJ[A-Za-z0-9_-]+$/.test(String(s ?? "").trim());
 }
 
+export function isDemoSlugConflictError(message) {
+  return /demo_slug|idx_businesses_nowebsite_demo_slug_unique/i.test(
+    String(message ?? ""),
+  );
+}
+
+/**
+ * @param {{ slugToPlace: Map<string, string>, placeToSlug: Map<string, string> }} state
+ * @param {string} pid
+ * @param {string|undefined|null} slug
+ */
+export function clearDemoSlugReservation(state, pid, slug) {
+  const placeId = String(pid ?? "").trim();
+  if (placeId) {
+    state.placeToSlug.delete(placeId);
+  }
+  const normalized =
+    slug != null ? String(slug).trim().toLowerCase() : "";
+  if (normalized) {
+    const owner = state.slugToPlace.get(normalized);
+    if (!owner || owner === placeId) {
+      state.slugToPlace.delete(normalized);
+    }
+  }
+}
+
+/**
+ * Register a slug owner from DB into the in-memory allocator.
+ * @param {import("@supabase/supabase-js").SupabaseClient} supabase
+ * @param {string} table
+ * @param {{ slugToPlace: Map<string, string>, placeToSlug: Map<string, string> }} state
+ * @param {string} slug
+ */
+export async function syncSlugReservationFromDb(supabase, table, state, slug) {
+  const normalized = String(slug ?? "").trim().toLowerCase();
+  if (!normalized) return;
+
+  const { data, error } = await supabase
+    .from(table)
+    .select("place_id")
+    .eq("demo_slug", normalized)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  if (!data?.place_id) return;
+
+  const pid = String(data.place_id).trim();
+  state.slugToPlace.set(normalized, pid);
+  state.placeToSlug.set(pid, normalized);
+}
+
 /**
  * Load existing slug assignments from Supabase.
  * @param {import("@supabase/supabase-js").SupabaseClient} supabase
@@ -48,6 +101,7 @@ export async function createDemoSlugAllocator(supabase, table) {
       .from(table)
       .select("place_id, demo_slug")
       .not("demo_slug", "is", null)
+      .order("place_id", { ascending: true })
       .range(offset, offset + pageSize - 1);
 
     if (error) {
@@ -91,11 +145,15 @@ export function assignDemoSlugToPayload(state, payload) {
   while (state.slugToPlace.has(candidate)) {
     const owner = state.slugToPlace.get(candidate);
     if (owner === pid) break;
-    candidate = `${base}${n}`;
+    const suffix = String(n);
+    const trimmedBase = base.slice(0, Math.max(1, MAX_SLUG_LEN - suffix.length));
+    candidate = `${trimmedBase}${suffix}`;
     n += 1;
     guard += 1;
     if (guard > 5000) {
-      candidate = `${base}x${pid.replace(/[^a-zA-Z0-9]/g, "").toLowerCase().slice(-6)}`;
+      const tail = pid.replace(/[^a-zA-Z0-9]/g, "").toLowerCase().slice(-6);
+      const trimmedBase = base.slice(0, Math.max(1, MAX_SLUG_LEN - 1 - tail.length));
+      candidate = `${trimmedBase}x${tail}`;
       break;
     }
   }
@@ -103,6 +161,34 @@ export function assignDemoSlugToPayload(state, payload) {
   state.slugToPlace.set(candidate, pid);
   state.placeToSlug.set(pid, candidate);
   payload.demo_slug = candidate;
+}
+
+/**
+ * After a unique-index failure, sync DB reservations and pick the next free slug.
+ * @param {import("@supabase/supabase-js").SupabaseClient} supabase
+ * @param {string} table
+ * @param {{ slugToPlace: Map<string, string>, placeToSlug: Map<string, string> }} state
+ * @param {{ place_id: string, name?: string|null, demo_slug?: string|null }} payload
+ */
+export async function reassignDemoSlugAfterConflict(
+  supabase,
+  table,
+  state,
+  payload,
+) {
+  const pid = payload.place_id != null ? String(payload.place_id).trim() : "";
+  if (!pid) return;
+
+  const failedSlug = payload.demo_slug;
+  if (failedSlug) {
+    try {
+      await syncSlugReservationFromDb(supabase, table, state, failedSlug);
+    } catch {
+      // Best-effort; allocator will still bump suffix below.
+    }
+  }
+  clearDemoSlugReservation(state, pid, failedSlug);
+  assignDemoSlugToPayload(state, payload);
 }
 
 /**

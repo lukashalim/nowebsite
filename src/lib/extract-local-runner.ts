@@ -73,17 +73,21 @@ export function startExtractLocal(
     env.EXTRACT_LOCAL_LOCATION_HINT = options.locationHint.trim();
   }
 
-  const child = spawn(process.execPath, args, {
-    cwd: scrapeDir,
-    env,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  const child = spawn(
+    process.execPath,
+    ["--import", "tsx", ...args],
+    {
+      cwd: scrapeDir,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
 
   state.running = true;
   state.pid = child.pid ?? null;
   state.startedAt = new Date().toISOString();
   state.exitCode = null;
-  state.logTail = [`> node ${args.slice(1).join(" ")}`];
+  state.logTail = [`> node --import tsx ${args.slice(1).join(" ")}`];
   state.options = { ...options };
 
   child.stdout?.on("data", (chunk: Buffer) => appendLog(chunk.toString()));

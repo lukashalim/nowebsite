@@ -19,7 +19,7 @@ interface MemoryEntry {
 const memoryStore = new Map<string, MemoryEntry>();
 
 const LIMITS: Record<RateLimitKind, { requests: number; windowMs: number }> = {
-  directoryPage: { requests: 120, windowMs: 60 * 60 * 1000 },
+  directoryPage: { requests: 300, windowMs: 60 * 60 * 1000 },
   directoryContacts: { requests: 60, windowMs: 60 * 60 * 1000 },
 };
 
@@ -98,11 +98,11 @@ export async function checkRateLimit(
 
   const limiter = upstashLimiters[kind];
   if (limiter) {
-    const result = await limiter.limit(key);
-    const effectiveLimit = LIMITS[kind].requests * multiplier;
+    const effectiveRequests = LIMITS[kind].requests * multiplier;
+    const result = await limiter.limit(key, { rate: effectiveRequests });
     return {
       success: result.success,
-      limit: effectiveLimit,
+      limit: effectiveRequests,
       remaining: result.remaining,
       reset: result.reset,
     };

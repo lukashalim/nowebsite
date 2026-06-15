@@ -7,6 +7,7 @@ import {
   getClientIp,
   rateLimitHeaders,
 } from "@/lib/rate-limit";
+import { shouldBypassRateLimit } from "@/lib/bot-detection";
 
 const RESERVED_FIRST_SEGMENTS = new Set([
   "api",
@@ -60,6 +61,14 @@ function isDirectoryPagePath(pathname: string): boolean {
   return segments.length === 1;
 }
 
+function isPrefetchRequest(request: NextRequest): boolean {
+  if (request.headers.get("next-router-prefetch") === "1") return true;
+  if (request.headers.get("purpose") === "prefetch") return true;
+  const secPurpose = request.headers.get("sec-purpose") ?? "";
+  if (secPurpose.includes("prefetch")) return true;
+  return false;
+}
+
 function copyCookies(from: NextResponse, to: NextResponse) {
   from.cookies.getAll().forEach(({ name, value }) => {
     to.cookies.set(name, value);
@@ -78,7 +87,12 @@ export async function middleware(request: NextRequest) {
     return response;
   };
 
-  if (request.method === "GET" && isDirectoryPagePath(pathname)) {
+  if (
+    request.method === "GET" &&
+    isDirectoryPagePath(pathname) &&
+    !isPrefetchRequest(request) &&
+    !shouldBypassRateLimit(request.headers.get("user-agent"))
+  ) {
     const userAgent = request.headers.get("user-agent");
     const ip = getClientIp(request);
     const rateLimit = await checkRateLimit("directoryPage", ip, userAgent);

@@ -8,14 +8,14 @@
     "start": "next start",
     "lint": "eslint",
     "deploy-workers": "node deploy-workers.mjs",
-    "demo:sync": "npx tsx ./scrape/sync-businesses-to-nowebsite.mjs",
-    "backfill-directory-category-slug": "npx tsx scripts/backfill-directory-category-slug.ts",
-    "generate-category-group-mapping": "npx tsx scripts/generate-category-group-mapping.ts",
-    "sync-category-group-members": "npx tsx scripts/sync-category-group-members-from-db.ts",
-    "demo:backfill-seo": "node --import ./scrape/env-nowebsite-queue.mjs ./scrape/backfill-demo-seo-dispatch.mjs",
-    "demo:pipeline": "node --import ./scrape/env-nowebsite-pipeline-cohort.mjs ./scrape/pipeline.mjs",
-    "demo:poller": "node --import ./scrape/env-nowebsite-queue.mjs ./scrape/poller.mjs",
-    "demo:dispatch": "node --import ./scrape/env-nowebsite-queue.mjs ./scrape/dispatch.mjs"
+    "demo:sync": "node --import tsx ./scrape/sync-businesses-to-nowebsite.mjs",
+    "backfill-directory-category-slug": "node --import tsx scripts/backfill-directory-category-slug.ts",
+    "generate-category-group-mapping": "node --import tsx scripts/generate-category-group-mapping.ts",
+    "sync-category-group-members": "node --import tsx scripts/sync-category-group-members-from-db.ts",
+    "demo:backfill-seo": "node --import ./scrape/env-nowebsite-queue.mjs --import tsx ./scrape/backfill-demo-seo-dispatch.mjs",
+    "demo:pipeline": "node --import ./scrape/env-nowebsite-pipeline-cohort.mjs --import tsx ./scrape/pipeline.mjs",
+    "demo:poller": "node --import ./scrape/env-nowebsite-queue.mjs --import tsx ./scrape/poller.mjs",
+    "demo:dispatch": "node --import ./scrape/env-nowebsite-queue.mjs --import tsx ./scrape/dispatch.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
@@ -40,6 +40,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
     "tailwindcss": "^4",
+    "tsx": "^4.22.4",
     "typescript": "^5"
   }
 }

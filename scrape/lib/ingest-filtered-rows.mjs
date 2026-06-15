@@ -14,6 +14,8 @@ import {
 import {
   createDemoSlugAllocator,
   assignDemoSlugToPayload,
+  isDemoSlugConflictError,
+  reassignDemoSlugAfterConflict,
 } from "./demo-slug.mjs";
 import {
   businessTypeArgToCategorySlug,
@@ -220,7 +222,7 @@ export function createIngestRunner(opts) {
   /** @type {Promise<{ slugToPlace: Map<string, string>, placeToSlug: Map<string, string> }>|null} */
   let slugStatePromise = null;
 
-  async function upsertChunkRecursive(chunk) {
+  async function upsertChunkRecursive(chunk, slugState) {
     if (chunk.length === 0) {
       return;
     }
@@ -232,14 +234,47 @@ export function createIngestRunner(opts) {
       return;
     }
     if (chunk.length === 1) {
+      const row = chunk[0];
+      const placeId = row?.place_id ?? "?";
+      if (
+        slugState &&
+        isDemoSlugConflictError(upErr.message) &&
+        row &&
+        typeof row === "object"
+      ) {
+        let resolved = false;
+        for (let attempt = 0; attempt < 8; attempt += 1) {
+          await reassignDemoSlugAfterConflict(
+            supabase,
+            businessesTable,
+            slugState,
+            row,
+          );
+          const { error: retryErr } = await supabase
+            .from(businessesTable)
+            .upsert([row], { onConflict: "place_id" });
+          if (!retryErr) {
+            stats.businessesUpserted += 1;
+            resolved = true;
+            break;
+          }
+          if (!isDemoSlugConflictError(retryErr.message)) {
+            stats.upsertBatchErrors += 1;
+            console.error(`Upsert failed (${placeId}):`, retryErr.message);
+            return;
+          }
+        }
+        if (resolved) {
+          return;
+        }
+      }
       stats.upsertBatchErrors += 1;
-      const placeId = chunk[0]?.place_id ?? "?";
       console.error(`Upsert failed (${placeId}):`, upErr.message);
       return;
     }
     const mid = Math.floor(chunk.length / 2);
-    await upsertChunkRecursive(chunk.slice(0, mid));
-    await upsertChunkRecursive(chunk.slice(mid));
+    await upsertChunkRecursive(chunk.slice(0, mid), slugState);
+    await upsertChunkRecursive(chunk.slice(mid), slugState);
   }
 
   async function flushPayloadBuffer(drainAll) {
@@ -274,7 +309,7 @@ export function createIngestRunner(opts) {
           `Conversion tracking (batch): ${trackErr?.message ?? trackErr}`,
         );
       }
-      await upsertChunkRecursive(chunk);
+      await upsertChunkRecursive(chunk, slugState);
     }
   }
 
