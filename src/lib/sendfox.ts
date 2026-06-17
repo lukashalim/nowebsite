@@ -29,9 +29,18 @@ function getSendFoxListId(): number {
   return id;
 }
 
-export async function addContactToList(email: string): Promise<void> {
+export async function addContactToList(
+  email: string,
+  options?: { firstName?: string },
+): Promise<void> {
   const token = getSendFoxToken();
   const listId = getSendFoxListId();
+
+  const requestBody: Record<string, unknown> = { email, lists: [listId] };
+  const firstName = options?.firstName?.trim();
+  if (firstName) {
+    requestBody.first_name = firstName;
+  }
 
   const response = await fetch(`${SENDFOX_API_BASE}/contacts`, {
     method: "POST",
@@ -40,7 +49,7 @@ export async function addContactToList(email: string): Promise<void> {
       "Content-Type": "application/json",
       Accept: "application/json",
     },
-    body: JSON.stringify({ email, lists: [listId] }),
+    body: JSON.stringify(requestBody),
   });
 
   if (response.ok) {
@@ -55,10 +64,10 @@ export async function addContactToList(email: string): Promise<void> {
     throw new Error("SendFox service unavailable");
   }
 
-  const body = (await response.json().catch(() => null)) as {
+  const errorBody = (await response.json().catch(() => null)) as {
     message?: string;
   } | null;
-  const message = body?.message?.toLowerCase() ?? "";
+  const message = errorBody?.message?.toLowerCase() ?? "";
 
   if (
     response.status === 422 &&
@@ -67,7 +76,7 @@ export async function addContactToList(email: string): Promise<void> {
     return;
   }
 
-  throw new Error(body?.message ?? "Failed to subscribe email");
+  throw new Error(errorBody?.message ?? "Failed to subscribe email");
 }
 
 export async function getContactByEmail(
@@ -118,9 +127,12 @@ export async function isEmailConfirmed(email: string): Promise<boolean> {
   return contact?.confirmed_at != null;
 }
 
-export async function addContactToListBestEffort(email: string): Promise<void> {
+export async function addContactToListBestEffort(
+  email: string,
+  options?: { firstName?: string },
+): Promise<void> {
   try {
-    await addContactToList(email);
+    await addContactToList(email, options);
   } catch {
     // Non-blocking: CRM sign-in and other flows must not fail when SendFox is down.
   }

@@ -19,6 +19,8 @@ const RESERVED_FIRST_SEGMENTS = new Set([
   "admin",
   "privacy",
   "terms",
+  "alternatives",
+  "blog",
   "_next",
   "favicon.ico",
   "robots.txt",

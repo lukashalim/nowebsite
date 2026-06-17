@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 import {
   fetchAdminUsageReport,
+  USAGE_EVENT_LABELS,
   USAGE_SEGMENT_LABELS,
   USAGE_SEGMENT_ORDER,
   type ServiceUsageRow,
@@ -78,13 +79,250 @@ function SegmentCell({
   );
 }
 
+function formatDateTime(value: string | null): string {
+  if (!value) return "Never";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString();
+}
+
+function formatCompactDateTime(value: string | null): string {
+  if (!value) return "Never";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+const SECTION_NAV_LINKS = [
+  { id: "overview", label: "Overview" },
+  { id: "anonymous-csv", label: "Anonymous CSV" },
+  { id: "registered-users", label: "Registered users" },
+  { id: "directory_csv", label: "Directory CSV" },
+  { id: "crm_outreach", label: "CRM outreach" },
+  { id: "crm_csv_export", label: "CRM export" },
+] as const;
+
+const sectionLinkClass =
+  "text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100";
+
+function SectionJumpNav() {
+  return (
+    <nav
+      className="sticky top-0 z-10 -mx-4 mb-6 border-b border-zinc-200 bg-zinc-50/95 px-4 py-2.5 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-950/95 sm:-mx-6 sm:px-6"
+      aria-label="Page sections"
+    >
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+        <span className="font-medium text-zinc-800 dark:text-zinc-200">
+          Jump to
+        </span>
+        <span className="text-zinc-400 dark:text-zinc-600" aria-hidden>
+          /
+        </span>
+        {SECTION_NAV_LINKS.map((link, index) => (
+          <span key={link.id} className="inline-flex items-center gap-x-2">
+            <a href={`#${link.id}`} className={sectionLinkClass}>
+              {link.label}
+            </a>
+            {index < SECTION_NAV_LINKS.length - 1 ? (
+              <span className="text-zinc-400 dark:text-zinc-600" aria-hidden>
+                /
+              </span>
+            ) : null}
+          </span>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
+function truncateUrl(url: string, max = 60): string {
+  if (url.length <= max) return url;
+  return `${url.slice(0, max - 1)}…`;
+}
+
+function AnonymousCsvTable({
+  rows,
+}: {
+  rows: Awaited<ReturnType<typeof fetchAdminUsageReport>>["anonymousCsvByPage"];
+}) {
+  return (
+    <section
+      id="anonymous-csv"
+      className="scroll-mt-20 overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950"
+    >
+      <div className="border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+        <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
+          Anonymous directory CSV downloads
+        </h2>
+        <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+          {rows.length.toLocaleString()} page
+          {rows.length === 1 ? "" : "s"} with downloads (not signed in)
+        </p>
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="px-4 py-6 text-sm text-zinc-500 dark:text-zinc-400">
+          No anonymous CSV downloads in this period.
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left">
+            <thead>
+              <tr className="border-b border-zinc-100 bg-zinc-50/80 text-xs uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-400">
+                <th className="px-4 py-2.5 font-medium">Page URL</th>
+                <th className="px-4 py-2.5 font-medium">Downloads</th>
+                <th className="px-4 py-2.5 font-medium">Last download</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr
+                  key={row.pageUrl}
+                  className="border-b border-zinc-100 dark:border-zinc-800"
+                >
+                  <td
+                    className="max-w-xs px-4 py-3 text-sm text-zinc-800 dark:text-zinc-200"
+                    title={row.pageUrl}
+                  >
+                    {truncateUrl(row.pageUrl)}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm tabular-nums text-zinc-900 dark:text-zinc-100">
+                    {row.downloadCount.toLocaleString()}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400">
+                    {formatDateTime(row.lastDownloadedAt)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function UserActivityTable({
+  rows,
+}: {
+  rows: Awaited<ReturnType<typeof fetchAdminUsageReport>>["userActivity"];
+}) {
+  return (
+    <section
+      id="registered-users"
+      className="scroll-mt-20 overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950"
+    >
+      <div className="border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+        <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
+          Registered users
+        </h2>
+        <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+          {rows.length.toLocaleString()} account
+          {rows.length === 1 ? "" : "s"} · activity counts respect the period
+          filter; login timestamps are profile-tracked (all-time)
+        </p>
+        <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+          Pro outreach counts only include activity after pro logging was
+          enabled.
+        </p>
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="px-4 py-6 text-sm text-zinc-500 dark:text-zinc-400">
+          No registered users found.
+        </p>
+      ) : (
+        <table className="w-full table-fixed text-left text-xs">
+          <thead>
+            <tr className="border-b border-zinc-100 bg-zinc-50/80 text-[11px] uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-400">
+              <th className="w-[18%] px-2.5 py-2 font-medium">Email</th>
+              <th className="w-[5%] px-2 py-2 font-medium">Tier</th>
+              <th className="w-[11%] px-2 py-2 font-medium">First login</th>
+              <th className="w-[11%] px-2 py-2 font-medium">Last login</th>
+              <th className="w-[7%] px-2 py-2 font-medium">Mktg</th>
+              <th className="w-[5%] px-2 py-2 text-right font-medium">CSV</th>
+              <th className="w-[6%] px-2 py-2 text-right font-medium">Logins</th>
+              <th className="w-[5%] px-2 py-2 text-right font-medium">DM</th>
+              <th className="w-[5%] px-2 py-2 text-right font-medium">SMS</th>
+              <th className="w-[5%] px-2 py-2 text-right font-medium">Calls</th>
+              <th className="w-[7%] px-2 py-2 text-right font-medium">Demo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr
+                key={row.userId}
+                className="border-b border-zinc-100 dark:border-zinc-800"
+              >
+                <td
+                  className="truncate px-2.5 py-2 text-zinc-800 dark:text-zinc-200"
+                  title={row.email ?? undefined}
+                >
+                  {row.email ?? "—"}
+                </td>
+                <td className="px-2 py-2">
+                  <span
+                    className={`inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                      row.isPro
+                        ? "bg-violet-100 text-violet-800 dark:bg-violet-950/50 dark:text-violet-200"
+                        : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                    }`}
+                  >
+                    {row.isPro ? "Pro" : "Free"}
+                  </span>
+                </td>
+                <td className="px-2 py-2 text-zinc-600 dark:text-zinc-400">
+                  {formatCompactDateTime(row.firstLogin)}
+                </td>
+                <td className="px-2 py-2 text-zinc-600 dark:text-zinc-400">
+                  {formatCompactDateTime(row.lastLogin ?? row.lastSignInAt)}
+                </td>
+                <td className="px-2 py-2 text-zinc-600 dark:text-zinc-400">
+                  {row.marketingOptIn ? "Yes" : "No"}
+                </td>
+                <td className="px-2 py-2 text-right tabular-nums text-zinc-900 dark:text-zinc-100">
+                  {row.csvDownloadCount.toLocaleString()}
+                </td>
+                <td className="px-2 py-2 text-right tabular-nums text-zinc-900 dark:text-zinc-100">
+                  {row.loginCount.toLocaleString()}
+                </td>
+                <td className="px-2 py-2 text-right tabular-nums text-zinc-900 dark:text-zinc-100">
+                  {row.dmCount.toLocaleString()}
+                </td>
+                <td className="px-2 py-2 text-right tabular-nums text-zinc-900 dark:text-zinc-100">
+                  {row.smsCount.toLocaleString()}
+                </td>
+                <td className="px-2 py-2 text-right tabular-nums text-zinc-900 dark:text-zinc-100">
+                  {row.phoneCallCount.toLocaleString()}
+                </td>
+                <td className="px-2 py-2 text-right tabular-nums text-zinc-900 dark:text-zinc-100">
+                  {row.demoClickCount.toLocaleString()}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  );
+}
+
 function ServiceTable({ service }: { service: ServiceUsageRow }) {
   const hasData = USAGE_SEGMENT_ORDER.some(
     (segment) => service.bySegment[segment].totalEvents > 0,
   );
 
   return (
-    <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+    <section
+      id={service.id}
+      className="scroll-mt-20 overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950"
+    >
       <div className="border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
         <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
           {service.label}
@@ -154,7 +392,11 @@ function ServiceTable({ service }: { service: ServiceUsageRow }) {
               .sort(([, a], [, b]) => b - a)
               .map(([action, count]) => (
                 <div key={action} className="flex gap-2">
-                  <dt className="text-zinc-500 dark:text-zinc-400">{action}</dt>
+                  <dt className="text-zinc-500 dark:text-zinc-400">
+                    {USAGE_EVENT_LABELS[
+                      action as keyof typeof USAGE_EVENT_LABELS
+                    ] ?? action}
+                  </dt>
                   <dd className="font-medium text-zinc-900 dark:text-zinc-100">
                     {count.toLocaleString()}
                   </dd>
@@ -179,7 +421,7 @@ export default async function AdminUsagePage({ searchParams }: PageProps) {
   const report = await fetchAdminUsageReport(period);
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
+    <main className="mx-auto max-w-[90rem] px-4 py-10 sm:px-6">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
@@ -208,6 +450,8 @@ export default async function AdminUsagePage({ searchParams }: PageProps) {
           </Link>
         </nav>
       </div>
+
+      <SectionJumpNav />
 
       <div className="mb-6 flex gap-2">
         <Link
@@ -241,7 +485,10 @@ export default async function AdminUsagePage({ searchParams }: PageProps) {
         </p>
       ) : null}
 
-      <section className="mb-8 grid gap-4 sm:grid-cols-3">
+      <section
+        id="overview"
+        className="scroll-mt-20 mb-8 grid gap-4 sm:grid-cols-3"
+      >
         <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
           <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
             Free accounts
@@ -270,6 +517,11 @@ export default async function AdminUsagePage({ searchParams }: PageProps) {
           </p>
         </div>
       </section>
+
+      <div className="mb-8 space-y-6">
+        <AnonymousCsvTable rows={report.anonymousCsvByPage} />
+        <UserActivityTable rows={report.userActivity} />
+      </div>
 
       <div className="space-y-6">
         {report.services.map((service) => (

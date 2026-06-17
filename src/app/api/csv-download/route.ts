@@ -15,6 +15,7 @@ import {
   rateLimitHeaders,
 } from "@/lib/rate-limit";
 import { getAuthenticatedUserProfile, isPro } from "@/lib/subscription";
+import { logUsageEvent } from "@/lib/log-usage-event";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -110,6 +111,9 @@ export async function GET(request: Request) {
     );
 
     await logCsvDownload(parsed.data.pageUrl, auth?.userId ?? null);
+    if (auth?.userId) {
+      void logUsageEvent(auth.userId, "csv_page_exported");
+    }
 
     const csv = buildDirectoryBusinessesCsv(businesses);
     const filename = csvFilenameFromPagePath(parsed.data.pageUrl);

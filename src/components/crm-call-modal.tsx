@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Loader2, MessageSquare, PhoneOff } from "luc
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { updateNotes } from "@/app/actions/update-notes";
+import { recordPhoneCallUsage } from "@/app/actions/crm-usage";
 import type { CallScriptSteps } from "@/lib/call-script-steps";
 import type { CrmUsageAction } from "@/lib/crm-limits";
 import {
@@ -123,12 +124,13 @@ export function CallSessionOverlay({
 
     void (async () => {
       if (!e164) {
+        void recordPhoneCallUsage(leadData.placeId);
         window.location.href = telHref;
         onPhaseChange("TALKING");
         return;
       }
 
-      const result = await initiateOutboundCall(userId, e164);
+      const result = await initiateOutboundCall(userId, e164, leadData.placeId);
 
       if (result.type === "ERROR") {
         setCallError(result.error);

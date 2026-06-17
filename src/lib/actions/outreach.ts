@@ -3,6 +3,7 @@
 import { recordOutreachUsage } from "@/app/actions/crm-usage";
 import { DEMO_DETAIL_COLUMNS } from "@/lib/crm-cohort";
 import { demoPathSegment, tenantDemoPublicPath } from "@/lib/demo-slug";
+import { logUsageEvent } from "@/lib/log-usage-event";
 import { ensureProfileUsername } from "@/lib/profile-username";
 import { absoluteUrl } from "@/lib/site-url";
 import { getUserProfile, getUserTwilioCredentials } from "@/lib/subscription";
@@ -159,6 +160,7 @@ export async function sendOutboundSMS(
 export async function initiateOutboundCall(
   userId: string,
   targetPhoneNumber: string,
+  placeId?: string,
 ): Promise<OutboundCallResult> {
   const auth = await requireSessionUser(userId);
   if (!auth.ok) {
@@ -167,6 +169,7 @@ export async function initiateOutboundCall(
 
   const credentials = await getUserTwilioCredentials(userId);
   if (!credentials) {
+    await logUsageEvent(userId, "phone_call_initiated", placeId);
     return { type: "FALLBACK" };
   }
 
@@ -178,6 +181,7 @@ export async function initiateOutboundCall(
       from: credentials.phoneNumber,
       url: buildVoiceHandlerUrl(userId, targetPhoneNumber, roomId),
     });
+    await logUsageEvent(userId, "phone_call_initiated", placeId);
     return { type: "TWILIO", ok: true, callSid: call.sid, roomId };
   } catch (error) {
     const message =

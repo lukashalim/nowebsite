@@ -1,5 +1,5 @@
 import {
-  EMPTY_CRM_USAGE_BY_ACTION,
+  CRM_ACTION_TO_USAGE_EVENT,
   FREE_MONTHLY_OUTREACH_LIMIT,
   type CrmUsageAction,
   type CrmUsageSummary,
@@ -9,7 +9,7 @@ import {
   fetchCrmUsageMonthlySummary,
   fetchCrmUsageMonthlyTotal,
 } from "@/lib/crm-aggregate-queries";
-import { createSupabaseAdmin } from "@/lib/supabase/admin";
+import { logUsageEvent } from "@/lib/log-usage-event";
 import { isPro, type UserProfile } from "@/lib/subscription";
 
 function nextMonthStartUtc(): string {
@@ -55,34 +55,39 @@ export async function recordCrmUsage(
   | { ok: true; remaining: number | null }
   | { ok: false; error: string; remaining: number }
 > {
-  if (isPro(profile)) {
-    return { ok: true, remaining: null };
+  const pro = isPro(profile);
+
+  if (!pro) {
+    const used = await getMonthlyUsageCount(userId);
+    if (used >= FREE_MONTHLY_OUTREACH_LIMIT) {
+      return {
+        ok: false,
+        error: "Monthly outreach limit reached. Upgrade to Pro for unlimited DMs, SMS, and demo links.",
+        remaining: 0,
+      };
+    }
   }
 
-  const used = await getMonthlyUsageCount(userId);
-  if (used >= FREE_MONTHLY_OUTREACH_LIMIT) {
+  const eventType = CRM_ACTION_TO_USAGE_EVENT[action];
+  const logged = await logUsageEvent(userId, eventType, placeId);
+
+  if (!logged.ok) {
+    if (pro) {
+      return { ok: false, error: logged.error, remaining: 0 };
+    }
+    const used = await getMonthlyUsageCount(userId);
     return {
       ok: false,
-      error: "Monthly outreach limit reached. Upgrade to Pro for unlimited DMs, SMS, and demo links.",
-      remaining: 0,
-    };
-  }
-
-  const supabase = createSupabaseAdmin();
-  const { error } = await supabase.from("crm_usage_events").insert({
-    user_id: userId,
-    action_type: action,
-    place_id: placeId?.trim() || null,
-  });
-
-  if (error) {
-    return {
-      ok: false,
-      error: error.message,
+      error: logged.error,
       remaining: Math.max(0, FREE_MONTHLY_OUTREACH_LIMIT - used),
     };
   }
 
-  const remaining = FREE_MONTHLY_OUTREACH_LIMIT - used - 1;
+  if (pro) {
+    return { ok: true, remaining: null };
+  }
+
+  const used = await getMonthlyUsageCount(userId);
+  const remaining = FREE_MONTHLY_OUTREACH_LIMIT - used;
   return { ok: true, remaining };
 }

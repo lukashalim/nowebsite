@@ -4,6 +4,7 @@ import { fetchCrmBusinessRows } from "@/lib/crm-cohort";
 import { tryParseCrmSearchParams } from "@/lib/crm-params";
 import { getSiteOrigin } from "@/lib/site-url";
 import { getUserProfile, isPro } from "@/lib/subscription";
+import { logUsageEvent } from "@/lib/log-usage-event";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { BusinessLead } from "@/lib/business";
 
@@ -96,6 +97,8 @@ export async function GET(request: Request) {
   if (error) {
     return NextResponse.json({ error }, { status: 400 });
   }
+
+  void logUsageEvent(user.id, "csv_page_exported");
 
   const csv = buildCrmLeadsCsv(rows, getSiteOrigin(), profile?.username);
   const filename = crmExportFilename();

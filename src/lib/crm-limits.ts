@@ -1,3 +1,5 @@
+import type { UsageEventType } from "@/lib/usage-storage";
+
 export const FREE_MONTHLY_OUTREACH_LIMIT = 25;
 
 export type CrmUsageAction = "dm" | "sms" | "demo_click";
@@ -27,3 +29,9 @@ export const EMPTY_CRM_USAGE_BY_ACTION: CrmUsageByAction = {
   sms: 0,
   demo_click: 0,
 };
+
+export const CRM_ACTION_TO_USAGE_EVENT = {
+  dm: "facebook_dm_copied",
+  sms: "sms_sent",
+  demo_click: "demo_site_created",
+} as const satisfies Record<CrmUsageAction, UsageEventType>;

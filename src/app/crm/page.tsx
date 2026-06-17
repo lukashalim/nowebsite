@@ -14,7 +14,7 @@ import { getCrmUsageSummary } from "@/lib/crm-usage";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
 import { tryParseCrmSearchParams } from "@/lib/crm-params";
 import { getUserProfile, isPro } from "@/lib/subscription";
-import { refreshSendFoxConfirmationForUser, syncSendFoxProfileForUser } from "@/lib/sendfox-profile-sync";
+import { ensureSendFoxProfileForUser } from "@/lib/sendfox-profile-sync";
 import { syncProForUser } from "@/lib/stripe-subscription";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -72,13 +72,12 @@ export default async function CrmPage({ searchParams }: PageProps) {
   const p = parsed.data;
   let profile = await getUserProfile(user.id);
   if (profile?.email) {
-    if (!profile.sendfox_subscribed_at) {
-      await syncSendFoxProfileForUser(user.id, profile.email).catch(() => {});
-      profile = await getUserProfile(user.id);
-    } else if (!profile.sendfox_confirmed_at) {
-      await refreshSendFoxConfirmationForUser(user.id, profile.email).catch(
-        () => {},
-      );
+    const synced = await ensureSendFoxProfileForUser(
+      user.id,
+      profile.email,
+      profile,
+    );
+    if (synced) {
       profile = await getUserProfile(user.id);
     }
   }

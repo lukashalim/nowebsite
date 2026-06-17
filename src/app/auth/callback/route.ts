@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
 import { getRequestOrigin } from "@/lib/auth-redirect";
 import { ensureProfileUsername } from "@/lib/profile-username";
-import { syncSendFoxProfileForUser } from "@/lib/sendfox-profile-sync";
+import { trackUserSession } from "@/lib/track-user-session";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/route-handler";
 
 export const runtime = "nodejs";
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
       if (user?.email) {
         await Promise.all([
           ensureProfileUsername(user.id, user.email).catch(() => null),
-          syncSendFoxProfileForUser(user.id, user.email).catch(() => null),
+          trackUserSession(user.id),
         ]);
       }
 

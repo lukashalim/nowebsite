@@ -11,6 +11,9 @@ export interface UserProfile {
   stripe_customer_id: string | null;
   subscription_price: string | null;
   subscription_started_at: string | null;
+  first_login: string | null;
+  last_login: string | null;
+  marketing_opt_in: boolean;
   sendfox_subscribed_at: string | null;
   sendfox_confirmed_at: string | null;
   twilio_account_sid: string | null;
@@ -35,7 +38,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "id, email, username, user_payment_link, is_pro, stripe_customer_id, subscription_price, subscription_started_at, sendfox_subscribed_at, sendfox_confirmed_at, twilio_account_sid, twilio_phone_number, forwarding_number",
+      "id, email, username, user_payment_link, is_pro, stripe_customer_id, subscription_price, subscription_started_at, first_login, last_login, marketing_opt_in, sendfox_subscribed_at, sendfox_confirmed_at, twilio_account_sid, twilio_phone_number, forwarding_number",
     )
     .eq("id", userId)
     .maybeSingle();
@@ -63,6 +66,11 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
       typeof data.subscription_started_at === "string"
         ? data.subscription_started_at
         : null,
+    first_login:
+      typeof data.first_login === "string" ? data.first_login : null,
+    last_login:
+      typeof data.last_login === "string" ? data.last_login : null,
+    marketing_opt_in: data.marketing_opt_in === true,
     sendfox_subscribed_at:
       typeof data.sendfox_subscribed_at === "string"
         ? data.sendfox_subscribed_at

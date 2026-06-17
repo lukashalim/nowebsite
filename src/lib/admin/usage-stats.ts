@@ -2,9 +2,15 @@ import { cache } from "react";
 import { FREE_MONTHLY_OUTREACH_LIMIT } from "@/lib/crm-limits";
 import { FREE_DIRECTORY_CSV_MAX_PAGES } from "@/lib/directory-csv-limits";
 import {
+  OUTREACH_USAGE_EVENT_TYPES,
+  type UsageEventType,
+} from "@/lib/usage-storage";
+import {
+  fetchAdminAnonymousCsvByPage,
   fetchAdminCrmUsageStats,
   fetchAdminCsvDownloadStats,
   fetchAdminUsageAudienceCounts,
+  fetchAdminUserActivityReport,
   isUsageSegment,
 } from "@/lib/admin/admin-aggregate-queries";
 
@@ -35,12 +41,47 @@ export interface AdminUsageAudience {
   csvOnlyEmails: number;
 }
 
+export interface AnonymousCsvByPageRow {
+  pageUrl: string;
+  downloadCount: number;
+  lastDownloadedAt: string;
+}
+
+export interface UserActivityRow {
+  userId: string;
+  email: string | null;
+  isPro: boolean;
+  firstLogin: string | null;
+  lastLogin: string | null;
+  marketingOptIn: boolean;
+  lastSignInAt: string | null;
+  csvDownloadCount: number;
+  loginCount: number;
+  dmCount: number;
+  smsCount: number;
+  phoneCallCount: number;
+  demoClickCount: number;
+}
+
+export const USAGE_EVENT_LABELS: Record<UsageEventType, string> = {
+  demo_site_created: "Demo site created",
+  facebook_dm_copied: "Facebook DM copied",
+  sms_sent: "SMS sent",
+  csv_page_exported: "CSV page exported",
+  user_login: "User login",
+  phone_call_initiated: "Phone call initiated",
+};
+
+const OUTREACH_EVENT_SET = new Set<string>(OUTREACH_USAGE_EVENT_TYPES);
+
 export interface AdminUsageReport {
   period: UsagePeriod;
   periodLabel: string;
   periodStart: string | null;
   generatedAt: string;
   audience: AdminUsageAudience;
+  anonymousCsvByPage: AnonymousCsvByPageRow[];
+  userActivity: UserActivityRow[];
   services: ServiceUsageRow[];
   error: string | null;
 }
@@ -121,13 +162,14 @@ function aggregateCrmStatsFromRows(
 } {
   const segmentCounts = emptySegmentCounts();
   const actionBreakdown: Record<string, number> = {
-    dm: 0,
-    sms: 0,
-    demo_click: 0,
+    demo_site_created: 0,
+    facebook_dm_copied: 0,
+    sms_sent: 0,
   };
 
   for (const row of rows) {
     if (!isUsageSegment(row.segment) || !row.user_id) continue;
+    if (!OUTREACH_EVENT_SET.has(row.action_type)) continue;
 
     actionBreakdown[row.action_type] =
       (actionBreakdown[row.action_type] ?? 0) + row.event_count;
@@ -149,6 +191,26 @@ function aggregateCrmStatsFromRows(
   };
 }
 
+function aggregateCrmCsvExportStatsFromRows(
+  rows: Awaited<ReturnType<typeof fetchAdminCrmUsageStats>>,
+): Record<UsageSegment, SegmentUtilization> {
+  const segmentCounts = emptySegmentCounts();
+
+  for (const row of rows) {
+    if (!isUsageSegment(row.segment) || !row.user_id) continue;
+    if (row.action_type !== "csv_page_exported") continue;
+
+    const bucket = segmentCounts[row.segment];
+    bucket.set(row.user_id, (bucket.get(row.user_id) ?? 0) + row.event_count);
+  }
+
+  return {
+    anonymous: finalizeSegment(segmentCounts.anonymous, null),
+    free_logged_in: finalizeSegment(segmentCounts.free_logged_in, null),
+    paid: finalizeSegment(segmentCounts.paid, null),
+  };
+}
+
 export const fetchAdminUsageReport = cache(
   async (period: UsagePeriod = "month"): Promise<AdminUsageReport> => {
     const periodStart = period === "month" ? currentMonthStartUtc() : null;
@@ -158,14 +220,18 @@ export const fetchAdminUsageReport = cache(
         : "All time";
 
     try {
-      const [audience, csvRows, crmRows] = await Promise.all([
-        fetchAdminUsageAudienceCounts(),
-        fetchAdminCsvDownloadStats(periodStart),
-        fetchAdminCrmUsageStats(periodStart),
-      ]);
+      const [audience, csvRows, crmRows, anonymousCsvRows, userActivityRows] =
+        await Promise.all([
+          fetchAdminUsageAudienceCounts(),
+          fetchAdminCsvDownloadStats(periodStart),
+          fetchAdminCrmUsageStats(periodStart),
+          fetchAdminAnonymousCsvByPage(periodStart),
+          fetchAdminUserActivityReport(periodStart),
+        ]);
 
       const csvStats = aggregateCsvStatsFromRows(csvRows);
       const crmStats = aggregateCrmStatsFromRows(crmRows);
+      const crmCsvStats = aggregateCrmCsvExportStatsFromRows(crmRows);
 
       const directoryCsv: ServiceUsageRow = {
         id: "directory_csv",
@@ -180,19 +246,14 @@ export const fetchAdminUsageReport = cache(
         limitLabel: `${FREE_MONTHLY_OUTREACH_LIMIT} actions / month (free, signed in)`,
         bySegment: crmStats.bySegment,
         actionBreakdown: crmStats.actionBreakdown,
-        note: "Pro outreach is unlimited and not logged. Email-only users cannot use CRM outreach.",
+        note: "Pro outreach is unlimited. Email-only users cannot use CRM outreach.",
       };
 
       const crmCsvExport: ServiceUsageRow = {
         id: "crm_csv_export",
         label: "CRM leads CSV export",
         limitLabel: "Free: current page only · Pro: full export",
-        bySegment: {
-          anonymous: emptySegmentUtilization(null),
-          free_logged_in: emptySegmentUtilization(null),
-          paid: emptySegmentUtilization(null),
-        },
-        note: "Exports are not logged yet — counts will appear here once tracking is added.",
+        bySegment: crmCsvStats,
       };
 
       return {
@@ -205,6 +266,26 @@ export const fetchAdminUsageReport = cache(
           registeredPro: audience.registered_pro,
           csvOnlyEmails: audience.csv_only_emails,
         },
+        anonymousCsvByPage: anonymousCsvRows.map((row) => ({
+          pageUrl: row.page_url,
+          downloadCount: row.download_count,
+          lastDownloadedAt: row.last_downloaded_at,
+        })),
+        userActivity: userActivityRows.map((row) => ({
+          userId: row.user_id,
+          email: row.email,
+          isPro: row.is_pro,
+          firstLogin: row.first_login,
+          lastLogin: row.last_login,
+          marketingOptIn: row.marketing_opt_in,
+          lastSignInAt: row.last_sign_in_at,
+          csvDownloadCount: row.csv_download_count,
+          loginCount: row.login_count,
+          dmCount: row.dm_count,
+          smsCount: row.sms_count,
+          phoneCallCount: row.phone_call_count,
+          demoClickCount: row.demo_click_count,
+        })),
         services: [directoryCsv, crmOutreach, crmCsvExport],
         error: null,
       };
@@ -220,6 +301,8 @@ export const fetchAdminUsageReport = cache(
           registeredPro: 0,
           csvOnlyEmails: 0,
         },
+        anonymousCsvByPage: [],
+        userActivity: [],
         services: [
           {
             id: "directory_csv",

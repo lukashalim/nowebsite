@@ -14,7 +14,15 @@ import { absoluteUrl } from "@/lib/site-url";
 /** Regenerate on each request so Vercel always has Supabase env at runtime. */
 export const dynamic = "force-dynamic";
 
-const MARKETING_PATHS = ["/about", "/contact", "/how-it-works", "/pro"] as const;
+const MARKETING_PATHS = [
+  "/about",
+  "/contact",
+  "/how-it-works",
+  "/pro",
+  "/blog",
+  "/blog/grapeleads-alternative",
+  "/blog/free-google-maps-data",
+] as const;
 
 function toLastModified(iso: string | null | undefined): Date {
   if (!iso) return new Date();

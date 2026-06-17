@@ -4,6 +4,7 @@ import { CrmLogin } from "@/components/crm-login";
 import { CrmNav } from "@/components/crm-nav";
 import { CrmUsageBanner } from "@/components/crm-usage-banner";
 import { SpintaxTemplateEditor } from "@/components/spintax-template-editor";
+import { ensureSendFoxProfileForUser } from "@/lib/sendfox-profile-sync";
 import { getCrmUsageSummary } from "@/lib/crm-usage";
 import { getUserProfile, isPro } from "@/lib/subscription";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -27,7 +28,17 @@ export default async function CrmSpintaxPage() {
     return <CrmLogin />;
   }
 
-  const profile = await getUserProfile(user.id);
+  let profile = await getUserProfile(user.id);
+  if (profile?.email) {
+    const synced = await ensureSendFoxProfileForUser(
+      user.id,
+      profile.email,
+      profile,
+    );
+    if (synced) {
+      profile = await getUserProfile(user.id);
+    }
+  }
   const userIsPro = isPro(profile);
   const usageSummary = userIsPro ? null : await getCrmUsageSummary(user.id);
   const result = await listSpintaxTemplates();

@@ -4,6 +4,7 @@ import { CrmNav } from "@/components/crm-nav";
 import { ProfileSettingsForm } from "@/components/profile-settings-form";
 import { TwilioSettingsForm } from "@/components/twilio-settings-form";
 import { suggestUsernameFromEmail } from "@/lib/profile-username";
+import { ensureSendFoxProfileForUser } from "@/lib/sendfox-profile-sync";
 import { getTwilioProfilePublic, getUserProfile, isPro } from "@/lib/subscription";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -33,7 +34,17 @@ export default async function DashboardSettingsPage({
 
   const params = await searchParams;
   const showUsernameSetupBanner = params.setup === "username";
-  const profile = await getUserProfile(user.id);
+  let profile = await getUserProfile(user.id);
+  if (profile?.email) {
+    const synced = await ensureSendFoxProfileForUser(
+      user.id,
+      profile.email,
+      profile,
+    );
+    if (synced) {
+      profile = await getUserProfile(user.id);
+    }
+  }
   const twilioProfile = await getTwilioProfilePublic(user.id);
   const userIsPro = isPro(profile);
   const suggestedUsername =
