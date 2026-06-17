@@ -7,14 +7,16 @@ import {
 } from "@/lib/directory/listing-scope";
 
 export interface DirectoryBusinessPublic
-  extends Omit<DirectoryBusiness, "phone" | "google_maps_link"> {
+  extends Omit<DirectoryBusiness, "phone" | "google_maps_link" | "address"> {
   phone?: never;
   google_maps_link?: never;
+  address?: never;
 }
 
 export interface DirectoryContactRow {
   i: number;
   phone: string | null;
+  address: string | null;
   google_maps_link: string | null;
 }
 
@@ -28,7 +30,12 @@ export interface DirectoryContactAccess {
 export function stripContactFields(
   business: DirectoryBusiness,
 ): DirectoryBusinessPublic {
-  const { phone: _phone, google_maps_link: _link, ...rest } = business;
+  const {
+    phone: _phone,
+    google_maps_link: _link,
+    address: _address,
+    ...rest
+  } = business;
   return rest;
 }
 
@@ -42,8 +49,21 @@ export function toContactRows(businesses: DirectoryBusiness[]): DirectoryContact
   return businesses.map((b, i) => ({
     i,
     phone: b.phone?.trim() || null,
+    address: b.address?.trim() || null,
     google_maps_link: b.google_maps_link?.trim() || null,
   }));
+}
+
+export function toContactRow(
+  business: DirectoryBusiness,
+  rowIndex: number,
+): DirectoryContactRow {
+  return {
+    i: rowIndex,
+    phone: business.phone?.trim() || null,
+    address: business.address?.trim() || null,
+    google_maps_link: business.google_maps_link?.trim() || null,
+  };
 }
 
 export function buildContactAccess(

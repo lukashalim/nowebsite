@@ -28,6 +28,28 @@ export async function fetchDirectoryContacts(
   return data.contacts;
 }
 
+export async function revealDirectoryContact(
+  access: DirectoryContactAccess,
+  rowIndex: number,
+): Promise<DirectoryContactRow> {
+  const response = await fetch("/api/directory/contacts/reveal", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      scope: access.scope,
+      token: access.token,
+      page: access.page,
+      filters: access.filters,
+      row: rowIndex,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error("Could not reveal contact details");
+  }
+  const data = (await response.json()) as { contact: DirectoryContactRow };
+  return data.contact;
+}
+
 export function contactsPathForPage(
   pagePath: string,
   access: DirectoryContactAccess,

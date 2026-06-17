@@ -1,0 +1,181 @@
+"use client";
+
+import Link from "next/link";
+import { ExternalLink, MapPin, Phone, Star } from "lucide-react";
+import { useState } from "react";
+import type { DirectoryBusinessPublic } from "@/lib/directory/contact-fields";
+import type { DirectoryContactAccess } from "@/lib/directory/contact-fields";
+import type { DirectoryContactRow } from "@/lib/directory/contact-fields";
+import { revealDirectoryContact } from "@/lib/directory/contact-api-client";
+import {
+  formatCategoryDisplayName,
+  formatListingCheckedAt,
+  formatListingCheckedAtTitle,
+  formatLocationLabel,
+} from "@/lib/directory/labels";
+import type { DirectoryBusinessListVariant } from "@/components/directory-business-list";
+
+interface DirectoryBusinessListRowProps {
+  business: DirectoryBusinessPublic;
+  rowIndex: number;
+  contactAccess: DirectoryContactAccess;
+  showCityState?: boolean;
+  variant?: DirectoryBusinessListVariant;
+}
+
+function categoryLabelForRow(b: DirectoryBusinessPublic): string {
+  const raw = b.main_category?.trim() || b.business_type?.trim();
+  return raw ? formatCategoryDisplayName(raw) : "—";
+}
+
+function locationLabelForRow(
+  b: DirectoryBusinessPublic,
+  showCityState: boolean,
+): string | null {
+  if (showCityState) {
+    return formatLocationLabel(b.city ?? "", b.state ?? "", b.country) || null;
+  }
+  const city = b.city?.trim();
+  return city || null;
+}
+
+export function DirectoryBusinessListRow({
+  business: b,
+  rowIndex,
+  contactAccess,
+  showCityState = false,
+  variant = "default",
+}: DirectoryBusinessListRowProps) {
+  const isCategory = variant === "category";
+  const [contact, setContact] = useState<DirectoryContactRow | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+
+  const location = locationLabelForRow(b, showCityState);
+  const checkedLabel = formatListingCheckedAt(b.checkedAt);
+  const checkedTitle = formatListingCheckedAtTitle(b.checkedAt);
+  const demoSlug = b.demo_slug?.trim();
+
+  async function handleReveal() {
+    if (contact || loading) return;
+    setLoading(true);
+    setError(false);
+    try {
+      const row = await revealDirectoryContact(contactAccess, rowIndex);
+      setContact(row);
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const phone = contact?.phone;
+  const address = contact?.address;
+  const mapsLink = contact?.google_maps_link;
+
+  return (
+    <tr className="align-top hover:bg-zinc-50/80 dark:hover:bg-zinc-900/50">
+      <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">
+        {b.name ?? "—"}
+      </td>
+      {isCategory ? (
+        <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">
+          {categoryLabelForRow(b)}
+        </td>
+      ) : null}
+      <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">
+        {location ? (
+          <span className="inline-flex items-start gap-1">
+            <MapPin
+              className="mt-0.5 size-3.5 shrink-0 text-zinc-400"
+              aria-hidden
+            />
+            {location}
+          </span>
+        ) : (
+          "—"
+        )}
+      </td>
+      <td className="px-4 py-3 tabular-nums text-zinc-800 dark:text-zinc-200">
+        {b.rating != null ? (
+          <span className="inline-flex items-center gap-1">
+            <Star
+              className="size-3.5 fill-amber-400 text-amber-400"
+              aria-hidden
+            />
+            {Number(b.rating).toFixed(1)}
+          </span>
+        ) : (
+          "—"
+        )}
+      </td>
+      <td className="px-4 py-3 tabular-nums text-zinc-800 dark:text-zinc-200">
+        {b.reviews ?? "—"}
+      </td>
+      {isCategory ? (
+        <td className="px-4 py-3">
+          {demoSlug ? (
+            <Link
+              href={`/demo/${encodeURIComponent(demoSlug)}`}
+              className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+            >
+              View demo
+            </Link>
+          ) : (
+            "—"
+          )}
+        </td>
+      ) : null}
+      <td className="px-4 py-3">
+        {phone ? (
+          <a
+            href={`tel:${phone.replace(/\s/g, "")}`}
+            className="inline-flex items-center gap-1 text-blue-600 hover:underline dark:text-blue-400"
+          >
+            <Phone className="size-3.5" aria-hidden />
+            {phone}
+          </a>
+        ) : loading ? (
+          <span className="inline-block h-4 w-16 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+        ) : contact ? (
+          "—"
+        ) : (
+          <button
+            type="button"
+            onClick={() => void handleReveal()}
+            className="rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            {error ? "Retry" : "Reveal"}
+          </button>
+        )}
+      </td>
+      <td className="max-w-[200px] px-4 py-3 text-zinc-600 dark:text-zinc-300">
+        {address ?? "—"}
+      </td>
+      <td
+        className="px-4 py-3 tabular-nums text-zinc-600 dark:text-zinc-400"
+        title={checkedTitle ?? undefined}
+      >
+        {checkedLabel ?? "—"}
+      </td>
+      <td className="px-4 py-3">
+        {loading ? (
+          <span className="inline-block h-4 w-12 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+        ) : mapsLink ? (
+          <a
+            href={mapsLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-0.5 text-blue-600 hover:underline dark:text-blue-400"
+          >
+            <ExternalLink className="size-3.5" aria-hidden />
+            Maps
+          </a>
+        ) : (
+          "—"
+        )}
+      </td>
+    </tr>
+  );
+}

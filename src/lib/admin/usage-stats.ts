@@ -70,6 +70,7 @@ export const USAGE_EVENT_LABELS: Record<UsageEventType, string> = {
   csv_page_exported: "CSV page exported",
   user_login: "User login",
   phone_call_initiated: "Phone call initiated",
+  lead_contact_revealed: "Lead contact revealed",
 };
 
 const OUTREACH_EVENT_SET = new Set<string>(OUTREACH_USAGE_EVENT_TYPES);

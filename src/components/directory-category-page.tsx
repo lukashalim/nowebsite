@@ -4,8 +4,11 @@ import { DirectoryGroupedByCity } from "@/components/directory-grouped-by-city";
 import { DirectoryBusinessList } from "@/components/directory-business-list";
 import { DirectoryPagination } from "@/components/directory-pagination";
 import { DownloadCsvButton } from "@/components/download-csv-button";
+import { DirectoryProspectingAboutData } from "@/components/directory-city-page-copy";
 import type { CategoryContent } from "@/lib/directory/category-content";
 import {
+  categoryAboutPlaceLabel,
+  categoryHubAboutCopy,
   nationwideCategoryPageTitle,
   pluralCategoryForTitle,
 } from "@/lib/directory/labels";
@@ -73,6 +76,8 @@ export function DirectoryCategoryPage({
   const path = `/${categorySlug}`;
   const jsonLd = buildDirectoryListJsonLd(businesses, path, title);
   const pluralLower = pluralCategoryForTitle(categoryLabel).toLowerCase();
+  const aboutPlace = categoryAboutPlaceLabel(categoryLabel);
+  const aboutCopy = categoryHubAboutCopy(categoryLabel);
   const paginated = totalPages > 1;
   const range = directoryPageRange(page, pageSize, totalCount);
   const hrefForPage = (p: number) =>
@@ -121,18 +126,18 @@ export function DirectoryCategoryPage({
           <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
             {paginated ? (
               <>
-                Browse page {page.toLocaleString()} of {totalPages.toLocaleString()}{" "}
-                ({totalCount.toLocaleString()} {pluralLower} across{" "}
-                {cityCount.toLocaleString()} US cities). Listings are sorted by Google
-                review count. Each row includes ratings, phone numbers, and Maps links
-                for outreach.
+                Prospecting data for agencies: page {page.toLocaleString()} of{" "}
+                {totalPages.toLocaleString()} ({totalCount.toLocaleString()}{" "}
+                {pluralLower} across {cityCount.toLocaleString()} US cities).
+                Export-ready B2B lead list sorted by review volume with outreach
+                signals and demo preview links.
               </>
             ) : (
               <>
-                Browse {totalCount.toLocaleString()} {pluralLower} across{" "}
-                {cityCount.toLocaleString()} US cities that do not have their own
-                website. Each listing includes ratings, review counts, phone numbers,
-                and Google Maps links for outreach.
+                Prospecting data for agencies: {totalCount.toLocaleString()}{" "}
+                {pluralLower} across {cityCount.toLocaleString()} US cities with
+                no standalone website. Export-ready list with review counts,
+                demo previews, and reveal-gated contact fields for outreach.
               </>
             )}
           </p>
@@ -190,6 +195,7 @@ export function DirectoryCategoryPage({
             <DirectoryBusinessList
               businesses={businesses}
               showCityState
+              variant="category"
               contactAccess={contactAccess}
             />
           </>
@@ -198,6 +204,8 @@ export function DirectoryCategoryPage({
             cityGroups={cityGroups}
             publishedCitySlugs={publishedCitySlugs}
             listingFilters={filters}
+            variant="category"
+            showCityState
           />
         ) : (
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -227,6 +235,8 @@ export function DirectoryCategoryPage({
           isPro={isPro}
         />
       ) : null}
+
+      <DirectoryProspectingAboutData place={aboutPlace} copy={aboutCopy} />
     </div>
   );
 }

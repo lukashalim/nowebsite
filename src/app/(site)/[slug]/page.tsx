@@ -5,6 +5,10 @@ import { CategoryGroupIcon } from "@/components/category-group-icon";
 import { CategoryIcon } from "@/components/category-icon";
 import { DirectoryCategoryPage } from "@/components/directory-category-page";
 import { DirectoryBusinessList } from "@/components/directory-business-list";
+import {
+  DirectoryCityAboutData,
+  DirectoryCityRevealCopy,
+} from "@/components/directory-city-page-copy";
 import { DownloadCsvButton } from "@/components/download-csv-button";
 import { DirectoryLastUpdated } from "@/components/directory-last-updated";
 import { DirectoryListingFilters } from "@/components/directory-listing-filters";
@@ -12,8 +16,14 @@ import { DirectoryStatePage } from "@/components/directory-state-page";
 import {
   categoryLinkLabel,
   categoryPath,
+  cityHubCategoryH2,
+  cityHubCategoryIntro,
+  cityHubHeaderSubcopy,
+  cityHubH1,
   cityHubMetaDescription,
-  cityHubTitle,
+  cityHubMetaTitle,
+  cityHubPlaceLabel,
+  cityHubProspectListH2,
   nationwideCategoryMetaDescription,
   nationwideCategoryMetaTitle,
   stateHubMetaDescription,
@@ -108,7 +118,7 @@ export async function generateMetadata({
   if (resolved.kind === "city") {
     const { hub, cityData } = resolved;
     const slugLower = slug.trim().toLowerCase();
-    const title = cityHubTitle(hub.city, hub.state, hub.country);
+    const title = cityHubMetaTitle(hub.city, hub.state, hub.country);
     const description = cityHubMetaDescription(
       hub.city,
       hub.state,
@@ -250,7 +260,11 @@ export default async function SlugDirectoryPage({
       1,
       cityData.filters,
     );
-    const title = cityHubTitle(hub.city, hub.state, hub.country);
+    const place = cityHubPlaceLabel(hub.city, hub.state, hub.country);
+    const h1 = cityHubH1(hub.city, hub.state, hub.country);
+    const topCategory = [...hub.categories].sort(
+      (a, b) => b.listingCount - a.listingCount,
+    )[0];
     const publishedSlugs = new Set(
       hub.publishedCategories.map((c) => c.categorySlug),
     );
@@ -313,12 +327,14 @@ export default async function SlugDirectoryPage({
             {hub.city}
           </p>
           <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            {title}
+            {h1}
           </h1>
           <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
-            {cityData.unfilteredCount.toLocaleString()} local businesses in {hub.city} without
-            a standalone website — phone numbers, ratings, and Google Maps links for
-            outreach. Browse by category when available, or see every listing below.
+            {cityHubHeaderSubcopy(
+              place,
+              hub.city,
+              cityData.unfilteredCount,
+            )}
           </p>
         </header>
 
@@ -335,7 +351,7 @@ export default async function SlugDirectoryPage({
 
         <section className="space-y-3">
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-            Categories
+            {cityHubCategoryH2(hub.city)}
           </h2>
           {hub.categories.length === 0 ? (
             <p className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -345,6 +361,9 @@ export default async function SlugDirectoryPage({
             </p>
           ) : (
             <div className="space-y-6">
+              <p className="max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
+                {cityHubCategoryIntro(place, hub.city, topCategory?.categoryLabel)}
+              </p>
               {groupedCategories.map(({ group, items }) => (
                 <div key={group.id} className="space-y-2">
                   <h3 className="flex items-center gap-2 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
@@ -367,8 +386,13 @@ export default async function SlugDirectoryPage({
 
         <section className="space-y-3">
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-            All listings in {hub.city}
+            {cityHubProspectListH2(place)}
           </h2>
+          <DirectoryCityRevealCopy
+            place={place}
+            count={cityData.unfilteredCount}
+            categoryCount={hub.categories.length}
+          />
           {businesses.length > 0 ? (
             <DirectoryBusinessList
               businesses={businesses}
@@ -390,6 +414,8 @@ export default async function SlugDirectoryPage({
             isPro={userIsPro}
           />
         ) : null}
+
+        <DirectoryCityAboutData place={place} />
       </div>
     );
   }

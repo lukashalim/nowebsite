@@ -1,5 +1,8 @@
 import Link from "next/link";
-import { DirectoryBusinessList } from "@/components/directory-business-list";
+import {
+  DirectoryBusinessList,
+  type DirectoryBusinessListVariant,
+} from "@/components/directory-business-list";
 import { cityPath, formatLocationLabel } from "@/lib/directory/labels";
 import { directoryCityHeadingLinkClass } from "@/lib/directory/ui-classes";
 import type { DirectoryCityGroup } from "@/lib/directory/types";
@@ -16,6 +19,8 @@ interface DirectoryGroupedByCityProps {
   getCityHref?: (group: DirectoryCityGroup) => string;
   isCityPublished?: (group: DirectoryCityGroup) => boolean;
   listingFilters?: DirectoryListingFilters;
+  variant?: DirectoryBusinessListVariant;
+  showCityState?: boolean;
 }
 
 export function DirectoryGroupedByCity({
@@ -24,6 +29,8 @@ export function DirectoryGroupedByCity({
   getCityHref,
   isCityPublished,
   listingFilters = DEFAULT_DIRECTORY_LISTING_FILTERS,
+  variant = "default",
+  showCityState = false,
 }: DirectoryGroupedByCityProps) {
   if (cityGroups.length === 0) {
     return (
@@ -67,6 +74,8 @@ export function DirectoryGroupedByCity({
             <DirectoryBusinessList
               businesses={group.businesses}
               contactAccess={contactAccess}
+              variant={variant}
+              showCityState={showCityState}
             />
           </section>
         );

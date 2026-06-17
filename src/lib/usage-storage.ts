@@ -21,6 +21,7 @@ export const USAGE_EVENT_TYPES = [
   "csv_page_exported",
   "user_login",
   "phone_call_initiated",
+  "lead_contact_revealed",
 ] as const;
 
 export type UsageEventType = (typeof USAGE_EVENT_TYPES)[number];

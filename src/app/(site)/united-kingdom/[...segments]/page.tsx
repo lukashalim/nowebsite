@@ -3,14 +3,23 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { CategoryIcon } from "@/components/category-icon";
 import { DirectoryBusinessList } from "@/components/directory-business-list";
+import {
+  DirectoryCityAboutData,
+  DirectoryCityRevealCopy,
+} from "@/components/directory-city-page-copy";
 import { DownloadCsvButton } from "@/components/download-csv-button";
 import { DirectoryLastUpdated } from "@/components/directory-last-updated";
 import { DirectoryStatePage } from "@/components/directory-state-page";
 import {
   categoryLinkLabel,
+  cityHubCategoryH2,
+  cityHubCategoryIntro,
+  cityHubHeaderSubcopy,
+  cityHubH1,
   cityHubMetaDescription,
-  cityHubTitle,
-  formatLocationLabel,
+  cityHubMetaTitle,
+  cityHubPlaceLabel,
+  cityHubProspectListH2,
   gbCountryPath,
   ukRegionHubMetaDescription,
   ukRegionHubMetaTitle,
@@ -77,7 +86,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (resolved.kind === "city") {
     const { hub, businesses } = resolved;
-    const title = cityHubTitle(hub.city, hub.state, COUNTRY_GB, hub.region);
+    const title = cityHubMetaTitle(hub.city, hub.state, COUNTRY_GB, hub.region);
     const description = cityHubMetaDescription(
       hub.city,
       hub.state,
@@ -87,7 +96,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       hub.region,
     );
     return {
-      title: { absolute: `${title} | No Website Business Leads` },
+      title: { absolute: title },
       description,
       alternates: { canonical: canonicalFor(segments, resolved) },
     };
@@ -145,7 +154,11 @@ export default async function UnitedKingdomNestedPage({ params }: PageProps) {
       1,
       { stateSlug: null, citySlug: null, minReviews: 0 },
     );
-    const title = cityHubTitle(hub.city, hub.state, COUNTRY_GB, hub.region);
+    const place = cityHubPlaceLabel(hub.city, hub.state, COUNTRY_GB, hub.region);
+    const h1 = cityHubH1(hub.city, hub.state, COUNTRY_GB, hub.region);
+    const topCategory = [...hub.categories].sort(
+      (a, b) => b.listingCount - a.listingCount,
+    )[0];
     const publishedSlugs = new Set(
       hub.publishedCategories.map((c) => c.categorySlug),
     );
@@ -169,13 +182,10 @@ export default async function UnitedKingdomNestedPage({ params }: PageProps) {
             {hub.city}
           </p>
           <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            {title}
+            {h1}
           </h1>
           <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
-            {businesses.length.toLocaleString()} local businesses in{" "}
-            {formatLocationLabel(hub.city, hub.state, COUNTRY_GB, hub.region)}{" "}
-            without a standalone website — phone numbers, ratings, and Google Maps
-            links for outreach.
+            {cityHubHeaderSubcopy(place, hub.city, businesses.length)}
           </p>
         </header>
 
@@ -183,14 +193,18 @@ export default async function UnitedKingdomNestedPage({ params }: PageProps) {
 
         <section className="space-y-3">
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-            Categories
+            {cityHubCategoryH2(hub.city)}
           </h2>
           {hub.categories.length === 0 ? (
             <p className="text-sm text-zinc-600 dark:text-zinc-400">
               No category breakdown yet. See all listings below.
             </p>
           ) : (
-            <ul className="grid gap-2 sm:grid-cols-2">
+            <>
+              <p className="max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
+                {cityHubCategoryIntro(place, hub.city, topCategory?.categoryLabel)}
+              </p>
+              <ul className="grid gap-2 sm:grid-cols-2">
               {hub.categories.map((cat) => {
                 const hasNationwidePage = publishedSlugs.has(cat.categorySlug);
                 const inner = (
@@ -230,13 +244,19 @@ export default async function UnitedKingdomNestedPage({ params }: PageProps) {
                 );
               })}
             </ul>
+            </>
           )}
         </section>
 
         <section className="space-y-3">
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-            All listings in {hub.city}
+            {cityHubProspectListH2(place)}
           </h2>
+          <DirectoryCityRevealCopy
+            place={place}
+            count={businesses.length}
+            categoryCount={hub.categories.length}
+          />
           <DirectoryBusinessList
             businesses={businesses}
             contactAccess={contactAccess}
@@ -252,6 +272,8 @@ export default async function UnitedKingdomNestedPage({ params }: PageProps) {
             isPro={userIsPro}
           />
         ) : null}
+
+        <DirectoryCityAboutData place={place} />
       </div>
     );
   }

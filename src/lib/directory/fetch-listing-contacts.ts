@@ -12,7 +12,45 @@ import { DEFAULT_DIRECTORY_LISTING_FILTERS } from "@/lib/directory/listing-filte
 import type { DirectoryListingFilters } from "@/lib/directory/listing-filters";
 import { toContactRows } from "@/lib/directory/contact-fields";
 import type { DirectoryContactRow } from "@/lib/directory/contact-fields";
+import type { DirectoryBusiness } from "@/lib/directory/types";
 import { parseListingScope, type ListingScope } from "@/lib/directory/listing-scope";
+
+export async function fetchDirectoryBusinessesForScope(
+  scope: ListingScope,
+  page: number,
+  filters: DirectoryListingFilters = DEFAULT_DIRECTORY_LISTING_FILTERS,
+): Promise<DirectoryBusiness[] | null> {
+  switch (scope.kind) {
+    case "city": {
+      const data = await fetchCityListings(scope.slug, { filters });
+      return data ? data.businesses : null;
+    }
+    case "category": {
+      const data = await fetchNationwideCategoryListings(scope.slug, {
+        page,
+        filters,
+      });
+      return data ? data.businesses : null;
+    }
+    case "state": {
+      const data = await fetchStateListings(scope.slug, { page, filters });
+      return data ? data.businesses : null;
+    }
+    case "facebook": {
+      const data = await fetchFacebookDirectoryPageData({ page, filters });
+      return data.businesses;
+    }
+    case "gb-city": {
+      return await fetchGbCityListings(scope.slug);
+    }
+    case "gb-region": {
+      const data = await fetchGbRegionListings(scope.slug);
+      return data ? data.businesses : null;
+    }
+    default:
+      return null;
+  }
+}
 
 export async function fetchDirectoryContactsForScope(
   scope: ListingScope,
