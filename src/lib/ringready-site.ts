@@ -109,6 +109,22 @@ export function getRingReadyCanonical(pathname: string): string {
   return ringReadyAbsoluteUrl(normalizePathname(pathname));
 }
 
+export const RING_READY_INDEXABLE_ROBOTS: Metadata["robots"] = {
+  index: true,
+  follow: true,
+};
+
+export function buildRingReadyLegalPageMetadata(
+  metadata: Pick<Metadata, "title" | "description">,
+  options: { isRingReady: boolean; canonical: string },
+): Metadata {
+  return {
+    ...metadata,
+    alternates: { canonical: options.canonical },
+    robots: options.isRingReady ? RING_READY_INDEXABLE_ROBOTS : undefined,
+  };
+}
+
 export async function isRingReadyRequest(): Promise<boolean> {
   const host = (await headers()).get("host") ?? "";
   return isRingReadyHost(host);

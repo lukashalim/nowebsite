@@ -1,4 +1,13 @@
-export function RingReadyHome() {
+import { RingReadySmsOptInSection } from "@/components/ringready-sms-opt-in-section";
+
+interface RingReadyHomeProps {
+  searchParams?: {
+    subscribed?: string;
+    error?: string;
+  };
+}
+
+export function RingReadyHome({ searchParams }: RingReadyHomeProps) {
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center px-4 py-16 sm:px-6 sm:py-24">
       <div className="space-y-4 text-center">
@@ -10,6 +19,11 @@ export function RingReadyHome() {
           site could look like.
         </p>
       </div>
+
+      <RingReadySmsOptInSection
+        subscribed={searchParams?.subscribed}
+        error={searchParams?.error}
+      />
     </main>
   );
 }

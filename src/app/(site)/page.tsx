@@ -98,10 +98,15 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ subscribed?: string; error?: string }>;
+}) {
   const host = (await headers()).get("host") ?? "";
   if (isRingReadyHost(host)) {
-    return <RingReadyHome />;
+    const params = await searchParams;
+    return <RingReadyHome searchParams={params} />;
   }
 
   let cities: Awaited<ReturnType<typeof fetchAllDirectoryCities>> = [];

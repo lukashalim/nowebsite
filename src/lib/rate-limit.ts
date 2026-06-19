@@ -2,7 +2,10 @@ import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { shouldBypassRateLimit } from "@/lib/bot-detection";
 
-export type RateLimitKind = "directoryPage" | "directoryContacts";
+export type RateLimitKind =
+  | "directoryPage"
+  | "directoryContacts"
+  | "ringreadySmsOptIn";
 
 interface RateLimitResult {
   success: boolean;
@@ -21,6 +24,7 @@ const memoryStore = new Map<string, MemoryEntry>();
 const LIMITS: Record<RateLimitKind, { requests: number; windowMs: number }> = {
   directoryPage: { requests: 300, windowMs: 60 * 60 * 1000 },
   directoryContacts: { requests: 60, windowMs: 60 * 60 * 1000 },
+  ringreadySmsOptIn: { requests: 5, windowMs: 60 * 60 * 1000 },
 };
 
 function getRedis(): Redis | null {
@@ -122,12 +126,16 @@ export function rateLimitHeaders(result: RateLimitResult): Record<string, string
 }
 
 export function getClientIp(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for");
+  return getClientIpFromHeaders(request.headers);
+}
+
+export function getClientIpFromHeaders(headerStore: Headers): string {
+  const forwarded = headerStore.get("x-forwarded-for");
   if (forwarded) {
     const first = forwarded.split(",")[0]?.trim();
     if (first) return first;
   }
-  const realIp = request.headers.get("x-real-ip")?.trim();
+  const realIp = headerStore.get("x-real-ip")?.trim();
   if (realIp) return realIp;
   return "unknown";
 }

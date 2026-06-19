@@ -6,26 +6,31 @@ import {
   LEGAL_CONTACT_EMAIL,
 } from "@/lib/legal-placeholders";
 import {
+  buildRingReadyLegalPageMetadata,
   isRingReadyHost,
   ringReadyAbsoluteUrl,
 } from "@/lib/ringready-site";
 import { absoluteUrl } from "@/lib/site-url";
 
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata(): Promise<Metadata> {
   const host = (await headers()).get("host") ?? "";
   const isRingReady = isRingReadyHost(host);
 
-  return {
-    title: "Terms of Service",
-    description:
-      "Terms of Service for our B2B SaaS platform providing website and outreach tools for local businesses.",
-    alternates: {
+  return buildRingReadyLegalPageMetadata(
+    {
+      title: "Terms of Service",
+      description:
+        "Terms of Service for our B2B SaaS platform providing website and outreach tools for local businesses.",
+    },
+    {
+      isRingReady,
       canonical: isRingReady
         ? ringReadyAbsoluteUrl("/terms")
         : absoluteUrl("/terms"),
     },
-    ...(isRingReady ? { robots: { index: true, follow: true } } : {}),
-  };
+  );
 }
 
 export default function TermsPage() {

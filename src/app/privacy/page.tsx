@@ -6,26 +6,33 @@ import {
   LEGAL_CONTACT_EMAIL,
 } from "@/lib/legal-placeholders";
 import {
+  buildRingReadyLegalPageMetadata,
   isRingReadyHost,
   ringReadyAbsoluteUrl,
 } from "@/lib/ringready-site";
 import { absoluteUrl } from "@/lib/site-url";
 
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata(): Promise<Metadata> {
   const host = (await headers()).get("host") ?? "";
   const isRingReady = isRingReadyHost(host);
 
-  return {
-    title: "Privacy Policy",
-    description:
-      "Privacy Policy for our B2B SaaS platform providing website and outreach tools for local businesses.",
-    alternates: {
+  const metadata = buildRingReadyLegalPageMetadata(
+    {
+      title: "Privacy Policy",
+      description:
+        "Privacy Policy for our B2B SaaS platform providing website and outreach tools for local businesses.",
+    },
+    {
+      isRingReady,
       canonical: isRingReady
         ? ringReadyAbsoluteUrl("/privacy")
         : absoluteUrl("/privacy"),
     },
-    ...(isRingReady ? { robots: { index: true, follow: true } } : {}),
-  };
+  );
+
+  return metadata;
 }
 
 export default function PrivacyPage() {
