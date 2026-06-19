@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import { tenantDemoPublicPath } from "@/lib/demo-slug";
 
 export const RING_READY_ORIGIN = "https://ringreadysite.com";
 
@@ -8,6 +9,9 @@ export const RING_READY_LEGAL_PATHS = [
   "/terms",
   "/sms-disclosure",
 ] as const;
+
+/** Homepage and compliance pages indexed for A2P 10DLC audit visibility. */
+export const RING_READY_INDEXABLE_PATHS = ["/", ...RING_READY_LEGAL_PATHS] as const;
 
 export const RING_READY_RESERVED_FIRST_SEGMENTS = new Set([
   "api",
@@ -36,6 +40,11 @@ export function isRingReadyHost(host: string): boolean {
 export function ringReadyAbsoluteUrl(path: string): string {
   const normalized = path.startsWith("/") ? path : `/${path}`;
   return `${RING_READY_ORIGIN}${normalized}`;
+}
+
+/** Public demo page URL on ringreadysite.com for CRM and outreach links. */
+export function ringReadyTenantDemoUrl(username: string, slug: string): string {
+  return ringReadyAbsoluteUrl(tenantDemoPublicPath(username, slug));
 }
 
 export function normalizePathname(pathname: string): string {
@@ -75,10 +84,14 @@ export function isRingReadyAllowedPath(pathname: string): boolean {
 }
 
 export function getRingReadyPageRobots(pathname: string): Metadata["robots"] {
-  if (isRingReadyLegalPath(pathname)) {
+  const normalized = normalizePathname(pathname);
+  if (
+    normalized === "/" ||
+    isRingReadyLegalPath(pathname)
+  ) {
     return { index: true, follow: true };
   }
-  if (normalizePathname(pathname) === "/" || isRingReadyDemoPath(pathname)) {
+  if (isRingReadyDemoPath(pathname)) {
     return { index: false, follow: true };
   }
   return undefined;

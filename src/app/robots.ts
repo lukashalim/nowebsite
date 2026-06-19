@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { headers } from "next/headers";
 import {
   isRingReadyHost,
-  RING_READY_LEGAL_PATHS,
+  RING_READY_INDEXABLE_PATHS,
 } from "@/lib/ringready-site";
 import { getSiteOrigin } from "@/lib/site-url";
 
@@ -24,7 +24,7 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
     return {
       rules: {
         userAgent: "*",
-        allow: [...RING_READY_LEGAL_PATHS],
+        allow: [...RING_READY_INDEXABLE_PATHS],
         disallow: "/",
       },
     };

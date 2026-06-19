@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { demoPathSegment, tenantDemoPublicPath } from "@/lib/demo-slug";
+import { demoPathSegment } from "@/lib/demo-slug";
+import { ringReadyTenantDemoUrl } from "@/lib/ringready-site";
 import { recordCrmUsage } from "@/lib/crm-usage";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
 import { DEMO_DETAIL_COLUMNS } from "@/lib/crm-cohort";
@@ -78,10 +79,8 @@ export async function GET(request: Request) {
     demo_slug:
       typeof row.demo_slug === "string" ? row.demo_slug : null,
   });
-  const demoPath = tenantDemoPublicPath(
-    username,
-    decodeURIComponent(slug),
-  );
 
-  return NextResponse.redirect(new URL(demoPath, request.url));
+  return NextResponse.redirect(
+    ringReadyTenantDemoUrl(username, decodeURIComponent(slug)),
+  );
 }

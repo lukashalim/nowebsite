@@ -2,10 +2,10 @@
 
 import { recordOutreachUsage } from "@/app/actions/crm-usage";
 import { DEMO_DETAIL_COLUMNS } from "@/lib/crm-cohort";
-import { demoPathSegment, tenantDemoPublicPath } from "@/lib/demo-slug";
+import { demoPathSegment } from "@/lib/demo-slug";
 import { logUsageEvent } from "@/lib/log-usage-event";
 import { ensureProfileUsername } from "@/lib/profile-username";
-import { absoluteUrl } from "@/lib/site-url";
+import { ringReadyTenantDemoUrl } from "@/lib/ringready-site";
 import { getUserProfile, getUserTwilioCredentials } from "@/lib/subscription";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -88,9 +88,7 @@ export async function resolveTenantDemoUrl(
 
   return {
     ok: true,
-    url: absoluteUrl(
-      tenantDemoPublicPath(username, decodeURIComponent(slug)),
-    ),
+    url: ringReadyTenantDemoUrl(username, decodeURIComponent(slug)),
   };
 }
 

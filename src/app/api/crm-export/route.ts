@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { buildCrmLeadsCsv, crmExportFilename } from "@/lib/crm-csv-export";
 import { fetchCrmBusinessRows } from "@/lib/crm-cohort";
 import { tryParseCrmSearchParams } from "@/lib/crm-params";
-import { getSiteOrigin } from "@/lib/site-url";
+import { RING_READY_ORIGIN } from "@/lib/ringready-site";
 import { getUserProfile, isPro } from "@/lib/subscription";
 import { logUsageEvent } from "@/lib/log-usage-event";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -100,7 +100,7 @@ export async function GET(request: Request) {
 
   void logUsageEvent(user.id, "csv_page_exported");
 
-  const csv = buildCrmLeadsCsv(rows, getSiteOrigin(), profile?.username);
+  const csv = buildCrmLeadsCsv(rows, RING_READY_ORIGIN, profile?.username);
   const filename = crmExportFilename();
 
   return new NextResponse(csv, {

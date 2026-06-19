@@ -77,7 +77,7 @@ export async function generateMetadata(): Promise<Metadata> {
       description:
         "Demo websites for cold outreach — show local businesses what their site could look like.",
       alternates: { canonical: ringReadyAbsoluteUrl("/") },
-      robots: { index: false, follow: true },
+      robots: { index: true, follow: true },
     };
   }
 
