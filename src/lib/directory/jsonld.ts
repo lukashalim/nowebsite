@@ -1,6 +1,34 @@
 import { siteOrganizationId, SITE_AUDIENCE_TYPE } from "@/lib/site-jsonld";
 import { absoluteUrl, getSiteOrigin } from "@/lib/site-url";
 
+export interface BreadcrumbJsonLdItem {
+  name: string;
+  path?: string;
+}
+
+export function buildBreadcrumbListJsonLd(
+  pagePath: string,
+  items: BreadcrumbJsonLdItem[],
+): Record<string, unknown> {
+  const pageUrl = absoluteUrl(pagePath);
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "@id": `${pageUrl}#breadcrumb`,
+    itemListElement: items.map((item, index) => {
+      const entry: Record<string, unknown> = {
+        "@type": "ListItem",
+        position: index + 1,
+        name: item.name,
+      };
+      if (item.path) {
+        entry.item = absoluteUrl(item.path);
+      }
+      return entry;
+    }),
+  };
+}
+
 export interface ProspectingDatasetJsonLdInput {
   name: string;
   description: string;

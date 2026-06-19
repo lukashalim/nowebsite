@@ -1,5 +1,9 @@
 import type { MetadataRoute } from "next";
 import { headers } from "next/headers";
+import {
+  isRingReadyHost,
+  RING_READY_LEGAL_PATHS,
+} from "@/lib/ringready-site";
 import { getSiteOrigin } from "@/lib/site-url";
 
 const PRODUCTION_DISALLOWS = [
@@ -14,12 +18,13 @@ const PRODUCTION_DISALLOWS = [
 
 export default async function robots(): Promise<MetadataRoute.Robots> {
   const host = (await headers()).get("host") ?? "";
-  const isRingReady = host.includes("ringreadysite.com");
+  const isRingReady = isRingReadyHost(host);
 
   if (isRingReady) {
     return {
       rules: {
         userAgent: "*",
+        allow: [...RING_READY_LEGAL_PATHS],
         disallow: "/",
       },
     };

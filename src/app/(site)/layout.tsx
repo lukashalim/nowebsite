@@ -1,11 +1,20 @@
+import { headers } from "next/headers";
 import { PublicNav } from "@/components/public-nav";
 import { SiteFooter } from "@/components/site-footer";
+import { isRingReadyHost } from "@/lib/ringready-site";
 
-export default function SiteLayout({
+export default async function SiteLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const host = (await headers()).get("host") ?? "";
+  const isRingReady = isRingReadyHost(host);
+
+  if (isRingReady) {
+    return <>{children}</>;
+  }
+
   return (
     <>
       <PublicNav />

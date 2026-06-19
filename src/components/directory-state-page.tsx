@@ -1,10 +1,11 @@
-import Link from "next/link";
 import { DirectoryLastUpdated } from "@/components/directory-last-updated";
 import { DirectoryGroupedByCity } from "@/components/directory-grouped-by-city";
 import { DirectoryBusinessList } from "@/components/directory-business-list";
 import { DirectoryPagination } from "@/components/directory-pagination";
 import { DownloadCsvButton } from "@/components/download-csv-button";
 import { DirectoryProspectingAboutData } from "@/components/directory-city-page-copy";
+import { DirectoryBreadcrumbs } from "@/components/directory-breadcrumbs";
+import { DirectoryExploreMore } from "@/components/directory-explore-more";
 import { stateHubTitle, stateHubHeaderSubcopy, stateHubAboutCopy, ukRegionHubTitle, ukRegionHubAboutCopy } from "@/lib/directory/labels";
 import { buildProspectingDatasetJsonLd } from "@/lib/directory/jsonld";
 import { DirectoryListingFilters } from "@/components/directory-listing-filters";
@@ -17,7 +18,6 @@ import {
   directoryPageRange,
   statePathWithPage,
 } from "@/lib/directory/pagination";
-import { directoryBreadcrumbLinkClass } from "@/lib/directory/ui-classes";
 import { stateAbbrToDisplayName, stateToAbbr } from "@/lib/directory/slugs";
 import type { DirectoryCityGroup } from "@/lib/directory/types";
 import type { DirectoryBusiness } from "@/lib/directory/types";
@@ -105,6 +105,22 @@ export function DirectoryStatePage({
   const showUsFilters = !isUkRegion && filters && filterOptions;
   const filtersActive = filters ? hasActiveDirectoryListingFilters(filters) : false;
   const unfilteredCount = unfilteredCountProp ?? totalCount;
+
+  const breadcrumbItems = isUkRegion
+    ? [
+        { label: hubLabel, href: hubHref },
+        { label: title },
+      ]
+    : [
+        { label: "Home", href: "/" },
+        { label: "All states", href: "/states" },
+        { label: title },
+      ];
+
+  const exploreLinks = !isUkRegion
+    ? [{ href: "/states", label: "All states" }]
+    : [{ href: hubHref, label: "United Kingdom directory" }];
+
   return (
     <div className="space-y-8">
       <script
@@ -113,19 +129,7 @@ export function DirectoryStatePage({
       />
 
       <header className="space-y-3">
-        <p className="text-sm text-zinc-500">
-          <Link href={hubHref} className={directoryBreadcrumbLinkClass}>
-            {hubLabel}
-          </Link>
-          {paginated ? (
-            <>
-              <span aria-hidden> / </span>
-              <Link href={path} className={directoryBreadcrumbLinkClass}>
-                {title}
-              </Link>
-            </>
-          ) : null}
-        </p>
+        <DirectoryBreadcrumbs items={breadcrumbItems} pagePath={path} />
         <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
           {title}
           {paginated ? (
@@ -179,6 +183,7 @@ export function DirectoryStatePage({
               businesses={businesses}
               showCityState
               contactAccess={contactAccess!}
+              publishedCitySlugs={publishedCitySlugs}
             />
           </>
         ) : cityGroups.length > 0 ? (
@@ -217,6 +222,8 @@ export function DirectoryStatePage({
           isPro={isPro}
         />
       ) : null}
+
+      <DirectoryExploreMore links={exploreLinks} />
 
       <DirectoryProspectingAboutData place={displayState} copy={aboutCopy} />
     </div>

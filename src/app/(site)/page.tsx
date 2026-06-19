@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { LayoutTemplate, Search, Workflow } from "lucide-react";
+import { RingReadyHome } from "@/components/ringready-home";
 import { CategoryGroupIcon } from "@/components/category-group-icon";
 import { CategoryIcon } from "@/components/category-icon";
 import { categoryGridLabel, cityPath, statePath } from "@/lib/directory/labels";
@@ -20,6 +22,10 @@ import {
   DIRECTORY_MIN_STATE_LISTINGS,
 } from "@/lib/directory/types";
 import { fetchCategoryGroupTaxonomy, fallbackCategoryGroupTaxonomy } from "@/lib/directory/category-groups";
+import {
+  isRingReadyHost,
+  ringReadyAbsoluteUrl,
+} from "@/lib/ringready-site";
 import { absoluteUrl } from "@/lib/site-url";
 import {
   directoryCardLinkClass,
@@ -64,6 +70,17 @@ const HOME_TOP_CITIES = 27;
 export const revalidate = 3600;
 
 export async function generateMetadata(): Promise<Metadata> {
+  const host = (await headers()).get("host") ?? "";
+  if (isRingReadyHost(host)) {
+    return {
+      title: { absolute: "RingReadySite" },
+      description:
+        "Demo websites for cold outreach — show local businesses what their site could look like.",
+      alternates: { canonical: ringReadyAbsoluteUrl("/") },
+      robots: { index: false, follow: true },
+    };
+  }
+
   let lastUpdatedLabel: string | null = null;
   try {
     lastUpdatedLabel = await fetchDirectoryLastUpdatedLabel();
@@ -82,6 +99,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
+  const host = (await headers()).get("host") ?? "";
+  if (isRingReadyHost(host)) {
+    return <RingReadyHome />;
+  }
+
   let cities: Awaited<ReturnType<typeof fetchAllDirectoryCities>> = [];
   let summary: Awaited<ReturnType<typeof fetchDirectorySummary>> | null = null;
   let publishedCategories: Awaited<

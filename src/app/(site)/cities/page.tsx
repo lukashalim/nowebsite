@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { DirectoryBreadcrumbs } from "@/components/directory-breadcrumbs";
+import { DirectoryHubNav } from "@/components/directory-hub-nav";
 import { DirectoryLastUpdated } from "@/components/directory-last-updated";
 import { fetchAllDirectoryCities, fetchDirectoryLastUpdatedLabel } from "@/lib/directory/data";
 import { cityPath, formatCityState } from "@/lib/directory/labels";
-import { directoryBreadcrumbLinkClass, directoryRowLinkClass } from "@/lib/directory/ui-classes";
+import { directoryRowLinkClass } from "@/lib/directory/ui-classes";
 import { absoluteUrl } from "@/lib/site-url";
 
 export const revalidate = 3600;
@@ -40,11 +42,11 @@ export default async function CitiesIndexPage() {
   return (
     <div className="space-y-8">
       <header className="space-y-3">
-        <p className="text-sm text-zinc-500">
-          <Link href="/" className={directoryBreadcrumbLinkClass}>
-            Home
-          </Link>
-        </p>
+        <DirectoryBreadcrumbs
+          items={[{ label: "Home", href: "/" }, { label: "All cities" }]}
+          pagePath="/cities"
+        />
+        <DirectoryHubNav active="cities" />
         <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
           All cities
         </h1>

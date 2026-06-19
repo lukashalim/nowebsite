@@ -1,19 +1,27 @@
-import Link from "next/link";
 import { DirectoryLastUpdated } from "@/components/directory-last-updated";
 import { DirectoryGroupedByCity } from "@/components/directory-grouped-by-city";
 import { DirectoryBusinessList } from "@/components/directory-business-list";
 import { DirectoryPagination } from "@/components/directory-pagination";
 import { DownloadCsvButton } from "@/components/download-csv-button";
 import { DirectoryProspectingAboutData } from "@/components/directory-city-page-copy";
+import { DirectoryBreadcrumbs } from "@/components/directory-breadcrumbs";
+import { DirectoryExploreMore } from "@/components/directory-explore-more";
 import type { CategoryContent } from "@/lib/directory/category-content";
 import {
   categoryAboutPlaceLabel,
   categoryHubAboutCopy,
+  categoryLinkLabel,
+  categoryPath,
   categorySeoPlural,
   categoryWithoutWebsiteTitle,
   nationwideCategoryPageTitle,
   pluralCategoryForTitle,
 } from "@/lib/directory/labels";
+import { fetchAllPublishedCategoryLinks } from "@/lib/directory/data";
+import {
+  categoryGroupForSlug,
+  fetchCategoryGroupTaxonomy,
+} from "@/lib/directory/category-groups";
 import { buildProspectingDatasetJsonLd } from "@/lib/directory/jsonld";
 import { DirectoryListingFilters } from "@/components/directory-listing-filters";
 import {
@@ -26,7 +34,6 @@ import {
   directoryPageRange,
 } from "@/lib/directory/pagination";
 import {
-  directoryBreadcrumbLinkClass,
   directoryCalloutClass,
 } from "@/lib/directory/ui-classes";
 import type { DirectoryCityGroup } from "@/lib/directory/types";
@@ -54,7 +61,7 @@ interface DirectoryCategoryPageProps {
   isPro?: boolean;
 }
 
-export function DirectoryCategoryPage({
+export async function DirectoryCategoryPage({
   categorySlug,
   categoryLabel,
   businesses,
@@ -99,6 +106,33 @@ export function DirectoryCategoryPage({
   );
   const filtersActive = hasActiveDirectoryListingFilters(filters);
 
+  const [taxonomy, publishedCategories] = await Promise.all([
+    fetchCategoryGroupTaxonomy(),
+    fetchAllPublishedCategoryLinks(),
+  ]);
+  const groupId = categoryGroupForSlug(categorySlug, taxonomy);
+  const publishedSlugs = new Set(
+    publishedCategories.map((c) => c.categorySlug),
+  );
+  const relatedExploreLinks = publishedCategories
+    .filter(
+      (c) =>
+        c.categorySlug !== categorySlug &&
+        groupId != null &&
+        categoryGroupForSlug(c.categorySlug, taxonomy) === groupId,
+    )
+    .slice(0, 6)
+    .map((c) => ({
+      href: categoryPath(c.categorySlug),
+      label: categoryLinkLabel(c.categoryLabel),
+    }));
+
+  const breadcrumbItems = [
+    { label: "Home", href: "/" },
+    { label: "All categories", href: "/categories" },
+    { label: title },
+  ];
+
   return (
     <div className="space-y-8">
       <script
@@ -107,19 +141,7 @@ export function DirectoryCategoryPage({
       />
 
       <header className="space-y-3">
-        <p className="text-sm text-zinc-500">
-          <Link href="/" className={directoryBreadcrumbLinkClass}>
-            Home
-          </Link>
-          {paginated ? (
-            <>
-              <span aria-hidden> / </span>
-              <Link href={path} className={directoryBreadcrumbLinkClass}>
-                {pluralCategoryForTitle(categoryLabel)}
-              </Link>
-            </>
-          ) : null}
-        </p>
+        <DirectoryBreadcrumbs items={breadcrumbItems} pagePath={path} />
         <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
           {title}
           {paginated ? (
@@ -209,6 +231,8 @@ export function DirectoryCategoryPage({
               showCityState
               variant="category"
               contactAccess={contactAccess}
+              publishedCitySlugs={publishedCitySlugs}
+              publishedCategorySlugs={publishedSlugs}
             />
           </>
         ) : cityGroups.length > 0 ? (
@@ -247,6 +271,11 @@ export function DirectoryCategoryPage({
           isPro={isPro}
         />
       ) : null}
+
+      <DirectoryExploreMore
+        heading="Related categories"
+        links={relatedExploreLinks}
+      />
 
       <DirectoryProspectingAboutData place={aboutPlace} copy={aboutCopy} />
     </div>

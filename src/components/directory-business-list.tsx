@@ -13,6 +13,8 @@ interface DirectoryBusinessListProps {
   showCityState?: boolean;
   contactAccess: DirectoryContactAccess;
   variant?: DirectoryBusinessListVariant;
+  publishedCitySlugs?: Set<string>;
+  publishedCategorySlugs?: Set<string>;
 }
 
 export function DirectoryBusinessList({
@@ -20,6 +22,8 @@ export function DirectoryBusinessList({
   showCityState = false,
   contactAccess,
   variant = "default",
+  publishedCitySlugs,
+  publishedCategorySlugs,
 }: DirectoryBusinessListProps) {
   const publicRows = stripContactFieldsList(businesses);
   const isCategory = variant === "category";
@@ -49,6 +53,8 @@ export function DirectoryBusinessList({
           showCityState={showCityState}
           contactAccess={contactAccess}
           variant={variant}
+          publishedCitySlugs={publishedCitySlugs}
+          publishedCategorySlugs={publishedCategorySlugs}
         />
       </table>
     </div>

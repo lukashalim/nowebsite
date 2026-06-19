@@ -1,17 +1,32 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { LegalPageShell, LegalSection } from "@/components/legal-page-shell";
 import {
   LEGAL_COMPANY_NAME,
   LEGAL_CONTACT_EMAIL,
 } from "@/lib/legal-placeholders";
+import {
+  isRingReadyHost,
+  ringReadyAbsoluteUrl,
+} from "@/lib/ringready-site";
 import { absoluteUrl } from "@/lib/site-url";
 
-export const metadata: Metadata = {
-  title: "Privacy Policy",
-  description:
-    "Privacy Policy for our B2B SaaS platform providing website and outreach tools for local businesses.",
-  alternates: { canonical: absoluteUrl("/privacy") },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const host = (await headers()).get("host") ?? "";
+  const isRingReady = isRingReadyHost(host);
+
+  return {
+    title: "Privacy Policy",
+    description:
+      "Privacy Policy for our B2B SaaS platform providing website and outreach tools for local businesses.",
+    alternates: {
+      canonical: isRingReady
+        ? ringReadyAbsoluteUrl("/privacy")
+        : absoluteUrl("/privacy"),
+    },
+    ...(isRingReady ? { robots: { index: true, follow: true } } : {}),
+  };
+}
 
 export default function PrivacyPage() {
   return (

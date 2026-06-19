@@ -7,6 +7,7 @@ import {
   DirectoryCityAboutData,
   DirectoryCityRevealCopy,
 } from "@/components/directory-city-page-copy";
+import { DirectoryBreadcrumbs } from "@/components/directory-breadcrumbs";
 import { DownloadCsvButton } from "@/components/download-csv-button";
 import { DirectoryLastUpdated } from "@/components/directory-last-updated";
 import { DirectoryStatePage } from "@/components/directory-state-page";
@@ -32,7 +33,6 @@ import { absoluteUrl } from "@/lib/site-url";
 import { getAuthenticatedUserProfile, isPro } from "@/lib/subscription";
 import { gbCityPath, gbRegionPath } from "@/lib/directory/paths";
 import {
-  directoryBreadcrumbLinkClass,
   directoryRowLinkStaticClass,
   directoryRowLinkWithGapClass,
 } from "@/lib/directory/ui-classes";
@@ -188,21 +188,15 @@ export default async function UnitedKingdomNestedPage({ params }: PageProps) {
         />
 
         <header className="space-y-3">
-          <p className="text-sm text-zinc-500">
-            <Link href="/" className={directoryBreadcrumbLinkClass}>
-              Home
-            </Link>
-            <span aria-hidden> / </span>
-            <Link href={gbCountryPath()} className={directoryBreadcrumbLinkClass}>
-              United Kingdom
-            </Link>
-            <span aria-hidden> / </span>
-            <Link href={gbRegionPath(regionSlug)} className={directoryBreadcrumbLinkClass}>
-              {hub.region}
-            </Link>
-            <span aria-hidden> / </span>
-            {hub.city}
-          </p>
+          <DirectoryBreadcrumbs
+            items={[
+              { label: "Home", href: "/" },
+              { label: "United Kingdom", href: gbCountryPath() },
+              { label: hub.region, href: gbRegionPath(regionSlug) },
+              { label: hub.city },
+            ]}
+            pagePath={cityPath}
+          />
           <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
             {h1}
           </h1>

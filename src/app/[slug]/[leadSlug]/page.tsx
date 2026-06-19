@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import {
   ExternalLink,
@@ -20,6 +21,10 @@ import {
   openStreetMapLink,
   truncateForMeta,
 } from "@/lib/demo-enrichment";
+import {
+  isRingReadyHost,
+  ringReadyAbsoluteUrl,
+} from "@/lib/ringready-site";
 import { absoluteUrl } from "@/lib/site-url";
 import {
   fetchTenantDemoLead,
@@ -88,17 +93,23 @@ export async function generateMetadata({
     return { title: "Site not found" };
   }
   const path = tenantDemoPublicPath(username, leadSlug);
+  const host = (await headers()).get("host") ?? "";
+  const isRingReady = isRingReadyHost(host);
+  const canonical = isRingReady ? ringReadyAbsoluteUrl(path) : absoluteUrl(path);
+
   return {
     title: formatTitle(result.lead),
     description: formatDescription(result.lead),
-    alternates: { canonical: path },
+    alternates: { canonical },
     openGraph: {
       title: formatTitle(result.lead),
       description: formatDescription(result.lead),
-      url: absoluteUrl(path),
+      url: canonical,
       type: "website",
     },
-    robots: { index: false, follow: false },
+    robots: isRingReady
+      ? { index: false, follow: true }
+      : { index: false, follow: false },
   };
 }
 

@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { parseCitySlug } from "@/lib/directory/slugs";
+import {
+  getRingReadyRobotsHeader,
+  isRingReadyAllowedPath,
+  isRingReadyHost,
+  RING_READY_RESERVED_FIRST_SEGMENTS,
+} from "@/lib/ringready-site";
 import { updateSession } from "@/lib/supabase/middleware";
 import {
   checkRateLimit,
@@ -8,26 +14,6 @@ import {
   rateLimitHeaders,
 } from "@/lib/rate-limit";
 import { shouldBypassRateLimit } from "@/lib/bot-detection";
-
-const RESERVED_FIRST_SEGMENTS = new Set([
-  "api",
-  "auth",
-  "sign-in",
-  "demo",
-  "crm",
-  "dashboard",
-  "admin",
-  "privacy",
-  "terms",
-  "sms-disclosure",
-  "alternatives",
-  "blog",
-  "_next",
-  "favicon.ico",
-  "robots.txt",
-  "sitemap.xml",
-  "united-kingdom",
-]);
 
 const DIRECTORY_EXACT = new Set([
   "/",
@@ -82,16 +68,23 @@ function copyCookies(from: NextResponse, to: NextResponse) {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const host = request.headers.get("host") ?? "";
-  const isRingReady = host.includes("ringreadysite.com");
+  const isRingReady = isRingReadyHost(host);
 
-  const withRobotsHeader = (response: NextResponse) => {
-    if (isRingReady) {
-      response.headers.set("X-Robots-Tag", "noindex, nofollow");
+  const withRingReadyRobotsHeader = (response: NextResponse) => {
+    if (!isRingReady) return response;
+    const robotsHeader = getRingReadyRobotsHeader(pathname);
+    if (robotsHeader) {
+      response.headers.set("X-Robots-Tag", robotsHeader);
     }
     return response;
   };
 
+  if (isRingReady && !isRingReadyAllowedPath(pathname)) {
+    return new NextResponse(null, { status: 404 });
+  }
+
   if (
+    !isRingReady &&
     request.method === "GET" &&
     isDirectoryPagePath(pathname) &&
     !isPrefetchRequest(request) &&
@@ -101,54 +94,56 @@ export async function middleware(request: NextRequest) {
     const ip = getClientIp(request);
     const rateLimit = await checkRateLimit("directoryPage", ip, userAgent);
     if (!rateLimit.success) {
-      return withRobotsHeader(
-        new NextResponse("Too many requests. Please try again later.", {
-          status: 429,
-          headers: {
-            "Content-Type": "text/plain; charset=utf-8",
-            ...rateLimitHeaders(rateLimit),
-          },
-        }),
-      );
+      return new NextResponse("Too many requests. Please try again later.", {
+        status: 429,
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          ...rateLimitHeaders(rateLimit),
+        },
+      });
     }
   }
 
   let sessionResponse: NextResponse | null = null;
   if (
-    pathname.startsWith("/crm") ||
-    pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/auth") ||
-    pathname.startsWith("/sign-in")
+    !isRingReady &&
+    (pathname.startsWith("/crm") ||
+      pathname.startsWith("/dashboard") ||
+      pathname.startsWith("/auth") ||
+      pathname.startsWith("/sign-in"))
   ) {
     sessionResponse = await updateSession(request);
   }
 
   if (pathname.startsWith("/demo")) {
+    if (isRingReady) {
+      return new NextResponse(null, { status: 404 });
+    }
     const url = request.nextUrl.clone();
     url.pathname = "/crm";
     const redirect = NextResponse.redirect(url, 308);
     if (sessionResponse) {
       copyCookies(sessionResponse, redirect);
     }
-    return withRobotsHeader(redirect);
+    return redirect;
   }
 
   const match = /^\/([^/]+)\/([^/]+)\/?$/.exec(pathname);
   if (!match || isRingReady) {
-    return withRobotsHeader(sessionResponse ?? NextResponse.next());
+    return withRingReadyRobotsHeader(sessionResponse ?? NextResponse.next());
   }
 
   const [, slug, secondSegment] = match;
-  if (RESERVED_FIRST_SEGMENTS.has(slug.toLowerCase())) {
-    return withRobotsHeader(sessionResponse ?? NextResponse.next());
+  if (RING_READY_RESERVED_FIRST_SEGMENTS.has(slug.toLowerCase())) {
+    return sessionResponse ?? NextResponse.next();
   }
 
   if (!parseCitySlug(slug)) {
-    return withRobotsHeader(sessionResponse ?? NextResponse.next());
+    return sessionResponse ?? NextResponse.next();
   }
 
   if (secondSegment.includes(".")) {
-    return withRobotsHeader(sessionResponse ?? NextResponse.next());
+    return sessionResponse ?? NextResponse.next();
   }
 
   const url = request.nextUrl.clone();
@@ -157,7 +152,7 @@ export async function middleware(request: NextRequest) {
   if (sessionResponse) {
     copyCookies(sessionResponse, redirect);
   }
-  return withRobotsHeader(redirect);
+  return redirect;
 }
 
 export const config = {

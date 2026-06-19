@@ -8,6 +8,8 @@ interface DirectoryBusinessListBodyProps {
   showCityState?: boolean;
   contactAccess: DirectoryContactAccess;
   variant?: DirectoryBusinessListVariant;
+  publishedCitySlugs?: Set<string>;
+  publishedCategorySlugs?: Set<string>;
 }
 
 export function DirectoryBusinessListBody({
@@ -15,6 +17,8 @@ export function DirectoryBusinessListBody({
   showCityState = false,
   contactAccess,
   variant = "default",
+  publishedCitySlugs,
+  publishedCategorySlugs,
 }: DirectoryBusinessListBodyProps) {
   return (
     <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
@@ -26,6 +30,8 @@ export function DirectoryBusinessListBody({
           contactAccess={contactAccess}
           showCityState={showCityState}
           variant={variant}
+          publishedCitySlugs={publishedCitySlugs}
+          publishedCategorySlugs={publishedCategorySlugs}
         />
       ))}
     </tbody>

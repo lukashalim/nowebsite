@@ -1,8 +1,18 @@
-export default function TenantDemoLayout({
+import { headers } from "next/headers";
+import { isRingReadyHost } from "@/lib/ringready-site";
+
+export default async function TenantDemoLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const host = (await headers()).get("host") ?? "";
+  const isRingReady = isRingReadyHost(host);
+
+  if (isRingReady) {
+    return <div className="flex min-h-0 flex-1 flex-col">{children}</div>;
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col pb-24">
       {children}

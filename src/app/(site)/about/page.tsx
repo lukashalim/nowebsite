@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { absoluteUrl } from "@/lib/site-url";
 
 export const metadata: Metadata = {
@@ -62,6 +63,26 @@ export default function AboutPage() {
           tracking, DM outreach templates, and an instant demo page builder — so
           you can show a prospect their future website before you even get on a
           call.
+        </p>
+      </section>
+      <section className="space-y-3 border-t border-zinc-200 pt-8 dark:border-zinc-800">
+        <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+          Browse the data
+        </h2>
+        <p className="text-base leading-relaxed text-zinc-600 dark:text-zinc-400">
+          Explore verified no-website businesses by{" "}
+          <Link href="/cities" className="font-medium text-zinc-900 underline decoration-zinc-300 underline-offset-2 hover:decoration-zinc-500 dark:text-zinc-100">
+            city
+          </Link>
+          ,{" "}
+          <Link href="/states" className="font-medium text-zinc-900 underline decoration-zinc-300 underline-offset-2 hover:decoration-zinc-500 dark:text-zinc-100">
+            state
+          </Link>
+          , or{" "}
+          <Link href="/categories" className="font-medium text-zinc-900 underline decoration-zinc-300 underline-offset-2 hover:decoration-zinc-500 dark:text-zinc-100">
+            category
+          </Link>
+          .
         </p>
       </section>
     </article>

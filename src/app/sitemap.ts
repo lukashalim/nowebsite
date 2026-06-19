@@ -10,6 +10,7 @@ import {
 } from "@/lib/directory/types";
 import { gbCityPath, gbCountryPath, gbRegionPath } from "@/lib/directory/paths";
 import { absoluteUrl } from "@/lib/site-url";
+import { isRingReadyHost } from "@/lib/ringready-site";
 
 /** Regenerate on each request so Vercel always has Supabase env at runtime. */
 export const dynamic = "force-dynamic";
@@ -45,7 +46,7 @@ function hubEntry(
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const host = (await headers()).get("host") ?? "";
-  const isRingReady = host.includes("ringreadysite.com");
+  const isRingReady = isRingReadyHost(host);
   if (isRingReady) {
     // Never expose a sitemap for ringreadysite.com.
     return [];

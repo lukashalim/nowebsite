@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { DirectoryBreadcrumbs } from "@/components/directory-breadcrumbs";
+import { DirectoryHubNav } from "@/components/directory-hub-nav";
 import { DirectoryLastUpdated } from "@/components/directory-last-updated";
 import {
   fetchAllDirectoryStates,
   fetchDirectoryLastUpdatedLabel,
 } from "@/lib/directory/data";
 import { statePath } from "@/lib/directory/labels";
-import { directoryBreadcrumbLinkClass, directoryRowLinkClass } from "@/lib/directory/ui-classes";
+import { directoryRowLinkClass } from "@/lib/directory/ui-classes";
 import { stateAbbrToDisplayName, stateToAbbr } from "@/lib/directory/slugs";
 import { absoluteUrl } from "@/lib/site-url";
 
@@ -44,11 +46,11 @@ export default async function StatesIndexPage() {
   return (
     <div className="space-y-8">
       <header className="space-y-3">
-        <p className="text-sm text-zinc-500">
-          <Link href="/" className={directoryBreadcrumbLinkClass}>
-            Home
-          </Link>
-        </p>
+        <DirectoryBreadcrumbs
+          items={[{ label: "Home", href: "/" }, { label: "All states" }]}
+          pagePath="/states"
+        />
+        <DirectoryHubNav active="states" />
         <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
           All states
         </h1>

@@ -5,6 +5,8 @@ import { CategoryGroupIcon } from "@/components/category-group-icon";
 import { CategoryIcon } from "@/components/category-icon";
 import { DirectoryCategoryPage } from "@/components/directory-category-page";
 import { DirectoryBusinessList } from "@/components/directory-business-list";
+import { DirectoryBreadcrumbs } from "@/components/directory-breadcrumbs";
+import { DirectoryExploreMore } from "@/components/directory-explore-more";
 import {
   DirectoryCityAboutData,
   DirectoryCityRevealCopy,
@@ -24,17 +26,20 @@ import {
   cityHubMetaTitle,
   cityHubPlaceLabel,
   cityHubProspectListH2,
+  cityPath,
+  formatCityState,
   nationwideCategoryMetaDescription,
   nationwideCategoryMetaTitle,
   stateHubMetaDescription,
   stateHubMetaTitle,
+  statePath,
 } from "@/lib/directory/labels";
-import { fetchAllValidSlugParams } from "@/lib/directory/data";
+import { fetchAllDirectoryCities, fetchAllValidSlugParams } from "@/lib/directory/data";
+import { stateAbbrToDisplayName, stateNameToSlug, stateToAbbr } from "@/lib/directory/slugs";
 import { groupPublishedCategories, fetchCategoryGroupTaxonomy } from "@/lib/directory/category-groups";
 import { resolveDirectorySlugPage } from "@/lib/directory/resolve-slug-page";
-import { DIRECTORY_MIN_CATEGORY_LISTINGS } from "@/lib/directory/types";
+import { DIRECTORY_MIN_CATEGORY_LISTINGS, DIRECTORY_MIN_CITY_LISTINGS } from "@/lib/directory/types";
 import {
-  directoryBreadcrumbLinkClass,
   directoryRowLinkStaticClass,
   directoryRowLinkWithGapClass,
 } from "@/lib/directory/ui-classes";
@@ -334,6 +339,42 @@ export default async function SlugDirectoryPage({
       keywords: ["businesses without website near me", "businesses without website"],
     });
 
+    const stateSlug = stateNameToSlug(hub.state);
+    const stateDisplay = stateAbbrToDisplayName(stateToAbbr(hub.state) ?? hub.state);
+    const allCities = await fetchAllDirectoryCities();
+    const siblingCities = allCities
+      .filter(
+        (c) =>
+          c.state === hub.state &&
+          c.citySlug !== lower &&
+          c.listingCount >= DIRECTORY_MIN_CITY_LISTINGS,
+      )
+      .sort((a, b) => b.listingCount - a.listingCount)
+      .slice(0, 8);
+
+    const cityExploreLinks = [
+      ...(stateSlug
+        ? [
+            {
+              href: statePath(stateSlug),
+              label: `All cities in ${stateDisplay}`,
+            },
+          ]
+        : []),
+      ...siblingCities.map((c) => ({
+        href: cityPath(c.citySlug),
+        label: formatCityState(c.city, c.state),
+      })),
+    ];
+
+    const cityBreadcrumbItems = [
+      { label: "Home", href: "/" },
+      ...(stateSlug
+        ? [{ label: stateDisplay, href: statePath(stateSlug) }]
+        : []),
+      { label: place },
+    ];
+
     return (
       <div className="space-y-8">
         <script
@@ -342,13 +383,10 @@ export default async function SlugDirectoryPage({
         />
 
         <header className="space-y-3">
-          <p className="text-sm text-zinc-500">
-            <Link href="/" className={directoryBreadcrumbLinkClass}>
-              Home
-            </Link>
-            <span aria-hidden> / </span>
-            {hub.city}
-          </p>
+          <DirectoryBreadcrumbs
+            items={cityBreadcrumbItems}
+            pagePath={`/${lower}`}
+          />
           <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
             {h1}
           </h1>
@@ -437,6 +475,11 @@ export default async function SlugDirectoryPage({
             isPro={userIsPro}
           />
         ) : null}
+
+        <DirectoryExploreMore
+          heading={`More cities in ${stateDisplay}`}
+          links={cityExploreLinks}
+        />
 
         <DirectoryCityAboutData place={place} />
       </div>

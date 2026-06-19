@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { DirectoryBusinessList } from "@/components/directory-business-list";
+import { DirectoryBreadcrumbs } from "@/components/directory-breadcrumbs";
 import { DirectoryGroupedByCity } from "@/components/directory-grouped-by-city";
 import { DirectoryLastUpdated } from "@/components/directory-last-updated";
 import { DirectoryListingFilters } from "@/components/directory-listing-filters";
@@ -152,19 +152,13 @@ export default async function FacebookDirectoryPage({
       ) : null}
 
       <header className="space-y-3">
-        <p className="text-sm text-zinc-500">
-          <Link href="/" className="hover:underline">
-            Home
-          </Link>
-          {paginated ? (
-            <>
-              <span aria-hidden> / </span>
-              <Link href={FACEBOOK_HUB_PATH} className="hover:underline">
-                Facebook-as-website leads
-              </Link>
-            </>
-          ) : null}
-        </p>
+        <DirectoryBreadcrumbs
+          items={[
+            { label: "Home", href: "/" },
+            { label: "Facebook-as-website leads" },
+          ]}
+          pagePath={FACEBOOK_HUB_PATH}
+        />
         <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
           {pageTitle}
           {paginated && data ? (
@@ -250,6 +244,7 @@ export default async function FacebookDirectoryPage({
                     businesses={data.businesses}
                     showCityState
                     contactAccess={contactAccess!}
+                    publishedCitySlugs={publishedCitySlugs}
                   />
                 ) : (
                   <p className="text-sm text-zinc-600 dark:text-zinc-400">

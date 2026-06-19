@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CategoryGroupIcon } from "@/components/category-group-icon";
 import { CategoryIcon } from "@/components/category-icon";
+import { DirectoryBreadcrumbs } from "@/components/directory-breadcrumbs";
+import { DirectoryHubNav } from "@/components/directory-hub-nav";
 import { DirectoryLastUpdated } from "@/components/directory-last-updated";
 import {
   fetchAllPublishedCategoryLinks,
@@ -13,7 +15,7 @@ import {
   fallbackCategoryGroupTaxonomy,
 } from "@/lib/directory/category-groups";
 import { categoryGridLabel } from "@/lib/directory/labels";
-import { directoryBreadcrumbLinkClass, directoryCardLinkClass } from "@/lib/directory/ui-classes";
+import { directoryCardLinkClass } from "@/lib/directory/ui-classes";
 import { DIRECTORY_MIN_CATEGORY_LISTINGS } from "@/lib/directory/types";
 import { absoluteUrl } from "@/lib/site-url";
 
@@ -56,11 +58,11 @@ export default async function CategoriesIndexPage() {
   return (
     <div className="space-y-8">
       <header className="space-y-3">
-        <p className="text-sm text-zinc-500">
-          <Link href="/" className={directoryBreadcrumbLinkClass}>
-            Home
-          </Link>
-        </p>
+        <DirectoryBreadcrumbs
+          items={[{ label: "Home", href: "/" }, { label: "All categories" }]}
+          pagePath="/categories"
+        />
+        <DirectoryHubNav active="categories" />
         <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
           All categories
         </h1>

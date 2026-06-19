@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { DirectoryBreadcrumbs } from "@/components/directory-breadcrumbs";
 import { DirectoryLastUpdated } from "@/components/directory-last-updated";
 import { DirectoryProspectingAboutData } from "@/components/directory-city-page-copy";
 import {
@@ -77,11 +78,13 @@ export default async function UnitedKingdomDirectoryPage() {
       ) : null}
 
       <header className="space-y-3">
-        <p className="text-sm text-zinc-500">
-          <Link href="/" className="hover:underline">
-            Home
-          </Link>
-        </p>
+        <DirectoryBreadcrumbs
+          items={[
+            { label: "Home", href: "/" },
+            { label: "United Kingdom" },
+          ]}
+          pagePath={gbCountryPath()}
+        />
         <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
           {gbCountryHubTitle()}
         </h1>

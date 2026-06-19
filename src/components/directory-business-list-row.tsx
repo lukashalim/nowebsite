@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ExternalLink, MapPin, Phone, Star } from "lucide-react";
 import { useState } from "react";
 import type { DirectoryBusinessPublic } from "@/lib/directory/contact-fields";
@@ -7,11 +8,14 @@ import type { DirectoryContactAccess } from "@/lib/directory/contact-fields";
 import type { DirectoryContactRow } from "@/lib/directory/contact-fields";
 import { revealDirectoryContact } from "@/lib/directory/contact-api-client";
 import {
+  categoryPath,
+  cityPath,
   formatCategoryDisplayName,
   formatListingCheckedAt,
   formatListingCheckedAtTitle,
   formatLocationLabel,
 } from "@/lib/directory/labels";
+import { categoryLabelToFlatSlug, cityStateToSlug } from "@/lib/directory/slugs";
 import type { DirectoryBusinessListVariant } from "@/components/directory-business-list";
 
 interface DirectoryBusinessListRowProps {
@@ -20,6 +24,8 @@ interface DirectoryBusinessListRowProps {
   contactAccess: DirectoryContactAccess;
   showCityState?: boolean;
   variant?: DirectoryBusinessListVariant;
+  publishedCitySlugs?: Set<string>;
+  publishedCategorySlugs?: Set<string>;
 }
 
 function categoryLabelForRow(b: DirectoryBusinessPublic): string {
@@ -38,12 +44,37 @@ function locationLabelForRow(
   return city || null;
 }
 
+function cityHrefForRow(
+  b: DirectoryBusinessPublic,
+  publishedCitySlugs?: Set<string>,
+): string | null {
+  const city = b.city?.trim();
+  const state = b.state?.trim();
+  if (!city || !state) return null;
+  const slug = cityStateToSlug(city, state, b.country);
+  if (!slug || !publishedCitySlugs?.has(slug)) return null;
+  return cityPath(slug);
+}
+
+function categoryHrefForRow(
+  b: DirectoryBusinessPublic,
+  publishedCategorySlugs?: Set<string>,
+): string | null {
+  const raw = b.main_category?.trim() || b.business_type?.trim();
+  if (!raw) return null;
+  const slug = categoryLabelToFlatSlug(raw);
+  if (!slug || !publishedCategorySlugs?.has(slug)) return null;
+  return categoryPath(slug);
+}
+
 export function DirectoryBusinessListRow({
   business: b,
   rowIndex,
   contactAccess,
   showCityState = false,
   variant = "default",
+  publishedCitySlugs,
+  publishedCategorySlugs,
 }: DirectoryBusinessListRowProps) {
   const isCategory = variant === "category";
   const [contact, setContact] = useState<DirectoryContactRow | null>(null);
@@ -51,6 +82,13 @@ export function DirectoryBusinessListRow({
   const [error, setError] = useState(false);
 
   const location = locationLabelForRow(b, showCityState);
+  const locationHref = showCityState
+    ? cityHrefForRow(b, publishedCitySlugs)
+    : null;
+  const categoryLabel = categoryLabelForRow(b);
+  const categoryHref = isCategory
+    ? categoryHrefForRow(b, publishedCategorySlugs)
+    : null;
   const checkedLabel = formatListingCheckedAt(b.checkedAt);
   const checkedTitle = formatListingCheckedAtTitle(b.checkedAt);
 
@@ -79,7 +117,16 @@ export function DirectoryBusinessListRow({
       </td>
       {isCategory ? (
         <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">
-          {categoryLabelForRow(b)}
+          {categoryHref ? (
+            <Link
+              href={categoryHref}
+              className="font-medium text-zinc-900 hover:underline dark:text-zinc-100"
+            >
+              {categoryLabel}
+            </Link>
+          ) : (
+            categoryLabel
+          )}
         </td>
       ) : null}
       <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">
@@ -89,7 +136,13 @@ export function DirectoryBusinessListRow({
               className="mt-0.5 size-3.5 shrink-0 text-zinc-400"
               aria-hidden
             />
-            {location}
+            {locationHref ? (
+              <Link href={locationHref} className="hover:underline">
+                {location}
+              </Link>
+            ) : (
+              location
+            )}
           </span>
         ) : (
           "—"
