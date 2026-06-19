@@ -18,6 +18,10 @@ export default function TermsPage() {
     <LegalPageShell title="Terms of Service">
       <LegalSection title="Agreement to Terms">
         <p>
+          This agreement governs the services provided by Saavy Data Science
+          (the operator of ringreadysite.com).
+        </p>
+        <p>
           These Terms of Service (&quot;Terms&quot;) govern your access to and
           use of the websites, applications, and services provided by{" "}
           {LEGAL_COMPANY_NAME} (&quot;Company,&quot; &quot;we,&quot;

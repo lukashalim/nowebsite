@@ -18,6 +18,10 @@ export default function PrivacyPage() {
     <LegalPageShell title="Privacy Policy">
       <LegalSection title="Introduction">
         <p>
+          This policy governs the services provided by Saavy Data Science (the
+          operator of ringreadysite.com).
+        </p>
+        <p>
           {LEGAL_COMPANY_NAME} (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;)
           operates a business-to-business software platform that helps agencies
           and contractors build websites, manage leads, and communicate with
