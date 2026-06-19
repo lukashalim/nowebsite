@@ -10,6 +10,7 @@ import {
 import { DownloadCsvButton } from "@/components/download-csv-button";
 import { DirectoryLastUpdated } from "@/components/directory-last-updated";
 import { DirectoryStatePage } from "@/components/directory-state-page";
+import { buildProspectingDatasetJsonLd } from "@/lib/directory/jsonld";
 import {
   categoryLinkLabel,
   cityHubCategoryH2,
@@ -156,6 +157,22 @@ export default async function UnitedKingdomNestedPage({ params }: PageProps) {
     );
     const place = cityHubPlaceLabel(hub.city, hub.state, COUNTRY_GB, hub.region);
     const h1 = cityHubH1(hub.city, hub.state, COUNTRY_GB, hub.region);
+    const cityPath = gbCityPath(citySlug);
+    const cityJsonLd = buildProspectingDatasetJsonLd({
+      name: h1,
+      description: cityHubMetaDescription(
+        hub.city,
+        hub.state,
+        businesses.length,
+        hub.lastUpdatedLabel,
+        COUNTRY_GB,
+        hub.region,
+      ),
+      path: cityPath,
+      recordCount: businesses.length,
+      spatialCoverage: place,
+      keywords: ["UK B2B lead list"],
+    });
     const topCategory = [...hub.categories].sort(
       (a, b) => b.listingCount - a.listingCount,
     )[0];
@@ -165,6 +182,11 @@ export default async function UnitedKingdomNestedPage({ params }: PageProps) {
 
     return (
       <div className="space-y-8">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(cityJsonLd) }}
+        />
+
         <header className="space-y-3">
           <p className="text-sm text-zinc-500">
             <Link href="/" className={directoryBreadcrumbLinkClass}>

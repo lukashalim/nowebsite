@@ -81,9 +81,39 @@ export function pluralCategoryForTitle(label: string): string {
   return `${t}s`;
 }
 
-export function nationwideCategoryPageTitle(categoryLabel: string): string {
-  const plural = pluralCategoryForTitle(categoryLabel);
+/** Target-keyword plural for category SEO (e.g. hair-salon → "Salons"). */
+const CATEGORY_SEO_PLURAL_BY_SLUG: Record<string, string> = {
+  restaurant: "Restaurants",
+  "hair-salon": "Salons",
+  "beauty-salon": "Salons",
+  "nail-salon": "Salons",
+};
+
+export function categorySeoPlural(
+  categoryLabel: string,
+  categorySlug?: string,
+): string {
+  const slug = categorySlug?.trim().toLowerCase();
+  if (slug && CATEGORY_SEO_PLURAL_BY_SLUG[slug]) {
+    return CATEGORY_SEO_PLURAL_BY_SLUG[slug];
+  }
+  return pluralCategoryForTitle(categoryLabel);
+}
+
+/** Exact-match H1/meta phrase: "{plural} without a website". */
+export function categoryWithoutWebsiteTitle(
+  categoryLabel: string,
+  categorySlug?: string,
+): string {
+  const plural = categorySeoPlural(categoryLabel, categorySlug);
   return `${plural} Without a Website`;
+}
+
+export function nationwideCategoryPageTitle(
+  categoryLabel: string,
+  categorySlug?: string,
+): string {
+  return categoryWithoutWebsiteTitle(categoryLabel, categorySlug);
 }
 
 export function nationwideCategoryMetaDescription(
@@ -92,14 +122,15 @@ export function nationwideCategoryMetaDescription(
   cityCount: number,
   lastUpdatedLabel: string | null,
   page?: { current: number; totalPages: number },
+  categorySlug?: string,
 ): string {
-  const plural = pluralCategoryForTitle(categoryLabel).toLowerCase();
+  const plural = categorySeoPlural(categoryLabel, categorySlug).toLowerCase();
   const updated = lastUpdatedLabel ? ` Updated ${lastUpdatedLabel}.` : "";
   const pageNote =
     page && page.totalPages > 1
       ? ` Page ${page.current} of ${page.totalPages}.`
       : "";
-  return `Browse ${count.toLocaleString()} ${plural} across ${cityCount.toLocaleString()} cities with no website.${pageNote}${updated}`;
+  return `${count.toLocaleString()} ${plural} without a website across ${cityCount.toLocaleString()} US cities — B2B lead list for web designers and agencies. Export-ready prospecting data sorted by review volume.${pageNote}${updated}`;
 }
 
 const SITE_BRAND = "No Website Business Leads";
@@ -107,8 +138,9 @@ const SITE_BRAND = "No Website Business Leads";
 export function nationwideCategoryMetaTitle(
   categoryLabel: string,
   page?: number,
+  categorySlug?: string,
 ): string {
-  const base = nationwideCategoryPageTitle(categoryLabel);
+  const base = categoryWithoutWebsiteTitle(categoryLabel, categorySlug);
   const pageSuffix =
     page != null && page > 1 ? ` — Page ${page.toLocaleString()}` : "";
   return `${base}${pageSuffix} | ${SITE_BRAND}`;
@@ -141,7 +173,52 @@ export function stateHubMetaDescription(
     page && page.totalPages > 1
       ? ` Page ${page.current} of ${page.totalPages}.`
       : "";
-  return `Browse ${count.toLocaleString()} businesses across ${cityCount.toLocaleString()} cities in ${display} with no website.${pageNote}${updated}`;
+  return `${count.toLocaleString()} businesses without a website across ${cityCount.toLocaleString()} cities in ${display} — B2B lead list for web designers and agencies.${pageNote}${updated}`;
+}
+
+export function stateHubHeaderSubcopy(
+  displayState: string,
+  count: number,
+  cityCount: number,
+  options?: {
+    isUkRegion?: boolean;
+    paginated?: { page: number; totalPages: number };
+  },
+): string {
+  const regionPrefix = options?.isUkRegion ? "UK " : "";
+  if (options?.paginated) {
+    const { page, totalPages } = options.paginated;
+    return `Prospecting data for agencies: page ${page.toLocaleString()} of ${totalPages.toLocaleString()} (${count.toLocaleString()} prospect records across ${cityCount.toLocaleString()} ${regionPrefix}cities in ${displayState}). Export-ready B2B lead list sorted by review volume with reveal-gated contact fields.`;
+  }
+  return `${count.toLocaleString()} businesses without a website in ${displayState} — B2B lead list for web designers across ${cityCount.toLocaleString()} ${regionPrefix}cities. Browse by city below, or scan the full export-ready table.`;
+}
+
+export function stateHubAboutCopy(place: string): CityHubAboutCopy {
+  return {
+    sectionHeading: "About this prospecting data",
+    blocks: [
+      {
+        heading: "Built for agency prospecting, not consumer lookup",
+        body: `This page is a B2B prospecting tool for web design agencies, freelancers, and digital marketers running outbound campaigns in ${place}. It is not a public business directory for consumers searching hours, menus, addresses, or phone numbers for individual brands.`,
+      },
+      {
+        heading: "What each record includes",
+        body: "Each row is a verified Google Maps business with no standalone website — sorted by review volume as a proxy for commercial activity. Fields support outreach workflow: business name, city, rating and review count, verification date, and demo preview links. Phone numbers and street addresses are reveal-gated because they are prospecting assets, not consumer service information.",
+      },
+      {
+        heading: "What this page is not",
+        body: `This is not a Yelp-style review site, a phone book, or a "near me" local search result. If you are looking for a specific business to visit, call, or check opening hours, use Google Maps directly. If you are building a pipeline of ${place} businesses that need a website, this list is the starting dataset.`,
+      },
+      {
+        heading: "Data methodology",
+        body: "Listings are scraped from Google Maps by city, filtered to exclude businesses with an owned website, and refreshed on a rolling schedule. Verified Google Maps businesses with no standalone site are published as export-ready prospecting data for agencies.",
+      },
+    ],
+  };
+}
+
+export function ukRegionHubAboutCopy(region: string): CityHubAboutCopy {
+  return stateHubAboutCopy(region);
 }
 
 export function statePath(stateSlug: string): string {
@@ -157,7 +234,7 @@ export function gbCountryHubTitle(): string {
 }
 
 export function gbCountryHubMetaTitle(): string {
-  return `${gbCountryHubTitle()} | ${SITE_BRAND}`;
+  return `UK Businesses Without a Website | ${SITE_BRAND}`;
 }
 
 export function gbCountryHubMetaDescription(
@@ -166,7 +243,18 @@ export function gbCountryHubMetaDescription(
   lastUpdatedLabel: string | null = null,
 ): string {
   const updated = lastUpdatedLabel ? ` Updated ${lastUpdatedLabel}.` : "";
-  return `Browse ${count.toLocaleString()} UK businesses without their own website across ${cityCount.toLocaleString()} cities.${updated}`;
+  return `${count.toLocaleString()} businesses without a website across ${cityCount.toLocaleString()} UK cities — B2B lead list for web designers and agencies.${updated}`;
+}
+
+export function gbCountryHubHeaderSubcopy(
+  count: number,
+  cityCount: number,
+): string {
+  return `${count.toLocaleString()} businesses without a website across the United Kingdom — B2B lead list for web designers spanning ${cityCount.toLocaleString()} UK cities. Browse by region and city below.`;
+}
+
+export function gbCountryHubAboutCopy(): CityHubAboutCopy {
+  return stateHubAboutCopy("the United Kingdom");
 }
 
 export { gbCountryPath } from "@/lib/directory/paths";
@@ -186,7 +274,70 @@ export function ukRegionHubMetaDescription(
   lastUpdatedLabel: string | null = null,
 ): string {
   const updated = lastUpdatedLabel ? ` Updated ${lastUpdatedLabel}.` : "";
-  return `Browse ${count.toLocaleString()} businesses across ${cityCount.toLocaleString()} UK cities in ${region} with no website.${updated}`;
+  return `${count.toLocaleString()} businesses without a website across ${cityCount.toLocaleString()} UK cities in ${region} — B2B lead list for web designers and agencies.${updated}`;
+}
+
+export const FACEBOOK_HUB_PATH = "/facebook";
+
+export function facebookHubTitle(): string {
+  return "Agency Outreach List: Businesses Using Facebook as Their Google Website";
+}
+
+export function facebookHubMetaTitle(page?: number): string {
+  const pageSuffix = page != null && page > 1 ? ` — Page ${page}` : "";
+  return `B2B Facebook-as-Website Lead List for Web Designers${pageSuffix} | ${SITE_BRAND}`;
+}
+
+export function facebookHubMetaDescription(
+  lastUpdatedLabel: string | null = null,
+  page?: { current: number; totalPages: number; totalCount: number },
+): string {
+  const updated = lastUpdatedLabel ? ` Updated ${lastUpdatedLabel}.` : "";
+  const pageNote =
+    page && page.totalPages > 1
+      ? ` Page ${page.current} of ${page.totalPages} (${page.totalCount.toLocaleString()} businesses).`
+      : "";
+  return `B2B outreach list for web designers and agencies: businesses whose Google Business Profile uses Facebook in the Website field — a guideline violation and high-intent prospecting signal.${pageNote}${updated}`;
+}
+
+export function facebookAboutPlaceLabel(): string {
+  return "nationwide businesses using Facebook as their Google website";
+}
+
+export function facebookHubHeaderSubcopy(
+  count: number,
+  cityCount: number,
+  paginated?: { page: number; totalPages: number },
+): string {
+  if (paginated) {
+    return `Prospecting data for agencies: page ${paginated.page.toLocaleString()} of ${paginated.totalPages.toLocaleString()} (${count.toLocaleString()} prospect records across ${cityCount.toLocaleString()} cities). Export-ready B2B lead list sorted by review volume with reveal-gated contact fields.`;
+  }
+  return `${count.toLocaleString()} prospecting records for web design outreach — businesses using Facebook instead of an owned website on Google Maps. Grouped by city below; export-ready for agency cold outreach.`;
+}
+
+export function facebookHubAboutCopy(): CityHubAboutCopy {
+  const place = facebookAboutPlaceLabel();
+  return {
+    sectionHeading: "About this prospecting data",
+    blocks: [
+      {
+        heading: "Built for agency prospecting, not consumer lookup",
+        body: `This page is a B2B prospecting tool for web design agencies, freelancers, and digital marketers running outbound campaigns targeting ${place}. It is not a public business directory for consumers searching hours, menus, addresses, or phone numbers for individual brands.`,
+      },
+      {
+        heading: "What each record includes",
+        body: "Each row is a verified Google Maps business whose Website field points to Facebook instead of an owned site — sorted by review volume. Fields support outreach workflow: business name, city, rating and review count, and verification date. Phone numbers and street addresses are reveal-gated because they are prospecting assets, not consumer service information.",
+      },
+      {
+        heading: "What this page is not",
+        body: `This is not a Yelp-style review site, a phone book, or a "near me" local search result. If you are looking for a specific business to visit, call, or check opening hours, use Google Maps directly. If you are building a pipeline of ${place} for web design outreach, this list is the starting dataset.`,
+      },
+      {
+        heading: "Data methodology",
+        body: "Listings are scraped from Google Maps, filtered to businesses using Facebook (or similar social URLs) in the Website field, and refreshed on a rolling schedule. Verified records are published as export-ready prospecting data for agencies.",
+      },
+    ],
+  };
 }
 
 /** Max place label length before city-hub meta title uses the short fallback. */
@@ -209,9 +360,9 @@ export function cityHubMetaTitle(
 ): string {
   const place = cityHubPlaceLabel(city, state, country, region);
   if (place.length > CITY_HUB_META_TITLE_MAX_PLACE) {
-    return `${city.trim()} B2B Lead List — No-Website Businesses | Agency Tool`;
+    return `${city.trim()} Businesses Without a Website Near You | ${SITE_BRAND}`;
   }
-  return `${place} B2B Lead List — Businesses Without Websites | Agency Tool`;
+  return `Businesses Without a Website Near You in ${place} | ${SITE_BRAND}`;
 }
 
 /** Visible page H1 — intentionally differs from meta title for natural variation. */
@@ -222,7 +373,7 @@ export function cityHubH1(
   region?: string | null,
 ): string {
   const place = cityHubPlaceLabel(city, state, country, region);
-  return `Agency Prospecting Asset: Businesses Without Websites in ${place}`;
+  return `Businesses Without a Website in ${place}`;
 }
 
 /** @deprecated Use cityHubH1 for on-page title and cityHubMetaTitle for metadata. */
@@ -245,7 +396,7 @@ export function cityHubMetaDescription(
 ): string {
   const place = cityHubPlaceLabel(city, state, country, region);
   const updated = lastUpdatedLabel ? ` Updated ${lastUpdatedLabel}.` : "";
-  return `Prospecting data for agencies: ${listingCount.toLocaleString()} verified businesses in ${place} with no standalone website. Export-ready B2B lead list with outreach signals and Google Maps verification.${updated}`;
+  return `${listingCount.toLocaleString()} businesses without a website near you in ${place} — B2B lead list for web designers and agencies. Export-ready prospecting data sorted by review volume.${updated}`;
 }
 
 export function cityHubHeaderSubcopy(
@@ -253,7 +404,7 @@ export function cityHubHeaderSubcopy(
   city: string,
   count: number,
 ): string {
-  return `${count.toLocaleString()} prospecting records for web design outreach in ${place} — a B2B lead list of agency cold outreach prospects in ${city}. Browse by category segment below, or scan the full export-ready table.`;
+  return `${count.toLocaleString()} businesses without a website near you in ${place} — a B2B lead list for web design outreach in ${city}. Browse restaurants, salons, and other categories below, or scan the full export-ready table.`;
 }
 
 export function cityHubCategoryH2(city: string): string {
@@ -334,13 +485,19 @@ export function cityHubAboutCopy(place: string): CityHubAboutCopy {
   };
 }
 
-export function categoryAboutPlaceLabel(categoryLabel: string): string {
-  const plural = pluralCategoryForTitle(categoryLabel).toLowerCase();
+export function categoryAboutPlaceLabel(
+  categoryLabel: string,
+  categorySlug?: string,
+): string {
+  const plural = categorySeoPlural(categoryLabel, categorySlug).toLowerCase();
   return `nationwide ${plural} without websites`;
 }
 
-export function categoryHubAboutCopy(categoryLabel: string): CityHubAboutCopy {
-  const place = categoryAboutPlaceLabel(categoryLabel);
+export function categoryHubAboutCopy(
+  categoryLabel: string,
+  categorySlug?: string,
+): CityHubAboutCopy {
+  const place = categoryAboutPlaceLabel(categoryLabel, categorySlug);
   return {
     sectionHeading: "About this prospecting data",
     blocks: [
@@ -350,7 +507,7 @@ export function categoryHubAboutCopy(categoryLabel: string): CityHubAboutCopy {
       },
       {
         heading: "What each record includes",
-        body: "Each row is a verified Google Maps business with no standalone website — sorted by review volume as a proxy for commercial activity. Fields support outreach workflow: business name, category, city, rating and review count, verification date, and demo preview links. Phone numbers and street addresses are reveal-gated because they are prospecting assets, not consumer service information.",
+        body: "Each row is a verified Google Maps business with no standalone website — sorted by review volume as a proxy for commercial activity. Fields support outreach workflow: business name, category, city, rating and review count, and verification date. Phone numbers and street addresses are reveal-gated because they are prospecting assets, not consumer service information.",
       },
       {
         heading: "What this page is not",

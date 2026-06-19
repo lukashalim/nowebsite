@@ -23,7 +23,7 @@ export function DirectoryBusinessList({
 }: DirectoryBusinessListProps) {
   const publicRows = stripContactFieldsList(businesses);
   const isCategory = variant === "category";
-  const minWidth = isCategory ? "960px" : "800px";
+  const minWidth = isCategory ? "880px" : "800px";
 
   return (
     <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
@@ -38,7 +38,6 @@ export function DirectoryBusinessList({
             <th className="px-4 py-3">Location</th>
             <th className="px-4 py-3">Rating</th>
             <th className="px-4 py-3">Reviews</th>
-            {isCategory ? <th className="px-4 py-3">Demo</th> : null}
             <th className="px-4 py-3">Phone</th>
             <th className="px-4 py-3">Address</th>
             <th className="px-4 py-3">Checked</th>

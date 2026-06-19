@@ -1,59 +1,72 @@
-import type { DirectoryBusiness } from "@/lib/directory/types";
-import { absoluteUrl } from "@/lib/site-url";
+import { siteOrganizationId, SITE_AUDIENCE_TYPE } from "@/lib/site-jsonld";
+import { absoluteUrl, getSiteOrigin } from "@/lib/site-url";
+
+export interface ProspectingDatasetJsonLdInput {
+  name: string;
+  description: string;
+  path: string;
+  recordCount: number;
+  keywords?: string[];
+  spatialCoverage?: string;
+}
 
 /**
- * ItemList JSON-LD with per-row LocalBusiness items — used on state and category hubs.
+ * Dataset JSON-LD for B2B prospecting hub pages.
  *
- * Do not add to city hub pages: LocalBusiness + telephone/openingHours signals
- * consumer lookup intent. If city pages need structured data later, use Dataset
- * with audience.audienceType (e.g. "Web design agencies") and omit per-business
- * LocalBusiness list items.
+ * Omits per-row LocalBusiness items — those signal consumer lookup intent.
+ * References the site Organization by @id (defined in root layout).
  */
-export function buildDirectoryListJsonLd(
-  businesses: DirectoryBusiness[],
-  path: string,
-  listName: string,
+export function buildProspectingDatasetJsonLd(
+  input: ProspectingDatasetJsonLdInput,
 ): Record<string, unknown> {
-  const pageUrl = absoluteUrl(path);
-  const items = businesses.map((b, index) => {
-    const name = b.name?.trim() || "Local business";
-    const item: Record<string, unknown> = {
-      "@type": "LocalBusiness",
-      name,
-      position: index + 1,
-    };
-    if (b.rating != null && b.reviews != null && b.reviews > 0) {
-      item.aggregateRating = {
-        "@type": "AggregateRating",
-        ratingValue: b.rating,
-        reviewCount: b.reviews,
-        bestRating: 5,
-        worstRating: 1,
-      };
-    }
-    const city = b.city?.trim();
-    const region = b.state?.trim();
-    if (city || region) {
-      item.address = {
-        "@type": "PostalAddress",
-        ...(city ? { addressLocality: city } : {}),
-        ...(region ? { addressRegion: region } : {}),
-        addressCountry: b.country ?? "US",
-      };
-    }
-    return item;
-  });
+  const pageUrl = absoluteUrl(input.path);
+  const origin = getSiteOrigin();
+  const keywords = [
+    "businesses without website",
+    "businesses without a website",
+    "businesses without website near me",
+    "B2B lead list",
+    "no-website businesses",
+    "agency prospecting",
+    "web design leads",
+    ...(input.keywords ?? []),
+  ];
 
-  return {
+  const dataset: Record<string, unknown> = {
     "@context": "https://schema.org",
-    "@type": "ItemList",
-    name: listName,
+    "@type": "Dataset",
+    "@id": `${pageUrl}#dataset`,
+    name: input.name,
+    description: input.description,
     url: pageUrl,
-    numberOfItems: items.length,
-    itemListElement: items.map((item, index) => ({
-      "@type": "ListItem",
-      position: index + 1,
-      item,
-    })),
+    creator: { "@id": siteOrganizationId(origin) },
+    publisher: { "@id": siteOrganizationId(origin) },
+    audience: {
+      "@type": "Audience",
+      audienceType: SITE_AUDIENCE_TYPE,
+    },
+    keywords: keywords.join(", "),
+    variableMeasured: [
+      {
+        "@type": "PropertyValue",
+        name: "recordCount",
+        value: input.recordCount,
+      },
+    ],
+    distribution: {
+      "@type": "DataDownload",
+      encodingFormat: "text/csv",
+      contentUrl: absoluteUrl("/sign-in"),
+      description: "Export-ready CSV for agency outreach (sign-in required)",
+    },
   };
+
+  if (input.spatialCoverage) {
+    dataset.spatialCoverage = {
+      "@type": "Place",
+      name: input.spatialCoverage,
+    };
+  }
+
+  return dataset;
 }

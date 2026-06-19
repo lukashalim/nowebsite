@@ -4,7 +4,7 @@ import { absoluteUrl } from "@/lib/site-url";
 export const metadata: Metadata = {
   title: "About | No Website Business Leads",
   description:
-    "A free directory of local businesses without websites, built for web designers and agencies looking for warm leads.",
+    "B2B prospecting platform and export-ready lead lists for web designers and agencies targeting local businesses without standalone websites.",
   alternates: { canonical: absoluteUrl("/about") },
 };
 

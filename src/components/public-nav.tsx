@@ -21,7 +21,7 @@ export function PublicNav() {
             United Kingdom
           </Link>
           <Link href="/facebook" className={navLinkClass}>
-            Facebook Listings
+            Facebook-as-Website Leads
           </Link>
           <Link href="/how-it-works" className={navLinkClass}>
             How It Works

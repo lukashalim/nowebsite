@@ -28,8 +28,8 @@ export async function generateMetadata(): Promise<Metadata> {
   }
   const updated = lastUpdatedLabel ? ` Updated ${lastUpdatedLabel}.` : "";
   return {
-    title: { absolute: "All categories | Businesses without a website" },
-    description: `Browse nationwide directories of local businesses without their own website — by trade and service category.${updated}`,
+    title: { absolute: "Businesses Without a Website by Category | Web Designer Leads" },
+    description: `Browse restaurants without a website, salons without a website, and other category lead lists — B2B prospecting data for web design agencies.${updated}`,
     alternates: { canonical: absoluteUrl("/categories") },
   };
 }

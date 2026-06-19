@@ -9,10 +9,12 @@ import type { CategoryContent } from "@/lib/directory/category-content";
 import {
   categoryAboutPlaceLabel,
   categoryHubAboutCopy,
+  categorySeoPlural,
+  categoryWithoutWebsiteTitle,
   nationwideCategoryPageTitle,
   pluralCategoryForTitle,
 } from "@/lib/directory/labels";
-import { buildDirectoryListJsonLd } from "@/lib/directory/jsonld";
+import { buildProspectingDatasetJsonLd } from "@/lib/directory/jsonld";
 import { DirectoryListingFilters } from "@/components/directory-listing-filters";
 import {
   hasActiveDirectoryListingFilters,
@@ -72,13 +74,23 @@ export function DirectoryCategoryPage({
   exportAccess,
   isPro = false,
 }: DirectoryCategoryPageProps) {
-  const title = nationwideCategoryPageTitle(categoryLabel);
+  const title = nationwideCategoryPageTitle(categoryLabel, categorySlug);
   const path = `/${categorySlug}`;
-  const jsonLd = buildDirectoryListJsonLd(businesses, path, title);
-  const pluralLower = pluralCategoryForTitle(categoryLabel).toLowerCase();
-  const aboutPlace = categoryAboutPlaceLabel(categoryLabel);
-  const aboutCopy = categoryHubAboutCopy(categoryLabel);
+  const pluralLower = categorySeoPlural(categoryLabel, categorySlug).toLowerCase();
+  const keywordPhrase = categoryWithoutWebsiteTitle(categoryLabel, categorySlug).toLowerCase();
+  const aboutPlace = categoryAboutPlaceLabel(categoryLabel, categorySlug);
+  const aboutCopy = categoryHubAboutCopy(categoryLabel, categorySlug);
   const paginated = totalPages > 1;
+  const headerDescription = paginated
+    ? `Prospecting data for agencies: page ${page.toLocaleString()} of ${totalPages.toLocaleString()} (${totalCount.toLocaleString()} ${pluralLower} across ${cityCount.toLocaleString()} US cities). Export-ready B2B lead list sorted by review volume with outreach signals and reveal-gated contact fields.`
+    : `Prospecting data for agencies: ${totalCount.toLocaleString()} ${pluralLower} across ${cityCount.toLocaleString()} US cities with no standalone website. Export-ready list with review counts and reveal-gated contact fields for outreach.`;
+  const jsonLd = buildProspectingDatasetJsonLd({
+    name: title,
+    description: headerDescription,
+    path,
+    recordCount: totalCount,
+    keywords: [keywordPhrase, pluralLower, "businesses without website"],
+  });
   const range = directoryPageRange(page, pageSize, totalCount);
   const hrefForPage = (p: number) =>
     categoryPathWithPage(categorySlug, p, filters);
@@ -130,14 +142,14 @@ export function DirectoryCategoryPage({
                 {totalPages.toLocaleString()} ({totalCount.toLocaleString()}{" "}
                 {pluralLower} across {cityCount.toLocaleString()} US cities).
                 Export-ready B2B lead list sorted by review volume with outreach
-                signals and demo preview links.
+                signals and reveal-gated contact fields.
               </>
             ) : (
               <>
                 Prospecting data for agencies: {totalCount.toLocaleString()}{" "}
                 {pluralLower} across {cityCount.toLocaleString()} US cities with
-                no standalone website. Export-ready list with review counts,
-                demo previews, and reveal-gated contact fields for outreach.
+                no standalone website. Export-ready list with review counts and
+                reveal-gated contact fields for outreach.
               </>
             )}
           </p>

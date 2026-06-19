@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { headers } from "next/headers";
 import { CrispChat } from "@/components/crisp-chat";
 import { LegalFooter } from "@/components/legal-footer";
+import { SiteJsonLdScript } from "@/components/site-jsonld-script";
 import { getSiteOrigin } from "@/lib/site-url";
 import "./globals.css";
 
@@ -19,11 +20,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteOrigin()),
   title: {
-    default: "No Website Business Leads | Directory for Web Designers",
+    default: "Businesses Without a Website | Lead Lists for Web Designers",
     template: "%s | No Website Business Leads",
   },
   description:
-    "Public directory of local businesses without websites, plus a Pro CRM for web designers and agencies.",
+    "Find businesses without a website — including restaurants without a website and salons without a website. B2B lead lists for web designers and agencies.",
 };
 
 export default async function RootLayout({
@@ -40,6 +41,7 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
+        {!isRingReady ? <SiteJsonLdScript /> : null}
         {isRingReady ? (
           <meta name="robots" content="noindex, nofollow" />
         ) : null}

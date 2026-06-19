@@ -4,8 +4,9 @@ import { DirectoryGroupedByCity } from "@/components/directory-grouped-by-city";
 import { DirectoryBusinessList } from "@/components/directory-business-list";
 import { DirectoryPagination } from "@/components/directory-pagination";
 import { DownloadCsvButton } from "@/components/download-csv-button";
-import { stateHubTitle, ukRegionHubTitle } from "@/lib/directory/labels";
-import { buildDirectoryListJsonLd } from "@/lib/directory/jsonld";
+import { DirectoryProspectingAboutData } from "@/components/directory-city-page-copy";
+import { stateHubTitle, stateHubHeaderSubcopy, stateHubAboutCopy, ukRegionHubTitle, ukRegionHubAboutCopy } from "@/lib/directory/labels";
+import { buildProspectingDatasetJsonLd } from "@/lib/directory/jsonld";
 import { DirectoryListingFilters } from "@/components/directory-listing-filters";
 import {
   hasActiveDirectoryListingFilters,
@@ -77,12 +78,27 @@ export function DirectoryStatePage({
   const path = pathPrefix
     ? `${pathPrefix}/${stateSlug}`
     : `/${stateSlug}`;
-  const jsonLd = buildDirectoryListJsonLd(businesses, path, title);
   const displayState = isUkRegion
     ? state
     : stateAbbrToDisplayName(stateToAbbr(state) ?? state);
   const totalCount = totalCountProp ?? businesses.length;
   const paginated = totalPages > 1;
+  const aboutCopy = isUkRegion
+    ? ukRegionHubAboutCopy(displayState)
+    : stateHubAboutCopy(displayState);
+  const jsonLd = buildProspectingDatasetJsonLd({
+    name: title,
+    description: stateHubHeaderSubcopy(displayState, totalCount, cityCount, {
+      isUkRegion,
+      paginated: paginated ? { page, totalPages } : undefined,
+    }),
+    path,
+    recordCount: totalCount,
+    spatialCoverage: displayState,
+    keywords: isUkRegion
+      ? ["UK businesses without website", "businesses without website near me"]
+      : ["businesses without website", "businesses without website near me"],
+  });
   const range = directoryPageRange(page, pageSize, totalCount);
   const hrefForPage = (p: number) =>
     isUkRegion ? statePathWithPage(stateSlug, p) : statePathWithPage(stateSlug, p, filters);
@@ -120,23 +136,10 @@ export function DirectoryStatePage({
           ) : null}
         </h1>
         <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
-          {paginated ? (
-            <>
-              Browse page {page.toLocaleString()} of {totalPages.toLocaleString()}{" "}
-              ({totalCount.toLocaleString()} businesses across{" "}
-              {cityCount.toLocaleString()} {isUkRegion ? "UK " : ""}cities in{" "}
-              {displayState}). Listings are sorted by Google review count. Each row
-              includes ratings, phone numbers, and Maps links for outreach.
-            </>
-          ) : (
-            <>
-              Browse {totalCount.toLocaleString()} businesses across{" "}
-              {cityCount.toLocaleString()} {isUkRegion ? "UK " : ""}cities in{" "}
-              {displayState} that do not have their own website. Each listing
-              includes ratings, review counts, phone numbers, and Google Maps links
-              for outreach.
-            </>
-          )}
+          {stateHubHeaderSubcopy(displayState, totalCount, cityCount, {
+            isUkRegion,
+            paginated: paginated ? { page, totalPages } : undefined,
+          })}
         </p>
       </header>
 
@@ -214,6 +217,8 @@ export function DirectoryStatePage({
           isPro={isPro}
         />
       ) : null}
+
+      <DirectoryProspectingAboutData place={displayState} copy={aboutCopy} />
     </div>
   );
 }

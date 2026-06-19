@@ -47,6 +47,7 @@ import {
   statePathWithPage,
 } from "@/lib/directory/pagination";
 import { categoryContentMetaDescription } from "@/lib/directory/category-content";
+import { buildProspectingDatasetJsonLd } from "@/lib/directory/jsonld";
 import { absoluteUrl } from "@/lib/site-url";
 import { getAuthenticatedUserProfile, isPro } from "@/lib/subscription";
 import { createDirectoryContactAccess } from "@/lib/directory/contact-access";
@@ -88,9 +89,11 @@ export async function generateMetadata({
 
   if (resolved.kind === "category") {
     const { data } = resolved;
+    const slugLower = slug.trim().toLowerCase();
     const title = nationwideCategoryMetaTitle(
       data.categoryLabel,
       data.page > 1 ? data.page : undefined,
+      slugLower,
     );
     const description =
       data.page === 1 && data.content?.pitch?.trim()
@@ -103,8 +106,8 @@ export async function generateMetadata({
             data.totalPages > 1
               ? { current: data.page, totalPages: data.totalPages }
               : undefined,
+            slugLower,
           );
-    const slugLower = slug.trim().toLowerCase();
     const canonicalPath = hasActiveDirectoryListingFilters(filters)
       ? categoryPathWithPage(slugLower, 1)
       : categoryPathWithPage(slugLower, data.page, data.filters);
@@ -316,8 +319,28 @@ export default async function SlugDirectoryPage({
       );
     };
 
+    const cityJsonLd = buildProspectingDatasetJsonLd({
+      name: h1,
+      description: cityHubMetaDescription(
+        hub.city,
+        hub.state,
+        cityData.unfilteredCount,
+        hub.lastUpdatedLabel,
+        hub.country,
+      ),
+      path: `/${lower}`,
+      recordCount: cityData.unfilteredCount,
+      spatialCoverage: place,
+      keywords: ["businesses without website near me", "businesses without website"],
+    });
+
     return (
       <div className="space-y-8">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(cityJsonLd) }}
+        />
+
         <header className="space-y-3">
           <p className="text-sm text-zinc-500">
             <Link href="/" className={directoryBreadcrumbLinkClass}>

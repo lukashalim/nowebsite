@@ -6,11 +6,21 @@ import { DirectoryLastUpdated } from "@/components/directory-last-updated";
 import { DirectoryListingFilters } from "@/components/directory-listing-filters";
 import { DirectoryPagination } from "@/components/directory-pagination";
 import { DownloadCsvButton } from "@/components/download-csv-button";
+import { DirectoryProspectingAboutData } from "@/components/directory-city-page-copy";
 import {
   fetchAllDirectoryCities,
   fetchFacebookDirectoryPageData,
 } from "@/lib/directory/data";
-import { buildDirectoryListJsonLd } from "@/lib/directory/jsonld";
+import { buildProspectingDatasetJsonLd } from "@/lib/directory/jsonld";
+import {
+  FACEBOOK_HUB_PATH,
+  facebookAboutPlaceLabel,
+  facebookHubAboutCopy,
+  facebookHubHeaderSubcopy,
+  facebookHubMetaDescription,
+  facebookHubMetaTitle,
+  facebookHubTitle,
+} from "@/lib/directory/labels";
 import {
   hasActiveDirectoryListingFilters,
   parseDirectoryListingFilters,
@@ -27,9 +37,6 @@ import { createDirectoryContactAccess } from "@/lib/directory/contact-access";
 import { listingScopeForFacebook } from "@/lib/directory/listing-scope";
 
 export const revalidate = 3600;
-
-const PAGE_PATH = "/facebook";
-const PAGE_TITLE = "Businesses Using Facebook as Their Google Website";
 
 interface PageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -52,19 +59,19 @@ export async function generateMetadata({
   } catch {
     // omit freshness from meta when directory data is unavailable
   }
-  const updated = lastUpdatedLabel ? ` Updated ${lastUpdatedLabel}.` : "";
-  const pageNote =
-    totalPages > 1
-      ? ` Page ${page.toLocaleString()} of ${totalPages.toLocaleString()} (${totalCount.toLocaleString()} businesses).`
-      : "";
-  const title =
-    page > 1 ? `${PAGE_TITLE} — Page ${page.toLocaleString()}` : PAGE_TITLE;
   const canonicalPath = hasActiveDirectoryListingFilters(filters)
     ? facebookPathWithPage(1)
     : facebookPathWithPage(page, filters);
   return {
-    title: { absolute: title },
-    description: `Local businesses whose Google Business Profile uses Facebook in the Website field — a guideline violation that can hurt local rankings and visibility.${pageNote}${updated}`,
+    title: {
+      absolute: facebookHubMetaTitle(page > 1 ? page : undefined),
+    },
+    description: facebookHubMetaDescription(
+      lastUpdatedLabel,
+      totalPages > 1
+        ? { current: page, totalPages, totalCount }
+        : undefined,
+    ),
     alternates: { canonical: absoluteUrl(canonicalPath) },
   };
 }
@@ -96,11 +103,13 @@ export default async function FacebookDirectoryPage({
   }
 
   const paginated = Boolean(data && data.totalPages > 1);
-  const filtersActive = data ? hasActiveDirectoryListingFilters(data.filters) : false;
   const range = data
     ? directoryPageRange(data.page, data.pageSize, data.totalCount)
     : null;
   const hrefForPage = (p: number) => facebookPathWithPage(p, data?.filters);
+  const pageTitle = facebookHubTitle();
+  const aboutPlace = facebookAboutPlaceLabel();
+  const aboutCopy = facebookHubAboutCopy();
 
   const contactAccess = data
     ? createDirectoryContactAccess(
@@ -120,7 +129,17 @@ export default async function FacebookDirectoryPage({
   const userIsPro = isPro(auth?.profile);
 
   const jsonLd = data
-    ? buildDirectoryListJsonLd(data.businesses, PAGE_PATH, PAGE_TITLE)
+    ? buildProspectingDatasetJsonLd({
+        name: pageTitle,
+        description: facebookHubHeaderSubcopy(
+          data.totalCount,
+          data.cityCount,
+          paginated ? { page: data.page, totalPages: data.totalPages } : undefined,
+        ),
+        path: FACEBOOK_HUB_PATH,
+        recordCount: data.totalCount,
+        keywords: ["Facebook-as-website leads", "Google Business Profile"],
+      })
     : null;
 
   return (
@@ -140,14 +159,14 @@ export default async function FacebookDirectoryPage({
           {paginated ? (
             <>
               <span aria-hidden> / </span>
-              <Link href={PAGE_PATH} className="hover:underline">
-                Facebook listings
+              <Link href={FACEBOOK_HUB_PATH} className="hover:underline">
+                Facebook-as-website leads
               </Link>
             </>
           ) : null}
         </p>
         <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          {PAGE_TITLE}
+          {pageTitle}
           {paginated && data ? (
             <span className="text-xl font-normal text-zinc-500">
               {" "}
@@ -156,22 +175,16 @@ export default async function FacebookDirectoryPage({
           ) : null}
         </h1>
         <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
-          These businesses appear on Google Maps without a standalone website. Many
-          use a Facebook URL in the Website field on their Google Business Profile —
-          or have a Facebook link from Maps enrichment. That is not the same as having
-          no online presence at all.
+          B2B outreach list for web designers and agencies: these businesses appear
+          on Google Maps without a standalone website. Many use a Facebook URL in
+          the Website field on their Google Business Profile — a guideline violation
+          that can hurt local rankings and visibility.
         </p>
         <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
           Google&apos;s Business Profile guidelines require the Website field to point
-          to a site the business controls, not a social profile. Using Facebook (or
-          other social URLs) as the website is non-compliant and is treated as a
-          quality issue that can reduce how prominently you appear in local search and
-          Maps rankings.
-        </p>
-        <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
-          For web designers and agencies, this is a high-intent outreach list:
-          prospects who already show up on Google but are likely hurting their own
-          visibility by substituting Facebook for a real site.
+          to a site the business controls, not a social profile. Prospects who
+          substitute Facebook for a real site are high-intent targets for web design
+          outreach.
         </p>
       </header>
 
@@ -198,7 +211,7 @@ export default async function FacebookDirectoryPage({
           <DirectoryLastUpdated label={data.lastUpdatedLabel} />
 
           <DirectoryListingFilters
-            action={PAGE_PATH}
+            action={FACEBOOK_HUB_PATH}
             mode="full"
             filters={data.filters}
             filterOptions={data.filterOptions}
@@ -207,20 +220,10 @@ export default async function FacebookDirectoryPage({
           />
 
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {paginated ? (
-              <>
-                Browse page {data.page.toLocaleString()} of{" "}
-                {data.totalPages.toLocaleString()} ({data.totalCount.toLocaleString()}{" "}
-                businesses across {data.cityCount.toLocaleString()} cities). Listings
-                are sorted by Google review count. Each row includes ratings, phone
-                numbers, and Maps links for outreach.
-              </>
-            ) : (
-              <>
-                {data.totalCount.toLocaleString()} businesses across{" "}
-                {data.cityGroups.length.toLocaleString()} cities — grouped below with
-                ratings, phones, and Google Maps links.
-              </>
+            {facebookHubHeaderSubcopy(
+              data.totalCount,
+              data.cityCount,
+              paginated ? { page: data.page, totalPages: data.totalPages } : undefined,
             )}
           </p>
 
@@ -240,7 +243,7 @@ export default async function FacebookDirectoryPage({
             {paginated ? (
               <>
                 <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-                  Listings
+                  Prospect list
                 </h2>
                 {data.businesses.length > 0 ? (
                   <DirectoryBusinessList
@@ -282,13 +285,15 @@ export default async function FacebookDirectoryPage({
           {data && data.totalCount > 0 && exportAccess ? (
             <DownloadCsvButton
               exportAccess={exportAccess}
-              pagePath={PAGE_PATH}
+              pagePath={FACEBOOK_HUB_PATH}
               pageSize={data.pageSize}
               totalPages={data.totalPages}
               isPro={userIsPro}
               className="inline-flex items-center justify-center gap-2 rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
             />
           ) : null}
+
+          <DirectoryProspectingAboutData place={aboutPlace} copy={aboutCopy} />
         </>
       ) : null}
     </div>

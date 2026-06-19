@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { ExternalLink, MapPin, Phone, Star } from "lucide-react";
 import { useState } from "react";
 import type { DirectoryBusinessPublic } from "@/lib/directory/contact-fields";
@@ -54,7 +53,6 @@ export function DirectoryBusinessListRow({
   const location = locationLabelForRow(b, showCityState);
   const checkedLabel = formatListingCheckedAt(b.checkedAt);
   const checkedTitle = formatListingCheckedAtTitle(b.checkedAt);
-  const demoSlug = b.demo_slug?.trim();
 
   async function handleReveal() {
     if (contact || loading) return;
@@ -113,20 +111,6 @@ export function DirectoryBusinessListRow({
       <td className="px-4 py-3 tabular-nums text-zinc-800 dark:text-zinc-200">
         {b.reviews ?? "—"}
       </td>
-      {isCategory ? (
-        <td className="px-4 py-3">
-          {demoSlug ? (
-            <Link
-              href={`/demo/${encodeURIComponent(demoSlug)}`}
-              className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
-            >
-              View demo
-            </Link>
-          ) : (
-            "—"
-          )}
-        </td>
-      ) : null}
       <td className="px-4 py-3">
         {phone ? (
           <a

@@ -21,8 +21,8 @@ export async function generateMetadata(): Promise<Metadata> {
   }
   const updated = lastUpdatedLabel ? ` Updated ${lastUpdatedLabel}.` : "";
   return {
-    title: { absolute: "All states | Businesses without a website" },
-    description: `Browse every state directory of local businesses without their own website — grouped by city with ratings, phones, and Maps links.${updated}`,
+    title: { absolute: "Businesses Without a Website by State | Web Designer Leads" },
+    description: `Browse state-level lists of businesses without a website — grouped by city for web design agency prospecting.${updated}`,
     alternates: { canonical: absoluteUrl("/states") },
   };
 }

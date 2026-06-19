@@ -74,9 +74,9 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: {
       absolute:
-        "Local Businesses Without a Website | Free Directory for Web Designers",
+        "Businesses Without a Website | Restaurants, Salons & More — Web Designer Leads",
     },
-    description: `Browse our free list of local businesses without websites — restaurants, plumbers, painters and more across the US.${updated} Free for web designers and agencies.`,
+    description: `Find businesses without a website — including restaurants without a website and salons without a website. Browse by city for businesses without a website near you. B2B lead lists for web designers and agencies.${updated}`,
     alternates: { canonical: absoluteUrl("/") },
   };
 }
@@ -131,8 +131,8 @@ export default async function HomePage() {
         </h1>
         <p className="max-w-2xl text-[17px] leading-relaxed text-[#4A4A4A] dark:text-zinc-300">
           {listingCount !== null
-            ? `Access ${listingCount.toLocaleString()} verified local leads lacking a website. Instantly sort by intent, track your outreach, and close clients faster.`
-            : "Access verified local leads lacking a website. Instantly sort by intent, track your outreach, and close clients faster."}
+            ? `Access ${listingCount.toLocaleString()} verified businesses without a website — restaurants, salons, contractors, and more. Sort by city for businesses without a website near you, track outreach, and close clients faster.`
+            : "Access verified businesses without a website — restaurants, salons, contractors, and more. Sort by city, track outreach, and close clients faster."}
         </p>
         <Link
           href={SIGN_IN_PATH}
@@ -378,7 +378,7 @@ export default async function HomePage() {
               aria-label="Directory coverage"
             >
               <p className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-4xl">
-                {summary.totalListings.toLocaleString()} businesses listed
+                {summary.totalListings.toLocaleString()} prospect records
               </p>
               <p className="mt-2 text-base text-zinc-600 dark:text-zinc-400">
                 across {summary.cityHubCount.toLocaleString()} cities,{" "}
@@ -387,12 +387,12 @@ export default async function HomePage() {
                 ready for outreach
               </p>
               <p className="mt-4 text-base text-zinc-600 dark:text-zinc-400">
-                Looking for local businesses without websites near you? Browse by city
-                or state below.
+                Browse businesses without a website near you by city or state —
+                including restaurants without a website and salons without a website.
               </p>
               {summary.lastUpdatedLabel ? (
                 <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
-                  Directory last updated: {summary.lastUpdatedLabel}
+                  Prospect data last updated: {summary.lastUpdatedLabel}
                 </p>
               ) : null}
             </section>

@@ -1,13 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { DirectoryLastUpdated } from "@/components/directory-last-updated";
+import { DirectoryProspectingAboutData } from "@/components/directory-city-page-copy";
 import {
   fetchGbCountryLanding,
   gbCityHref,
   gbRegionHref,
 } from "@/lib/directory/gb-data";
+import { buildProspectingDatasetJsonLd } from "@/lib/directory/jsonld";
 import {
   formatLocationLabel,
+  gbCountryHubAboutCopy,
+  gbCountryHubHeaderSubcopy,
   gbCountryHubMetaDescription,
   gbCountryHubMetaTitle,
   gbCountryHubTitle,
@@ -50,6 +54,28 @@ export default async function UnitedKingdomDirectoryPage() {
 
   return (
     <div className="space-y-8">
+      {landing && landing.listingCount > 0 ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(
+              buildProspectingDatasetJsonLd({
+                name: gbCountryHubTitle(),
+                description: gbCountryHubMetaDescription(
+                  landing.listingCount,
+                  landing.cities.length,
+                  landing.lastUpdatedLabel,
+                ),
+                path: gbCountryPath(),
+                recordCount: landing.listingCount,
+                spatialCoverage: "United Kingdom",
+                keywords: ["UK B2B lead list"],
+              }),
+            ),
+          }}
+        />
+      ) : null}
+
       <header className="space-y-3">
         <p className="text-sm text-zinc-500">
           <Link href="/" className="hover:underline">
@@ -60,12 +86,12 @@ export default async function UnitedKingdomDirectoryPage() {
           {gbCountryHubTitle()}
         </h1>
         <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
-          Local businesses in the United Kingdom whose Google Maps listing has no
-          standalone website. Browse by region and city; each listing includes
-          ratings, phone numbers, and Maps links.
           {landing && landing.listingCount > 0
-            ? ` ${landing.listingCount.toLocaleString()} UK listings in the database.`
-            : null}
+            ? gbCountryHubHeaderSubcopy(
+                landing.listingCount,
+                landing.cities.length,
+              )
+            : "B2B prospecting data for web designers and agencies — verified UK businesses without standalone websites, grouped by region and city."}
         </p>
       </header>
 
@@ -136,6 +162,13 @@ export default async function UnitedKingdomDirectoryPage() {
             </section>
           ))}
         </>
+      ) : null}
+
+      {landing ? (
+        <DirectoryProspectingAboutData
+          place="the United Kingdom"
+          copy={gbCountryHubAboutCopy()}
+        />
       ) : null}
     </div>
   );
