@@ -6,17 +6,22 @@ import {
 } from "@/lib/extract-local-runner";
 import { isLocalAdminEnabled } from "@/lib/local-admin";
 
-function notFound() {
-  return new NextResponse(null, { status: 404 });
+export const runtime = "nodejs";
+
+function disabledResponse() {
+  return NextResponse.json(
+    { error: "Local admin is not enabled on this host." },
+    { status: 404 },
+  );
 }
 
 export async function GET(request: Request) {
-  if (!isLocalAdminEnabled(request.headers.get("host"))) return notFound();
+  if (!isLocalAdminEnabled(request.headers.get("host"))) return disabledResponse();
   return NextResponse.json(getExtractRunnerSnapshot());
 }
 
 export async function POST(request: Request) {
-  if (!isLocalAdminEnabled(request.headers.get("host"))) return notFound();
+  if (!isLocalAdminEnabled(request.headers.get("host"))) return disabledResponse();
 
   let body: Record<string, unknown> = {};
   try {

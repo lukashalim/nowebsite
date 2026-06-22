@@ -4,6 +4,16 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { ExtractRunnerSnapshot } from "@/lib/extract-local-runner-types";
 
+const EXTRACT_LOCAL_API = "/api/extract-local";
+
+async function readJsonResponse<T>(res: Response): Promise<T | null> {
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    return null;
+  }
+  return (await res.json()) as T;
+}
+
 export function ExtractAdminPanel() {
   const [businessType, setBusinessType] = useState("");
   const [country, setCountry] = useState<"" | "US" | "GB" | "AU">("");
@@ -18,14 +28,17 @@ export function ExtractAdminPanel() {
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/extract-local");
+      const res = await fetch(EXTRACT_LOCAL_API);
       if (res.status === 404) {
         return;
       }
       if (!res.ok) {
         return;
       }
-      setStatus((await res.json()) as ExtractRunnerSnapshot);
+      const data = await readJsonResponse<ExtractRunnerSnapshot>(res);
+      if (data) {
+        setStatus(data);
+      }
     } catch {
       // ignore transient poll errors
     }
@@ -48,7 +61,7 @@ export function ExtractAdminPanel() {
     setStarting(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/extract-local", {
+      const res = await fetch(EXTRACT_LOCAL_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -61,8 +74,12 @@ export function ExtractAdminPanel() {
           maxFiles: maxFiles.trim() ? Number.parseInt(maxFiles, 10) : undefined,
         }),
       });
-      const data = (await res.json()) as { ok?: boolean; error?: string };
-      if (!res.ok) {
+      const data = await readJsonResponse<{ ok?: boolean; error?: string }>(res);
+      if (!data) {
+        setError(
+          `Server returned ${res.status} without JSON. Try restarting the dev server.`,
+        );
+      } else if (!res.ok) {
         setError(data.error ?? `Start failed (${res.status})`);
       } else {
         setStatus(data as ExtractRunnerSnapshot);

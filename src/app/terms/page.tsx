@@ -38,7 +38,7 @@ export default function TermsPage() {
     <LegalPageShell title="Terms of Service">
       <LegalSection title="Agreement to Terms">
         <p>
-          This agreement governs the services provided by Saavy Data Science
+          This agreement governs the services provided by {LEGAL_COMPANY_NAME}{" "}
           (the operator of ringreadysite.com).
         </p>
         <p>
@@ -104,14 +104,38 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="SMS and Messaging Compliance">
+      <LegalSection title="SMS Messaging">
         <p>
-          If you use SMS or messaging features, you agree to comply with all
-          applicable carrier and regulatory requirements, including registering
-          campaigns where required, honoring opt-out requests (including STOP
-          replies), and including required disclosures in your messages. We may
-          suspend messaging features if we reasonably believe your use violates
-          law or carrier policies.
+          {LEGAL_COMPANY_NAME}, a business entity operating within the United
+          States, may send you project-related SMS updates when you opt in on{" "}
+          <a
+            href="https://ringreadysite.com"
+            className="font-medium text-blue-600 hover:underline dark:text-blue-400"
+          >
+            https://ringreadysite.com
+          </a>
+          . SMS opt-in collection is conducted exclusively for users located in
+          the United States. Message frequency varies. Message and data rates
+          may apply.
+        </p>
+        <p>
+          To opt in, you must manually check a mandatory checkbox agreeing to
+          these Terms of Service and our SMS Disclosure before submitting your
+          mobile number. The checkbox is unchecked by default.
+        </p>
+        <p>
+          Reply HELP for help or STOP to opt out of SMS messages from{" "}
+          {LEGAL_COMPANY_NAME}. After you send STOP, we will send a
+          confirmation and no further marketing or project-update texts unless
+          you opt in again.
+        </p>
+        <p>
+          If you use SMS or messaging features in our platform, you agree to
+          comply with all applicable carrier and regulatory requirements,
+          including registering campaigns where required, honoring opt-out
+          requests (including STOP replies), and including required disclosures
+          in your messages. We may suspend messaging features if we reasonably
+          believe your use violates law or carrier policies.
         </p>
       </LegalSection>
 
@@ -127,6 +151,26 @@ export default function TermsPage() {
           Demo sites and preview pages are provided for sales and marketing
           purposes. They may display publicly available business information and
           are not affiliated with the businesses shown unless explicitly stated.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="Directory and Lead Data" id="directory-data">
+        <p>
+          Directory listings, lead lists, and related export data are compiled
+          by {LEGAL_COMPANY_NAME} from publicly available sources. You may
+          browse directory pages on the site for prospecting research. Bulk
+          export (including CSV downloads) requires an account and, where
+          applicable, an active subscription.
+        </p>
+        <p>
+          Directory and lead data is provided &quot;as is&quot; without warranty
+          of completeness or accuracy. You may not scrape, resell, or
+          redistribute the dataset or substantial portions of it without our
+          prior written permission.
+        </p>
+        <p>
+          No open-data license (such as Creative Commons) applies to this
+          content. Use of directory and lead data is governed by these Terms.
         </p>
       </LegalSection>
 

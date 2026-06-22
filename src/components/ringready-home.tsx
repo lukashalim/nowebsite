@@ -18,6 +18,9 @@ export function RingReadyHome({ searchParams }: RingReadyHomeProps) {
           Demo websites for cold outreach — show local businesses what their
           site could look like.
         </p>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          RingReadySite is a service of Suite300.
+        </p>
       </div>
 
       <RingReadySmsOptInSection

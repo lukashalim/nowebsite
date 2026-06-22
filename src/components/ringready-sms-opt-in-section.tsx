@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { submitRingReadySmsOptIn } from "@/lib/actions/ringready-sms-opt-in";
-import { RING_READY_SMS_OPT_IN_DISCLOSURE } from "@/lib/legal-placeholders";
+import {
+  COMPLIANCE_US_ONLY_NOTICE,
+  RING_READY_SMS_OPT_IN_DISCLOSURE,
+} from "@/lib/legal-placeholders";
 
 const linkClass =
   "font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300";
@@ -32,13 +35,21 @@ export function RingReadySmsOptInSection({
       <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
         {RING_READY_SMS_OPT_IN_DISCLOSURE}{" "}
         <Link href="/terms" className={linkClass}>
-          Terms
+          Terms of Service
         </Link>{" "}
         ·{" "}
         <Link href="/privacy" className={linkClass}>
           Privacy Policy
+        </Link>{" "}
+        ·{" "}
+        <Link href="/sms-disclosure" className={linkClass}>
+          SMS Disclosure
         </Link>
         .
+      </p>
+
+      <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        {COMPLIANCE_US_ONLY_NOTICE}
       </p>
 
       {showSuccess ? (
@@ -95,7 +106,8 @@ export function RingReadySmsOptInSection({
               htmlFor="ringready-consent"
               className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300"
             >
-              I agree to the{" "}
+              I agree to receive project-related SMS updates from Suite300 and
+              accept the{" "}
               <Link href="/terms" className={linkClass}>
                 Terms of Service
               </Link>{" "}

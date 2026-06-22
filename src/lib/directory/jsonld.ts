@@ -1,3 +1,4 @@
+import { DATASET_LICENSE_PATH } from "@/lib/legal-placeholders";
 import { siteOrganizationId, SITE_AUDIENCE_TYPE } from "@/lib/site-jsonld";
 import { absoluteUrl, getSiteOrigin } from "@/lib/site-url";
 
@@ -69,6 +70,7 @@ export function buildProspectingDatasetJsonLd(
     url: pageUrl,
     creator: { "@id": siteOrganizationId(origin) },
     publisher: { "@id": siteOrganizationId(origin) },
+    license: absoluteUrl(DATASET_LICENSE_PATH),
     audience: {
       "@type": "Audience",
       audienceType: SITE_AUDIENCE_TYPE,
