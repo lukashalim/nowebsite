@@ -135,7 +135,7 @@ export default function TermsPage() {
             on project activity.
           </li>
           <li>
-            <strong>Opt-Out:</strong> You may opt out at any time by replying
+            <strong>Opt Out:</strong> You may opt out at any time by replying
             STOP to any message you receive. After you send STOP, we will send a
             confirmation and no further project-update texts unless you opt in
             again.
@@ -150,7 +150,7 @@ export default function TermsPage() {
         <p>
           If you use SMS or messaging features in our platform, you agree to
           comply with all applicable carrier and regulatory requirements,
-          including registering campaigns where required, honoring opt-out
+          including registering campaigns where required, honoring opt out
           requests (including STOP replies), and including required disclosures
           in your messages. We may suspend messaging features if we reasonably
           believe your use violates law or carrier policies.
