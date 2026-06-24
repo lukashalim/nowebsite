@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { LegalPageShell, LegalSection } from "@/components/legal-page-shell";
 import {
+  LEGAL_BUSINESS_ADDRESS,
   LEGAL_COMPANY_NAME,
   LEGAL_CONTACT_EMAIL,
 } from "@/lib/legal-placeholders";
@@ -102,6 +103,13 @@ export default function PrivacyPage() {
           Reply HELP for help. Message and data rates may apply. Message
           frequency varies.
         </p>
+        <p>
+          We do not share, sell, or otherwise provide your mobile phone number
+          or messaging consent information to any third parties or affiliates for
+          marketing or promotional purposes. SMS delivery providers (such as
+          Twilio) process messages solely to deliver opted-in project updates on
+          our behalf.
+        </p>
       </LegalSection>
 
       <LegalSection title="How We Use Information">
@@ -166,14 +174,19 @@ export default function PrivacyPage() {
       <LegalSection title="Contact Us">
         <p>
           If you have questions about this Privacy Policy or our data practices,
-          contact us at{" "}
+          contact {LEGAL_COMPANY_NAME} at:
+        </p>
+        <p>
+          {LEGAL_COMPANY_NAME}
+          <br />
+          {LEGAL_BUSINESS_ADDRESS}
+          <br />
           <a
             href={`mailto:${LEGAL_CONTACT_EMAIL}`}
             className="font-medium text-blue-600 hover:underline dark:text-blue-400"
           >
             {LEGAL_CONTACT_EMAIL}
           </a>
-          .
         </p>
       </LegalSection>
     </LegalPageShell>

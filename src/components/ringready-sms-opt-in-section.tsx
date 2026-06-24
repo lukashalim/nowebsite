@@ -2,6 +2,7 @@ import Link from "next/link";
 import { submitRingReadySmsOptIn } from "@/lib/actions/ringready-sms-opt-in";
 import {
   COMPLIANCE_US_ONLY_NOTICE,
+  RING_READY_SMS_OPT_IN_CHECKBOX_LABEL,
   RING_READY_SMS_OPT_IN_DISCLOSURE,
 } from "@/lib/legal-placeholders";
 
@@ -22,14 +23,15 @@ export function RingReadySmsOptInSection({
 
   return (
     <section
+      id="sms-optin"
       aria-labelledby="sms-updates-heading"
-      className="mx-auto mt-12 w-full max-w-md space-y-4 text-left"
+      className="mx-auto mt-8 w-full max-w-md scroll-mt-8 space-y-4 text-left"
     >
       <h2
         id="sms-updates-heading"
         className="text-lg font-semibold text-zinc-900 dark:text-zinc-50"
       >
-        SMS updates
+        Subscribe to SMS Updates
       </h2>
 
       <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
@@ -73,7 +75,11 @@ export function RingReadySmsOptInSection({
       ) : null}
 
       {!showSuccess ? (
-        <form action={submitRingReadySmsOptIn} className="space-y-4">
+        <form
+          id="sms-optin-form"
+          action={submitRingReadySmsOptIn}
+          className="space-y-4"
+        >
           <div className="space-y-2">
             <label
               htmlFor="ringready-phone"
@@ -106,16 +112,7 @@ export function RingReadySmsOptInSection({
               htmlFor="ringready-consent"
               className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300"
             >
-              I agree to receive project-related SMS updates from Suite300 and
-              accept the{" "}
-              <Link href="/terms" className={linkClass}>
-                Terms of Service
-              </Link>{" "}
-              and{" "}
-              <Link href="/sms-disclosure" className={linkClass}>
-                SMS Disclosure
-              </Link>
-              .
+              {RING_READY_SMS_OPT_IN_CHECKBOX_LABEL}
             </label>
           </div>
 
@@ -123,7 +120,7 @@ export function RingReadySmsOptInSection({
             type="submit"
             className="w-full rounded-md bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
           >
-            Get SMS updates
+            Get SMS Updates
           </button>
         </form>
       ) : null}

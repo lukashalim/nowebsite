@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { LegalPageShell, LegalSection } from "@/components/legal-page-shell";
 import {
+  LEGAL_BUSINESS_ADDRESS,
   LEGAL_COMPANY_NAME,
   LEGAL_CONTACT_EMAIL,
+  RING_READY_SMS_OPT_IN_URL,
 } from "@/lib/legal-placeholders";
 import {
   buildRingReadyLegalPageMetadata,
@@ -104,31 +106,47 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="SMS Messaging">
+      <LegalSection title="SMS Messaging Terms">
+        <p>
+          By opting into SMS updates from {LEGAL_COMPANY_NAME}, you agree to
+          receive text messages regarding project updates and business
+          notifications.
+        </p>
         <p>
           {LEGAL_COMPANY_NAME}, a business entity operating within the United
-          States, may send you project-related SMS updates when you opt in on{" "}
+          States, may send you project-related SMS updates when you opt in at{" "}
           <a
-            href="https://ringreadysite.com"
+            href={RING_READY_SMS_OPT_IN_URL}
             className="font-medium text-blue-600 hover:underline dark:text-blue-400"
           >
-            https://ringreadysite.com
+            {RING_READY_SMS_OPT_IN_URL}
           </a>
           . SMS opt-in collection is conducted exclusively for users located in
-          the United States. Message frequency varies. Message and data rates
-          may apply.
+          the United States.
         </p>
         <p>
           To opt in, you must manually check a mandatory checkbox agreeing to
           these Terms of Service and our SMS Disclosure before submitting your
           mobile number. The checkbox is unchecked by default.
         </p>
-        <p>
-          Reply HELP for help or STOP to opt out of SMS messages from{" "}
-          {LEGAL_COMPANY_NAME}. After you send STOP, we will send a
-          confirmation and no further marketing or project-update texts unless
-          you opt in again.
-        </p>
+        <ul className="list-disc space-y-2 pl-6">
+          <li>
+            <strong>Message Frequency:</strong> Message frequency varies based
+            on project activity.
+          </li>
+          <li>
+            <strong>Opt-Out:</strong> You may opt out at any time by replying
+            STOP to any message you receive. After you send STOP, we will send a
+            confirmation and no further project-update texts unless you opt in
+            again.
+          </li>
+          <li>
+            <strong>Help:</strong> Reply HELP for assistance.
+          </li>
+          <li>
+            <strong>Rates:</strong> Message and data rates may apply.
+          </li>
+        </ul>
         <p>
           If you use SMS or messaging features in our platform, you agree to
           comply with all applicable carrier and regulatory requirements,
@@ -232,15 +250,18 @@ export default function TermsPage() {
       </LegalSection>
 
       <LegalSection title="Contact">
+        <p>Questions about these Terms may be sent to {LEGAL_COMPANY_NAME} at:</p>
         <p>
-          Questions about these Terms may be sent to{" "}
+          {LEGAL_COMPANY_NAME}
+          <br />
+          {LEGAL_BUSINESS_ADDRESS}
+          <br />
           <a
             href={`mailto:${LEGAL_CONTACT_EMAIL}`}
             className="font-medium text-blue-600 hover:underline dark:text-blue-400"
           >
             {LEGAL_CONTACT_EMAIL}
           </a>
-          .
         </p>
       </LegalSection>
     </LegalPageShell>
