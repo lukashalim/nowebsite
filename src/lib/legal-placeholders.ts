@@ -17,10 +17,14 @@ export const COMPLIANCE_US_ONLY_NOTICE =
 
 export const RING_READY_SMS_PROGRAM_NAME = "Suite300 Project Updates";
 
-export const RING_READY_SMS_OPT_IN_CONSENT_VERSION = "2026-06-suite300-llc";
+export const RING_READY_SMS_OPT_IN_CONSENT_VERSION = "2026-06-suite300-llc-no-sharing";
+
+export const RING_READY_SMS_NO_SHARING_NOTICE =
+  "Mobile information will not be shared with third parties for marketing or promotional purposes.";
 
 export const RING_READY_SMS_OPT_IN_DISCLOSURE =
-  "By submitting this form, you agree to receive project-related SMS updates from Suite300 LLC. Message and data rates may apply. Frequency varies. Reply HELP for help, STOP to opt out.";
+  "By submitting this form, you agree to receive project-related SMS updates from Suite300 LLC. Message and data rates may apply. Frequency varies. Reply HELP for help, STOP to opt out. " +
+  RING_READY_SMS_NO_SHARING_NOTICE;
 
 export const RING_READY_SMS_OPT_IN_CHECKBOX_LABEL =
   "I agree to receive project-related SMS updates from Suite300 LLC. Msg frequency varies. Msg & data rates may apply. Reply STOP to opt out.";
