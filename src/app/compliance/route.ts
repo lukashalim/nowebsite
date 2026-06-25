@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import {
   LEGAL_COMPANY_NAME,
+  RING_READY_COMPLIANCE_CHECKBOX_TEXT,
   RING_READY_COMPLIANCE_CONSENT_VERSION,
   RING_READY_COMPLIANCE_DISCLOSURE,
   RING_READY_COMPLIANCE_SOURCE,
-  RING_READY_SMS_OPT_IN_CHECKBOX_LABEL,
 } from "@/lib/legal-placeholders";
 import { processRingReadySmsOptIn } from "@/lib/ringready-sms-opt-in-core";
 import { getClientIp } from "@/lib/rate-limit";
@@ -21,6 +21,14 @@ function escapeHtml(value: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function renderComplianceCheckboxLabel(): string {
+  return (
+    `${escapeHtml(RING_READY_COMPLIANCE_CHECKBOX_TEXT)} ` +
+    `<a href="/privacy">Privacy Policy</a> ` +
+    `<a href="/terms">Terms of Service</a>`
+  );
 }
 
 function renderCompliancePage(options: {
@@ -45,6 +53,11 @@ function renderCompliancePage(options: {
 <body>
   <h1>${escapeHtml(LEGAL_COMPANY_NAME)}</h1>
   <p>${escapeHtml(RING_READY_COMPLIANCE_DISCLOSURE)}</p>
+  <p>
+    <a href="/privacy">Privacy Policy</a> ·
+    <a href="/terms">Terms of Service</a> ·
+    <a href="/sms-disclosure">SMS Disclosure</a>
+  </p>
   ${statusMessage}
   <form method="post" action="/compliance">
     <p>
@@ -54,7 +67,7 @@ function renderCompliancePage(options: {
     <p>
       <label>
         <input name="consent" type="checkbox" value="yes" required>
-        ${escapeHtml(RING_READY_SMS_OPT_IN_CHECKBOX_LABEL)}
+        ${renderComplianceCheckboxLabel()}
       </label>
     </p>
     <p>
