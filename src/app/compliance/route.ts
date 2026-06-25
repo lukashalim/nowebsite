@@ -93,13 +93,12 @@ export async function POST(request: NextRequest) {
   }
 
   const formData = await request.formData();
+  const phone = formData.get("phone");
+  const consent = formData.get("consent");
+
   const result = await processRingReadySmsOptIn({
-    phoneRaw:
-      typeof formData.get("phone") === "string" ? formData.get("phone") : "",
-    consent:
-      typeof formData.get("consent") === "string"
-        ? formData.get("consent")
-        : null,
+    phoneRaw: typeof phone === "string" ? phone : "",
+    consent: typeof consent === "string" ? consent : null,
     ip: getClientIp(request),
     userAgent: request.headers.get("user-agent"),
     source: RING_READY_COMPLIANCE_SOURCE,
