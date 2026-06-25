@@ -6,10 +6,9 @@ import {
   COMPLIANCE_SERVICE_DOMAIN,
   RING_READY_SMS_OPT_IN_CONSENT_VERSION,
 } from "@/lib/legal-placeholders";
-import { normalizePhoneE164 } from "@/lib/phone-lookup";
-import { checkRateLimit, getClientIpFromHeaders } from "@/lib/rate-limit";
+import { processRingReadySmsOptIn } from "@/lib/ringready-sms-opt-in-core";
+import { getClientIpFromHeaders } from "@/lib/rate-limit";
 import { isRingReadyHost } from "@/lib/ringready-site";
-import { createSupabaseAdmin } from "@/lib/supabase/admin";
 
 export async function submitRingReadySmsOptIn(formData: FormData): Promise<void> {
   const headerStore = await headers();
@@ -18,40 +17,20 @@ export async function submitRingReadySmsOptIn(formData: FormData): Promise<void>
     redirect("/?error=invalid");
   }
 
+  const phone = formData.get("phone");
   const consent = formData.get("consent");
-  if (consent !== "yes") {
-    redirect("/?error=invalid");
-  }
 
-  const phoneRaw = formData.get("phone");
-  if (typeof phoneRaw !== "string" || !phoneRaw.trim()) {
-    redirect("/?error=invalid");
-  }
-
-  const phoneE164 = normalizePhoneE164(phoneRaw, "US");
-  if (!phoneE164) {
-    redirect("/?error=invalid");
-  }
-
-  const ip = getClientIpFromHeaders(headerStore);
-  const rateLimit = await checkRateLimit(
-    "ringreadySmsOptIn",
-    ip,
-    headerStore.get("user-agent"),
-  );
-  if (!rateLimit.success) {
-    redirect("/?error=rate_limit");
-  }
-
-  const admin = createSupabaseAdmin();
-  const { error } = await admin.from("ringready_sms_opt_ins").insert({
-    phone_e164: phoneE164,
-    consent_version: RING_READY_SMS_OPT_IN_CONSENT_VERSION,
+  const result = await processRingReadySmsOptIn({
+    phoneRaw: typeof phone === "string" ? phone : "",
+    consent: typeof consent === "string" ? consent : null,
+    ip: getClientIpFromHeaders(headerStore),
+    userAgent: headerStore.get("user-agent"),
     source: COMPLIANCE_SERVICE_DOMAIN,
+    consentVersion: RING_READY_SMS_OPT_IN_CONSENT_VERSION,
   });
 
-  if (error && error.code !== "23505") {
-    redirect("/?error=invalid");
+  if (!result.ok) {
+    redirect(`/?error=${result.reason === "rate_limit" ? "rate_limit" : "invalid"}`);
   }
 
   redirect("/?subscribed=1");

@@ -8,6 +8,7 @@ export const RING_READY_LEGAL_PATHS = [
   "/privacy",
   "/terms",
   "/sms-disclosure",
+  "/compliance",
 ] as const;
 
 /** Homepage and compliance pages indexed for A2P 10DLC audit visibility. */
@@ -24,6 +25,7 @@ export const RING_READY_RESERVED_FIRST_SEGMENTS = new Set([
   "privacy",
   "terms",
   "sms-disclosure",
+  "compliance",
   "alternatives",
   "blog",
   "_next",

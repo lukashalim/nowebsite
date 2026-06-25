@@ -31,3 +31,13 @@ export const RING_READY_SMS_OPT_IN_CHECKBOX_LABEL =
 
 export const RING_READY_SMS_OPT_IN_URL =
   "https://www.ringreadysite.com/#sms-optin";
+
+export const RING_READY_COMPLIANCE_DISCLOSURE =
+  "By submitting this form, you agree to receive recurring project-related SMS updates from Suite300 LLC. Message and data rates may apply. Reply HELP for help, STOP to opt out. Mobile information will not be shared with third parties for marketing or promotional purposes.";
+
+export const RING_READY_COMPLIANCE_URL =
+  "https://www.ringreadysite.com/compliance";
+
+export const RING_READY_COMPLIANCE_CONSENT_VERSION = "2026-06-compliance-page";
+
+export const RING_READY_COMPLIANCE_SOURCE = "ringreadysite.com/compliance";

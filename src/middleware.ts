@@ -34,6 +34,7 @@ const SKIP_RATE_LIMIT_PREFIXES = [
   "/privacy",
   "/terms",
   "/sms-disclosure",
+  "/compliance",
   "/admin",
   "/_next",
   "/scrape-progress",
