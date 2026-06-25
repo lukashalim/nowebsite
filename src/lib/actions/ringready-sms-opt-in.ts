@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   COMPLIANCE_SERVICE_DOMAIN,
-  RING_READY_SMS_OPT_IN_CONSENT_VERSION,
+  RING_READY_COMPLIANCE_CONSENT_VERSION,
 } from "@/lib/legal-placeholders";
 import { processRingReadySmsOptIn } from "@/lib/ringready-sms-opt-in-core";
 import { getClientIpFromHeaders } from "@/lib/rate-limit";
@@ -26,7 +26,7 @@ export async function submitRingReadySmsOptIn(formData: FormData): Promise<void>
     ip: getClientIpFromHeaders(headerStore),
     userAgent: headerStore.get("user-agent"),
     source: COMPLIANCE_SERVICE_DOMAIN,
-    consentVersion: RING_READY_SMS_OPT_IN_CONSENT_VERSION,
+    consentVersion: RING_READY_COMPLIANCE_CONSENT_VERSION,
   });
 
   if (!result.ok) {

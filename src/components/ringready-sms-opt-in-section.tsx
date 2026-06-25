@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { submitRingReadySmsOptIn } from "@/lib/actions/ringready-sms-opt-in";
 import {
-  COMPLIANCE_US_ONLY_NOTICE,
-  RING_READY_SMS_OPT_IN_CHECKBOX_LABEL,
-  RING_READY_SMS_OPT_IN_DISCLOSURE,
+  RING_READY_COMPLIANCE_CHECKBOX_TEXT,
+  RING_READY_COMPLIANCE_DISCLOSURE,
 } from "@/lib/legal-placeholders";
 
 const linkClass =
@@ -27,31 +26,26 @@ export function RingReadySmsOptInSection({
       aria-labelledby="sms-updates-heading"
       className="mx-auto mt-8 w-full max-w-md scroll-mt-8 space-y-4 text-left"
     >
-      <h2
-        id="sms-updates-heading"
-        className="text-lg font-semibold text-zinc-900 dark:text-zinc-50"
-      >
-        Subscribe to SMS Updates
+      <h2 id="sms-updates-heading" className="sr-only">
+        SMS opt-in
       </h2>
 
-      <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
-        {RING_READY_SMS_OPT_IN_DISCLOSURE}{" "}
-        <Link href="/terms" className={linkClass}>
-          Terms of Service
-        </Link>{" "}
-        ·{" "}
+      <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
+        {RING_READY_COMPLIANCE_DISCLOSURE}
+      </p>
+
+      <p className="text-sm text-zinc-600 dark:text-zinc-400">
         <Link href="/privacy" className={linkClass}>
           Privacy Policy
-        </Link>{" "}
-        ·{" "}
+        </Link>
+        {" · "}
+        <Link href="/terms" className={linkClass}>
+          Terms of Service
+        </Link>
+        {" · "}
         <Link href="/sms-disclosure" className={linkClass}>
           SMS Disclosure
         </Link>
-        .
-      </p>
-
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">
-        {COMPLIANCE_US_ONLY_NOTICE}
       </p>
 
       {showSuccess ? (
@@ -59,7 +53,7 @@ export function RingReadySmsOptInSection({
           role="status"
           className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200"
         >
-          Thank you. You&apos;re signed up for SMS updates.
+          Thank you. You are signed up for SMS updates.
         </p>
       ) : null}
 
@@ -112,7 +106,13 @@ export function RingReadySmsOptInSection({
               htmlFor="ringready-consent"
               className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300"
             >
-              {RING_READY_SMS_OPT_IN_CHECKBOX_LABEL}
+              {RING_READY_COMPLIANCE_CHECKBOX_TEXT}{" "}
+              <Link href="/privacy" className={linkClass}>
+                Privacy Policy
+              </Link>{" "}
+              <Link href="/terms" className={linkClass}>
+                Terms of Service
+              </Link>
             </label>
           </div>
 
