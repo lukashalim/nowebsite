@@ -7,6 +7,7 @@ import {
   resolveTenantDemoUrl,
   sendOutboundSMS,
 } from "@/lib/actions/outreach";
+import { listSpintaxTemplates } from "@/app/actions/spintax-templates";
 import { buildCallScriptSteps } from "@/lib/call-script-steps";
 import {
   CallSessionOverlay,
@@ -105,11 +106,6 @@ export function CrmPhonePopover({
 
   const callTemplates = useMemo(
     () => filterSpintaxTemplatesForLeadChannel(templates, "call", leadAudience),
-    [templates, leadAudience],
-  );
-
-  const emailTemplates = useMemo(
-    () => filterSpintaxTemplatesForLeadChannel(templates, "email", leadAudience),
     [templates, leadAudience],
   );
 
@@ -285,7 +281,8 @@ export function CrmPhonePopover({
 
   function handleCall() {
     void (async () => {
-      if (!selectedCallTemplate) return;
+      const callTemplateId = selectedCallId;
+      if (!callTemplateId) return;
 
       const demoResult = await resolveTenantDemoUrl(userId, placeId);
       if (!demoResult.ok) {
@@ -293,39 +290,54 @@ export function CrmPhonePopover({
         return;
       }
 
-      const pivotTemplate =
-        selectedCallTemplate.pivot_template?.trim() ||
-        "When mobile searchers tap through Google listings, businesses without a clear website link often get skipped.";
-      const offerTemplate =
-        selectedCallTemplate.offer_template?.trim() ||
-        "I put together a quick demo for your listing. Mind if I text you the link?";
+      const templatesResult = await listSpintaxTemplates();
+      if (!templatesResult.ok) {
+        window.alert(templatesResult.error);
+        return;
+      }
+
+      const freshCallTemplates = filterSpintaxTemplatesForLeadChannel(
+        templatesResult.templates,
+        "call",
+        leadAudience,
+      );
+      const callTemplate =
+        freshCallTemplates.find((t) => t.id === callTemplateId) ??
+        freshCallTemplates[0];
+      if (!callTemplate) {
+        window.alert("No call script matches this lead type.");
+        return;
+      }
+
+      const tokenOpts = {
+        name: businessName,
+        ownerName,
+        mainCategory,
+        businessType,
+        demoLink: demoResult.url,
+        senderName: senderName?.trim() || null,
+      };
 
       const scriptSteps = buildCallScriptSteps(
-        selectedCallTemplate.template,
-        pivotTemplate,
-        offerTemplate,
-        {
-          name: businessName,
-          ownerName,
-          mainCategory,
-          businessType,
-        },
+        callTemplate.template,
+        callTemplate.pivot_template?.trim() ?? "",
+        callTemplate.offer_template?.trim() ?? "",
+        tokenOpts,
       );
 
+      const freshEmailTemplates = filterSpintaxTemplatesForLeadChannel(
+        templatesResult.templates,
+        "email",
+        leadAudience,
+      );
       const emailTemplate =
-        emailTemplates.find((t) => t.name === "Demo link") ?? emailTemplates[0];
+        freshEmailTemplates.find((t) => t.name === "Demo link") ??
+        freshEmailTemplates[0];
       const emailContent = emailTemplate
         ? buildEmailContent(
             emailTemplate.template,
             emailTemplate.pivot_template?.trim() ?? "",
-            {
-              name: businessName,
-              ownerName,
-              mainCategory,
-              businessType,
-              demoLink: demoResult.url,
-              senderName: senderName?.trim() || null,
-            },
+            tokenOpts,
           )
         : {
             subject: `Your demo — ${businessName?.trim() || "your business"}`,
@@ -334,7 +346,7 @@ export function CrmPhonePopover({
 
       window.localStorage.setItem(
         lastCallTemplateStorageKey(userId),
-        selectedCallTemplate.id,
+        callTemplate.id,
       );
 
       setCallLeadData({

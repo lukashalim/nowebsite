@@ -447,7 +447,7 @@ export function CallSessionOverlay({
             </p>
           ) : null}
 
-          {phase === "TALKING" || phase === "COMPLETED" ? (
+          {phase === "CONNECTING" || phase === "TALKING" || phase === "COMPLETED" ? (
             <>
               <div className="space-y-3">
                 <p className="text-xs font-bold uppercase tracking-wider text-amber-400">
@@ -459,137 +459,141 @@ export function CallSessionOverlay({
                       {label}
                     </p>
                     <div className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-3 text-base leading-snug whitespace-pre-wrap text-zinc-100">
-                      {leadData.scriptSteps[key]}
+                      {leadData.scriptSteps[key] || "—"}
                     </div>
                   </div>
                 ))}
               </div>
 
-              <label className="flex flex-col gap-1 text-sm">
-                <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-                  Notes
-                </span>
-                <textarea
-                  rows={4}
-                  maxLength={2000}
-                  disabled={pendingSave}
-                  value={draftNotes}
-                  aria-label="Call notes"
-                  className="w-full resize-y rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 disabled:opacity-50"
-                  onChange={(e) => setDraftNotes(e.target.value)}
-                />
-              </label>
-
-              <div className="space-y-2 border-t border-zinc-800 pt-3">
-                <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-                  SMS to {leadData.phone}
-                </p>
-                <textarea
-                  rows={6}
-                  maxLength={1600}
-                  disabled={pendingSms || outreachBlocked}
-                  value={smsBody}
-                  aria-label="SMS message"
-                  className="w-full resize-y rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 disabled:opacity-50"
-                  onChange={(e) => setSmsBody(e.target.value)}
-                />
-                {outreachBlocked ? (
-                  <p className="text-xs text-zinc-500">
-                    Monthly outreach limit reached.
-                  </p>
-                ) : null}
-                {smsError ? (
-                  <p className="text-xs font-medium text-red-400" role="alert">
-                    {smsError}
-                  </p>
-                ) : null}
-                <button
-                  type="button"
-                  disabled={pendingSms || outreachBlocked}
-                  onClick={() => void handleSendSms()}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-500 px-3 py-2.5 text-sm font-bold text-zinc-950 hover:bg-emerald-400 disabled:opacity-50"
-                >
-                  <MessageSquare className="size-4" aria-hidden />
-                  {pendingSms ? "Checking number…" : "Send SMS"}
-                </button>
-              </div>
-
-              <div className="space-y-2 border-t border-zinc-800 pt-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-                    Email to{" "}
-                    {effectiveEmail ? (
-                      effectiveEmail
-                    ) : (
-                      <span className="text-zinc-500">No email on file</span>
-                    )}
-                  </p>
-                  {showInlineEmailInput ? (
-                    <input
-                      type="email"
-                      value={draftEmail}
-                      disabled={pendingEmail || pendingSave}
-                      placeholder="Add email"
-                      aria-label="Lead email address"
-                      onChange={(e) => setDraftEmail(e.target.value)}
-                      className="min-w-[180px] flex-1 rounded-md border border-zinc-600 bg-zinc-900 px-2 py-1 text-xs text-zinc-100 disabled:opacity-50"
+              {phase === "TALKING" || phase === "COMPLETED" ? (
+                <>
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                      Notes
+                    </span>
+                    <textarea
+                      rows={4}
+                      maxLength={2000}
+                      disabled={pendingSave}
+                      value={draftNotes}
+                      aria-label="Call notes"
+                      className="w-full resize-y rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 disabled:opacity-50"
+                      onChange={(e) => setDraftNotes(e.target.value)}
                     />
-                  ) : null}
-                </div>
-                <input
-                  type="text"
-                  value={emailSubject}
-                  disabled={pendingEmail}
-                  maxLength={4000}
-                  aria-label="Email subject"
-                  placeholder="Subject"
-                  onChange={(e) => setEmailSubject(e.target.value)}
-                  className="w-full rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 disabled:opacity-50"
-                />
-                <textarea
-                  rows={6}
-                  maxLength={4000}
-                  disabled={pendingEmail}
-                  value={emailBody}
-                  aria-label="Email body"
-                  className="w-full resize-y rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 disabled:opacity-50"
-                  onChange={(e) => setEmailBody(e.target.value)}
-                />
-                {emailError ? (
-                  <p className="text-xs font-medium text-red-400" role="alert">
-                    {emailError}
-                  </p>
-                ) : null}
-                <button
-                  type="button"
-                  disabled={
-                    pendingEmail ||
-                    !emailSubject.trim() ||
-                    !emailBody.trim() ||
-                    !effectiveEmail
-                  }
-                  onClick={() => void handleSendEmail()}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-sky-500 px-3 py-2.5 text-sm font-bold text-zinc-950 hover:bg-sky-400 disabled:opacity-50"
-                >
-                  <Mail className="size-4" aria-hidden />
-                  {pendingEmail ? "Opening email…" : "Send Email"}
-                </button>
-              </div>
+                  </label>
+
+                  <div className="space-y-2 border-t border-zinc-800 pt-3">
+                    <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                      SMS to {leadData.phone}
+                    </p>
+                    <textarea
+                      rows={6}
+                      maxLength={1600}
+                      disabled={pendingSms || outreachBlocked}
+                      value={smsBody}
+                      aria-label="SMS message"
+                      className="w-full resize-y rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 disabled:opacity-50"
+                      onChange={(e) => setSmsBody(e.target.value)}
+                    />
+                    {outreachBlocked ? (
+                      <p className="text-xs text-zinc-500">
+                        Monthly outreach limit reached.
+                      </p>
+                    ) : null}
+                    {smsError ? (
+                      <p className="text-xs font-medium text-red-400" role="alert">
+                        {smsError}
+                      </p>
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={pendingSms || outreachBlocked}
+                      onClick={() => void handleSendSms()}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-500 px-3 py-2.5 text-sm font-bold text-zinc-950 hover:bg-emerald-400 disabled:opacity-50"
+                    >
+                      <MessageSquare className="size-4" aria-hidden />
+                      {pendingSms ? "Checking number…" : "Send SMS"}
+                    </button>
+                  </div>
+
+                  <div className="space-y-2 border-t border-zinc-800 pt-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                        Email to{" "}
+                        {effectiveEmail ? (
+                          effectiveEmail
+                        ) : (
+                          <span className="text-zinc-500">No email on file</span>
+                        )}
+                      </p>
+                      {showInlineEmailInput ? (
+                        <input
+                          type="email"
+                          value={draftEmail}
+                          disabled={pendingEmail || pendingSave}
+                          placeholder="Add email"
+                          aria-label="Lead email address"
+                          onChange={(e) => setDraftEmail(e.target.value)}
+                          className="min-w-[180px] flex-1 rounded-md border border-zinc-600 bg-zinc-900 px-2 py-1 text-xs text-zinc-100 disabled:opacity-50"
+                        />
+                      ) : null}
+                    </div>
+                    <input
+                      type="text"
+                      value={emailSubject}
+                      disabled={pendingEmail}
+                      maxLength={4000}
+                      aria-label="Email subject"
+                      placeholder="Subject"
+                      onChange={(e) => setEmailSubject(e.target.value)}
+                      className="w-full rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 disabled:opacity-50"
+                    />
+                    <textarea
+                      rows={6}
+                      maxLength={4000}
+                      disabled={pendingEmail}
+                      value={emailBody}
+                      aria-label="Email body"
+                      className="w-full resize-y rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 disabled:opacity-50"
+                      onChange={(e) => setEmailBody(e.target.value)}
+                    />
+                    {emailError ? (
+                      <p className="text-xs font-medium text-red-400" role="alert">
+                        {emailError}
+                      </p>
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={
+                        pendingEmail ||
+                        !emailSubject.trim() ||
+                        !emailBody.trim() ||
+                        !effectiveEmail
+                      }
+                      onClick={() => void handleSendEmail()}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-sky-500 px-3 py-2.5 text-sm font-bold text-zinc-950 hover:bg-sky-400 disabled:opacity-50"
+                    >
+                      <Mail className="size-4" aria-hidden />
+                      {pendingEmail ? "Opening email…" : "Send Email"}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                    Notes
+                  </span>
+                  <textarea
+                    rows={4}
+                    disabled
+                    value={draftNotes}
+                    aria-label="Call notes"
+                    className="w-full resize-y rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 opacity-50"
+                    readOnly
+                  />
+                </label>
+              )}
             </>
-          ) : phase === "CONNECTING" ? (
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-                Notes
-              </span>
-              <textarea
-                rows={4}
-                disabled
-                value={draftNotes}
-                aria-label="Call notes"
-                className="w-full resize-y rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 opacity-50"
-                readOnly
-              />
-            </label>
           ) : null}
         </div>
 
