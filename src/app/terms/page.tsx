@@ -156,19 +156,20 @@ export default async function TermsPage() {
             on {isRingReady ? "demo generation activity" : "project activity"}.
           </li>
           <li>
-            <strong>Opt Out:</strong> You may opt out at any time by replying
-            STOP to any message you receive. After you send STOP, we will send a
-            confirmation and no further{" "}
+            <strong>Opt Out:</strong> You may opt out at any time by replying{" "}
+            <strong>STOP</strong> to any message you receive. After you send{" "}
+            <strong>STOP</strong>, we will send a confirmation and no further{" "}
             {isRingReady ? "demo-status" : "project-update"} texts unless you
             opt in again.
           </li>
           <li>
-            <strong>Help:</strong> Reply HELP for assistance.
+            <strong>Help:</strong> Reply <strong>HELP</strong> for assistance.
           </li>
           <li>
             <strong>Rates:</strong> Message and data rates may apply.
           </li>
         </ul>
+        <p>Carriers are not liable for delayed or undelivered messages.</p>
         <p>
           If you use SMS or messaging features in our platform, you agree to
           comply with all applicable carrier and regulatory requirements,

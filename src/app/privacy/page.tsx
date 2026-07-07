@@ -131,12 +131,22 @@ export default async function PrivacyPage() {
           frequency varies.
         </p>
         <p>
-          We do not share, sell, or otherwise provide your mobile phone number
-          or messaging consent information to any third parties or affiliates for
-          marketing or promotional purposes. SMS delivery providers (such as
-          Twilio) process messages solely to deliver opted-in{" "}
-          {isRingReady ? "demo-status updates" : "project updates"} on our
-          behalf.
+          {isRingReady ? (
+            <>
+              Text messaging originator opt-in data and consent information will
+              not be shared with any third parties or affiliates, for any
+              purpose. SMS delivery providers (such as Twilio) process messages
+              solely to deliver opted-in demo-status updates on our behalf.
+            </>
+          ) : (
+            <>
+              We do not share, sell, or otherwise provide your mobile phone number
+              or messaging consent information to any third parties or affiliates for
+              marketing or promotional purposes. SMS delivery providers (such as
+              Twilio) process messages solely to deliver opted-in project updates on
+              our behalf.
+            </>
+          )}
         </p>
       </LegalSection>
 
