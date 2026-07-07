@@ -27,4 +27,6 @@ export interface BusinessLead {
   stage: CrmStage;
   owner_name: string | null;
   notes: string | null;
+  contact_email: string | null;
+  enrichment_email: string | null;
 }

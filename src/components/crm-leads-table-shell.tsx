@@ -13,6 +13,7 @@ interface CrmLeadsTableShellProps {
   spintaxTemplates: SpintaxTemplate[];
   isPro: boolean;
   initialOutreachRemaining: number | null;
+  senderName?: string | null;
   onOutreachRecorded?: CrmOutreachRecordedHandler;
 }
 
@@ -24,6 +25,7 @@ export function CrmLeadsTableShell({
   spintaxTemplates,
   isPro,
   initialOutreachRemaining,
+  senderName,
   onOutreachRecorded,
 }: CrmLeadsTableShellProps) {
   return (
@@ -54,6 +56,7 @@ export function CrmLeadsTableShell({
               spintaxTemplates={spintaxTemplates}
               isPro={isPro}
               initialOutreachRemaining={initialOutreachRemaining}
+              senderName={senderName}
               onOutreachRecorded={onOutreachRecorded}
             />
           </tbody>

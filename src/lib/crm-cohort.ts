@@ -3,7 +3,7 @@ import {
   parseContactEnrichment,
   type ContactEnrichment,
 } from "@/lib/contact-enrichment-schema";
-import { toFiniteNumber } from "@/lib/demo-enrichment";
+import { extractDemoPublicEmail, toFiniteNumber } from "@/lib/demo-enrichment";
 import { isCrmStage, type CrmStage } from "@/lib/crm-stage";
 import {
   defaultCrmDemoCohortFilters,
@@ -44,7 +44,7 @@ import { cache } from "react";
 export type { DemoReviewHighlight } from "@/lib/demo-review-types";
 
 export const CRM_BUSINESS_LIST_COLUMNS =
-  "place_id, demo_slug, name, address, city, state, country, postal_code, business_type, main_category, rating, reviews, phone, phone_line_type, google_maps_link, facebook_url, listing_website, crm_contact_surface" as const;
+  "place_id, demo_slug, name, address, city, state, country, postal_code, business_type, main_category, rating, reviews, phone, phone_line_type, google_maps_link, facebook_url, listing_website, crm_contact_surface, contact_enrichment" as const;
 
 const DEMO_CORE_COLUMNS =
   "place_id, demo_slug, name, address, city, state, postal_code, business_type, main_category, rating, reviews, phone, google_maps_link, facebook_url, listing_website, crm_contact_surface, contact_enrichment" as const;
@@ -192,6 +192,8 @@ export function mapRowToDemoBusiness(
     facebook_url: (data.facebook_url as string | null) ?? null,
     listing_website: (data.listing_website as string | null) ?? null,
     crm_contact_surface: parseCrmContactSurface(data.crm_contact_surface),
+    contact_email: null,
+    enrichment_email: extractDemoPublicEmail(enrichment),
     enrichment,
   };
   if (detail) {
@@ -219,6 +221,7 @@ interface UserContactRow {
   stage: CrmStage;
   owner_name: string | null;
   notes: string | null;
+  contact_email: string | null;
 }
 
 function parseUserContactStage(raw: unknown): CrmStage {
@@ -353,7 +356,7 @@ export async function fetchCrmBusinessRows(
 
     const { data: userContactsRaw, error: contactsError } = await supabase
       .from("crm_user_contacts")
-      .select("place_id, contact_count, stage, owner_name, notes")
+      .select("place_id, contact_count, stage, owner_name, notes, contact_email")
       .eq("user_id", userId);
 
     if (contactsError) {
@@ -370,6 +373,8 @@ export async function fetchCrmBusinessRows(
       owner_name:
         typeof row.owner_name === "string" ? row.owner_name : null,
       notes: typeof row.notes === "string" ? row.notes : null,
+      contact_email:
+        typeof row.contact_email === "string" ? row.contact_email : null,
     }));
     const contactMap = new Map(
       userContacts.map((c) => [
@@ -379,6 +384,7 @@ export async function fetchCrmBusinessRows(
           stage: c.stage,
           owner_name: c.owner_name,
           notes: c.notes,
+          contact_email: c.contact_email,
         },
       ]),
     );
@@ -447,15 +453,20 @@ export async function fetchCrmBusinessRows(
 
     const rows = ((data ?? []) as Omit<
       BusinessLead,
-      "contact_count" | "stage" | "owner_name" | "notes"
+      "contact_count" | "stage" | "owner_name" | "notes" | "contact_email" | "enrichment_email"
     >[]).map((row) => {
       const userContact = contactMap.get(row.place_id);
+      const enrichment = parseContactEnrichment(
+        (row as { contact_enrichment?: unknown }).contact_enrichment,
+      );
       return {
         ...row,
         contact_count: userContact?.contact_count ?? 0,
         stage: userContact?.stage ?? "new",
         owner_name: userContact?.owner_name ?? null,
         notes: userContact?.notes ?? null,
+        contact_email: userContact?.contact_email ?? null,
+        enrichment_email: extractDemoPublicEmail(enrichment),
       };
     }) as BusinessLead[];
 

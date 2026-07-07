@@ -1,8 +1,9 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Loader2, MessageSquare, PhoneOff } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Mail, MessageSquare, PhoneOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { updateContactEmail } from "@/app/actions/update-contact-email";
 import { updateNotes } from "@/app/actions/update-notes";
 import { recordPhoneCallUsage } from "@/app/actions/crm-usage";
 import type { CallScriptSteps } from "@/lib/call-script-steps";
@@ -23,6 +24,13 @@ export interface CallLeadData {
   scriptSteps: CallScriptSteps;
   demoUrl: string;
   existingNotes: string | null;
+  contactEmail: string | null;
+  enrichmentEmail: string | null;
+  ownerName: string | null;
+  mainCategory: string | null;
+  businessType: string | null;
+  emailSubject: string;
+  emailBody: string;
 }
 
 export type CallModalPhase = "IDLE" | "CONNECTING" | "TALKING" | "COMPLETED";
@@ -35,6 +43,8 @@ const SCRIPT_STEP_LABELS: Record<ScriptStepKey, string> = {
   pivot: "Pivot",
   offer: "Offer",
 };
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 interface CallSessionOverlayProps {
   userId: string;
@@ -74,6 +84,20 @@ function buildDefaultSmsBody(
   return `Hey ${shortName}, Lukas here. I called about a quick fix for your Google listing—the missing website link: ${demoUrl}`;
 }
 
+function resolveEffectiveEmail(
+  contactEmail: string | null,
+  enrichmentEmail: string | null,
+  draftEmail: string,
+): string | null {
+  const draft = draftEmail.trim();
+  if (draft && EMAIL_PATTERN.test(draft)) return draft;
+  const saved = contactEmail?.trim();
+  if (saved && EMAIL_PATTERN.test(saved)) return saved;
+  const enrichment = enrichmentEmail?.trim();
+  if (enrichment && EMAIL_PATTERN.test(enrichment)) return enrichment;
+  return null;
+}
+
 export function CallSessionOverlay({
   userId,
   phoneCountry,
@@ -90,13 +114,19 @@ export function CallSessionOverlay({
   const roomIdRef = useRef<string | null>(null);
   const [draftNotes, setDraftNotes] = useState("");
   const [smsBody, setSmsBody] = useState("");
+  const [draftEmail, setDraftEmail] = useState("");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
   const [scriptStepIndex, setScriptStepIndex] = useState(0);
   const [callError, setCallError] = useState<string | null>(null);
   const [smsError, setSmsError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [pendingSave, setPendingSave] = useState(false);
   const [pendingHangUp, setPendingHangUp] = useState(false);
   const [pendingSms, setPendingSms] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState(false);
   const [smsToast, setSmsToast] = useState<string | null>(null);
+  const [emailToast, setEmailToast] = useState<string | null>(null);
 
   const outreachBlocked = outreachRemaining === 0;
 
@@ -107,11 +137,15 @@ export function CallSessionOverlay({
       roomIdRef.current = null;
       setCallError(null);
       setSmsError(null);
+      setEmailError(null);
       setScriptStepIndex(0);
       return;
     }
     setDraftNotes(leadData.existingNotes ?? "");
     setSmsBody(buildDefaultSmsBody(leadData.name, leadData.demoUrl));
+    setDraftEmail(leadData.contactEmail ?? "");
+    setEmailSubject(leadData.emailSubject);
+    setEmailBody(leadData.emailBody);
   }, [phase, leadData]);
 
   useEffect(() => {
@@ -154,6 +188,12 @@ export function CallSessionOverlay({
     return () => window.clearTimeout(timer);
   }, [smsToast]);
 
+  useEffect(() => {
+    if (!emailToast) return;
+    const timer = window.setTimeout(() => setEmailToast(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [emailToast]);
+
   if (phase === "IDLE" || !leadData) {
     return null;
   }
@@ -162,18 +202,55 @@ export function CallSessionOverlay({
   const currentStepKey = SCRIPT_STEP_ORDER[scriptStepIndex] ?? "hook";
   const currentStepLabel = SCRIPT_STEP_LABELS[currentStepKey];
   const currentStepText = leadData.scriptSteps[currentStepKey];
+  const effectiveEmail = resolveEffectiveEmail(
+    leadData.contactEmail,
+    leadData.enrichmentEmail,
+    draftEmail,
+  );
+  const showInlineEmailInput = !effectiveEmail;
+
+  async function persistDraftEmailIfChanged(): Promise<boolean> {
+    if (!leadData) return true;
+    const trimmed = draftEmail.trim().toLowerCase();
+    const previous = (leadData.contactEmail ?? "").trim().toLowerCase();
+    if (trimmed === previous) return true;
+    if (trimmed && !EMAIL_PATTERN.test(trimmed)) {
+      setEmailError("Invalid email address");
+      return false;
+    }
+    const res = await updateContactEmail(
+      leadData.placeId,
+      trimmed || null,
+    );
+    if (!res.ok) {
+      setEmailError(res.error);
+      return false;
+    }
+    leadData.contactEmail = trimmed || null;
+    return true;
+  }
 
   async function handleSave() {
     if (phase !== "COMPLETED" || pendingSave) return;
 
-    const trimmed = draftNotes.trim();
-    const previous = (leadData?.existingNotes ?? "").trim();
-    if (trimmed === previous) {
-      onClose();
+    setPendingSave(true);
+    setEmailError(null);
+
+    const emailSaved = await persistDraftEmailIfChanged();
+    if (!emailSaved) {
+      setPendingSave(false);
       return;
     }
 
-    setPendingSave(true);
+    const trimmed = draftNotes.trim();
+    const previous = (leadData?.existingNotes ?? "").trim();
+    if (trimmed === previous) {
+      setPendingSave(false);
+      onClose();
+      router.refresh();
+      return;
+    }
+
     const res = await updateNotes(leadData!.placeId, trimmed || null);
     setPendingSave(false);
 
@@ -283,13 +360,64 @@ export function CallSessionOverlay({
     setPendingSms(false);
   }
 
+  async function handleSendEmail() {
+    if (pendingEmail) return;
+
+    const subject = emailSubject.trim();
+    const body = emailBody.trim();
+    if (!subject) {
+      setEmailError("Subject cannot be empty");
+      return;
+    }
+    if (!body) {
+      setEmailError("Body cannot be empty");
+      return;
+    }
+
+    const email = resolveEffectiveEmail(
+      leadData!.contactEmail,
+      leadData!.enrichmentEmail,
+      draftEmail,
+    );
+    if (!email) {
+      setEmailError("Add a valid email address first");
+      return;
+    }
+
+    setPendingEmail(true);
+    setEmailError(null);
+
+    const saved = await persistDraftEmailIfChanged();
+    if (!saved) {
+      setPendingEmail(false);
+      return;
+    }
+
+    let copied = false;
+    try {
+      await navigator.clipboard.writeText(body);
+      copied = true;
+    } catch {
+      copied = false;
+    }
+
+    window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    setEmailToast(
+      copied
+        ? "Email opened — body copied to clipboard"
+        : "Email opened in your mail client",
+    );
+    setPendingEmail(false);
+  }
+
   return (
     <>
       <div
         role="dialog"
         aria-label={`Call with ${leadLabel}`}
         aria-modal="true"
-        className="fixed bottom-6 right-6 z-50 flex h-[500px] w-[400px] flex-col overflow-hidden rounded-xl border border-zinc-700 bg-zinc-950 text-zinc-50 shadow-2xl"
+        className="fixed bottom-6 right-6 z-50 flex h-[min(920px,calc(100vh-3rem))] w-[min(760px,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border border-zinc-700 bg-zinc-950 text-zinc-50 shadow-2xl"
       >
         <div className="shrink-0 border-b border-zinc-700 px-4 py-3">
           <div className="flex items-start justify-between gap-2">
@@ -376,7 +504,7 @@ export function CallSessionOverlay({
                   Notes
                 </span>
                 <textarea
-                  rows={3}
+                  rows={4}
                   maxLength={2000}
                   disabled={pendingSave}
                   value={draftNotes}
@@ -391,7 +519,7 @@ export function CallSessionOverlay({
                   SMS to {leadData.phone}
                 </p>
                 <textarea
-                  rows={3}
+                  rows={6}
                   maxLength={1600}
                   disabled={pendingSms || outreachBlocked}
                   value={smsBody}
@@ -419,6 +547,68 @@ export function CallSessionOverlay({
                   {pendingSms ? "Checking number…" : "Send SMS"}
                 </button>
               </div>
+
+              <div className="space-y-2 border-t border-zinc-800 pt-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                    Email to{" "}
+                    {effectiveEmail ? (
+                      effectiveEmail
+                    ) : (
+                      <span className="text-zinc-500">No email on file</span>
+                    )}
+                  </p>
+                  {showInlineEmailInput ? (
+                    <input
+                      type="email"
+                      value={draftEmail}
+                      disabled={pendingEmail || pendingSave}
+                      placeholder="Add email"
+                      aria-label="Lead email address"
+                      onChange={(e) => setDraftEmail(e.target.value)}
+                      className="min-w-[180px] flex-1 rounded-md border border-zinc-600 bg-zinc-900 px-2 py-1 text-xs text-zinc-100 disabled:opacity-50"
+                    />
+                  ) : null}
+                </div>
+                <input
+                  type="text"
+                  value={emailSubject}
+                  disabled={pendingEmail}
+                  maxLength={4000}
+                  aria-label="Email subject"
+                  placeholder="Subject"
+                  onChange={(e) => setEmailSubject(e.target.value)}
+                  className="w-full rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 disabled:opacity-50"
+                />
+                <textarea
+                  rows={6}
+                  maxLength={4000}
+                  disabled={pendingEmail}
+                  value={emailBody}
+                  aria-label="Email body"
+                  className="w-full resize-y rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 disabled:opacity-50"
+                  onChange={(e) => setEmailBody(e.target.value)}
+                />
+                {emailError ? (
+                  <p className="text-xs font-medium text-red-400" role="alert">
+                    {emailError}
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  disabled={
+                    pendingEmail ||
+                    !emailSubject.trim() ||
+                    !emailBody.trim() ||
+                    !effectiveEmail
+                  }
+                  onClick={() => void handleSendEmail()}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-sky-500 px-3 py-2.5 text-sm font-bold text-zinc-950 hover:bg-sky-400 disabled:opacity-50"
+                >
+                  <Mail className="size-4" aria-hidden />
+                  {pendingEmail ? "Opening email…" : "Send Email"}
+                </button>
+              </div>
             </>
           ) : phase === "CONNECTING" ? (
             <label className="flex flex-col gap-1 text-sm">
@@ -426,7 +616,7 @@ export function CallSessionOverlay({
                 Notes
               </span>
               <textarea
-                rows={3}
+                rows={4}
                 disabled
                 value={draftNotes}
                 aria-label="Call notes"
@@ -464,9 +654,19 @@ export function CallSessionOverlay({
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-[540px] right-6 z-50 max-w-[360px] rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg"
+          className="fixed bottom-[calc(min(920px,calc(100vh-3rem))+1.5rem)] right-6 z-50 max-w-[min(720px,calc(100vw-2rem))] rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg"
         >
           {smsToast}
+        </div>
+      ) : null}
+
+      {emailToast ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-[calc(min(920px,calc(100vh-3rem))+1.5rem)] right-6 z-50 max-w-[min(720px,calc(100vw-2rem))] rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg"
+        >
+          {emailToast}
         </div>
       ) : null}
     </>

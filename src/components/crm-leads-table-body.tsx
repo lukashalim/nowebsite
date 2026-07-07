@@ -33,6 +33,7 @@ interface CrmLeadsTableBodyProps {
   spintaxTemplates: SpintaxTemplate[];
   isPro: boolean;
   initialOutreachRemaining: number | null;
+  senderName?: string | null;
   onOutreachRecorded?: CrmOutreachRecordedHandler;
 }
 
@@ -49,6 +50,7 @@ export function CrmLeadsTableBody({
   spintaxTemplates,
   isPro,
   initialOutreachRemaining,
+  senderName,
   onOutreachRecorded: onOutreachRecordedProp,
 }: CrmLeadsTableBodyProps) {
   const onOutreachRecordedFromContext = useCrmOutreachRecorded();
@@ -165,6 +167,10 @@ export function CrmLeadsTableBody({
                   businessName={b.name}
                   mainCategory={b.main_category}
                   businessType={b.business_type}
+                  ownerName={b.owner_name}
+                  contactEmail={b.contact_email}
+                  enrichmentEmail={b.enrichment_email}
+                  senderName={senderName}
                   leadAudience={spintaxLeadAudience}
                   templates={spintaxTemplates}
                   existingNotes={b.notes}

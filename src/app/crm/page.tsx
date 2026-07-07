@@ -132,6 +132,7 @@ export default async function CrmPage({ searchParams }: PageProps) {
       spintaxTemplates={spintaxTemplates}
       isPro={userIsPro}
       initialOutreachRemaining={usageSummary?.remaining ?? null}
+      senderName={profile?.email?.split("@")[0]?.trim() || null}
     />
   );
 

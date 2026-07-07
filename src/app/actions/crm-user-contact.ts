@@ -7,16 +7,18 @@ export interface CrmUserContactRow {
   stage: CrmStage;
   owner_name: string | null;
   notes: string | null;
+  contact_email: string | null;
 }
 
 export const CRM_USER_CONTACT_SELECT =
-  "contact_count, stage, owner_name, notes" as const;
+  "contact_count, stage, owner_name, notes, contact_email" as const;
 
 export const DEFAULT_CRM_USER_CONTACT: CrmUserContactRow = {
   contact_count: 0,
   stage: "new",
   owner_name: null,
   notes: null,
+  contact_email: null,
 };
 
 export async function fetchCrmUserContact(
@@ -43,6 +45,8 @@ export async function fetchCrmUserContact(
     owner_name:
       typeof data.owner_name === "string" ? data.owner_name : null,
     notes: typeof data.notes === "string" ? data.notes : null,
+    contact_email:
+      typeof data.contact_email === "string" ? data.contact_email : null,
   };
 }
 
@@ -63,6 +67,7 @@ export async function upsertCrmUserContact(
       stage: merged.stage,
       owner_name: merged.owner_name,
       notes: merged.notes,
+      contact_email: merged.contact_email,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "user_id,place_id" },

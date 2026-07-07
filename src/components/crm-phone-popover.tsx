@@ -13,6 +13,7 @@ import {
   type CallLeadData,
   type CallModalPhase,
 } from "@/components/crm-call-modal";
+import { buildEmailContent } from "@/lib/email-template-steps";
 import { buildOutreachMessage } from "@/lib/outreach-spintax";
 import { normalizePhoneE164, type PhoneCountry } from "@/lib/phone-lookup";
 import {
@@ -30,6 +31,10 @@ interface CrmPhonePopoverProps {
   businessName: string | null;
   mainCategory: string | null;
   businessType: string | null;
+  ownerName: string | null;
+  contactEmail: string | null;
+  enrichmentEmail: string | null;
+  senderName?: string | null;
   leadAudience: SpintaxAudience;
   templates: SpintaxTemplate[];
   existingNotes: string | null;
@@ -70,6 +75,10 @@ export function CrmPhonePopover({
   businessName,
   mainCategory,
   businessType,
+  ownerName,
+  contactEmail,
+  enrichmentEmail,
+  senderName,
   leadAudience,
   templates,
   existingNotes,
@@ -96,6 +105,11 @@ export function CrmPhonePopover({
 
   const callTemplates = useMemo(
     () => filterSpintaxTemplatesForLeadChannel(templates, "call", leadAudience),
+    [templates, leadAudience],
+  );
+
+  const emailTemplates = useMemo(
+    () => filterSpintaxTemplatesForLeadChannel(templates, "email", leadAudience),
     [templates, leadAudience],
   );
 
@@ -292,10 +306,31 @@ export function CrmPhonePopover({
         offerTemplate,
         {
           name: businessName,
+          ownerName,
           mainCategory,
           businessType,
         },
       );
+
+      const emailTemplate =
+        emailTemplates.find((t) => t.name === "Demo link") ?? emailTemplates[0];
+      const emailContent = emailTemplate
+        ? buildEmailContent(
+            emailTemplate.template,
+            emailTemplate.pivot_template?.trim() ?? "",
+            {
+              name: businessName,
+              ownerName,
+              mainCategory,
+              businessType,
+              demoLink: demoResult.url,
+              senderName: senderName?.trim() || null,
+            },
+          )
+        : {
+            subject: `Your demo — ${businessName?.trim() || "your business"}`,
+            body: `Hi ${ownerName?.trim() || businessName?.trim() || "there"},\n\nHere's the link to what your site could look like:\n\n${demoResult.url}`,
+          };
 
       window.localStorage.setItem(
         lastCallTemplateStorageKey(userId),
@@ -310,6 +345,13 @@ export function CrmPhonePopover({
         scriptSteps,
         demoUrl: demoResult.url,
         existingNotes,
+        contactEmail,
+        enrichmentEmail,
+        ownerName,
+        mainCategory,
+        businessType,
+        emailSubject: emailContent.subject,
+        emailBody: emailContent.body,
       });
       setCallPhase("CONNECTING");
       setOpen(false);
