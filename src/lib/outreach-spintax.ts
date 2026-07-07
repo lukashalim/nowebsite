@@ -1,7 +1,6 @@
 import { formatCategoryDisplayName } from "@/lib/directory/labels";
 import { directoryCategoryLabel } from "@/lib/directory/slugs";
 import type { CrmWebPresence } from "@/lib/crm-params";
-import { RING_READY_ORIGIN } from "@/lib/ringready-site";
 
 /** Strip legal suffixes; keep up to ~3 words / 28 chars for casual outreach. */
 export function shortenBusinessNameForOutreach(full: string | null): string {
@@ -68,7 +67,8 @@ export function isEligibleForCrmSpintax(
 export const SPINTAX_PREVIEW_SAMPLE_NAME = "Joe's Pizza";
 export const SPINTAX_PREVIEW_SAMPLE_OWNER_NAME = "Joe";
 export const SPINTAX_PREVIEW_SAMPLE_CATEGORY = "plumber";
-export const SPINTAX_PREVIEW_SAMPLE_DEMO_LINK = `${RING_READY_ORIGIN}/demo/joes-pizza`;
+export const SPINTAX_PREVIEW_SAMPLE_DEMO_LINK =
+  "https://ringreadysite.com/demo/joes-pizza";
 export const SPINTAX_PREVIEW_SAMPLE_SENDER_NAME = "Alex";
 
 export function categoryLabelForOutreach(
