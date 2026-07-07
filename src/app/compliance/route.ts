@@ -23,12 +23,23 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
+function escapeHtmlWithBoldStopHelp(value: string): string {
+  return escapeHtml(value)
+    .replace(/\bSTOP\b/g, "<strong>STOP</strong>")
+    .replace(/\bHELP\b/g, "<strong>HELP</strong>");
+}
+
 function renderComplianceCheckboxLabel(): string {
   return (
-    `${escapeHtml(RING_READY_COMPLIANCE_CHECKBOX_TEXT)} ` +
+    `${escapeHtmlWithBoldStopHelp(RING_READY_COMPLIANCE_CHECKBOX_TEXT)} ` +
     `<a href="/privacy">Privacy Policy</a> ` +
     `<a href="/terms">Terms of Service</a>`
   );
+}
+
+function renderComplianceOptOutInstructions(): string {
+  return `<p><strong>Opt Out:</strong> You may opt out at any time by replying <strong>STOP</strong> to any message you receive. After you send <strong>STOP</strong>, you will receive a confirmation and no further demo-status texts unless you opt in again.</p>
+  <p><strong>Help:</strong> Reply <strong>HELP</strong> for assistance.</p>`;
 }
 
 function renderCompliancePage(options: {
@@ -52,7 +63,8 @@ function renderCompliancePage(options: {
 </head>
 <body>
   <h1>${escapeHtml(LEGAL_COMPANY_NAME)}</h1>
-  <p>${escapeHtml(RING_READY_COMPLIANCE_DISCLOSURE)}</p>
+  <p>${escapeHtmlWithBoldStopHelp(RING_READY_COMPLIANCE_DISCLOSURE)}</p>
+  ${renderComplianceOptOutInstructions()}
   <p>
     <a href="/privacy">Privacy Policy</a> ·
     <a href="/terms">Terms of Service</a> ·
