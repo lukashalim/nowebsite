@@ -11,6 +11,7 @@ import { statePath } from "@/lib/directory/labels";
 import { directoryRowLinkClass } from "@/lib/directory/ui-classes";
 import { stateAbbrToDisplayName, stateToAbbr } from "@/lib/directory/slugs";
 import { absoluteUrl } from "@/lib/site-url";
+import { directoryOpenGraph } from "@/lib/site-metadata";
 
 export const revalidate = 3600;
 
@@ -22,10 +23,13 @@ export async function generateMetadata(): Promise<Metadata> {
     // omit freshness from meta when directory data is unavailable
   }
   const updated = lastUpdatedLabel ? ` Updated ${lastUpdatedLabel}.` : "";
+  const title = "Businesses Without a Website by State | Web Designer Leads";
+  const description = `Browse state-level lists of businesses without a website — grouped by city for web design agency prospecting.${updated}`;
   return {
-    title: { absolute: "Businesses Without a Website by State | Web Designer Leads" },
-    description: `Browse state-level lists of businesses without a website — grouped by city for web design agency prospecting.${updated}`,
+    title: { absolute: title },
+    description,
     alternates: { canonical: absoluteUrl("/states") },
+    ...directoryOpenGraph({ title, description, path: "/states" }),
   };
 }
 
@@ -52,11 +56,12 @@ export default async function StatesIndexPage() {
         />
         <DirectoryHubNav active="states" />
         <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          All states
+          Businesses Without a Website by State
         </h1>
         <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
-          Each state page lists no-website businesses statewide, grouped by city,
-          with ratings, phones, and Google Maps links.
+          Browse businesses without a website statewide — grouped by city with
+          ratings, phones, and Google Maps links for web design agency
+          prospecting.
         </p>
       </header>
 

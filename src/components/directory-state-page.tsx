@@ -6,7 +6,9 @@ import { DownloadCsvButton } from "@/components/download-csv-button";
 import { DirectoryProspectingAboutData } from "@/components/directory-city-page-copy";
 import { DirectoryBreadcrumbs } from "@/components/directory-breadcrumbs";
 import { DirectoryExploreMore } from "@/components/directory-explore-more";
-import { stateHubTitle, stateHubHeaderSubcopy, stateHubAboutCopy, ukRegionHubTitle, ukRegionHubAboutCopy } from "@/lib/directory/labels";
+import { stateHubTitle, stateHubHeaderSubcopy, stateHubAboutCopy, ukRegionHubTitle, ukRegionHubAboutCopy, categoryGridSeoLabel, categoryPath } from "@/lib/directory/labels";
+import { fetchAllPublishedCategoryLinks } from "@/lib/directory/data";
+import { sortCategoriesByPriority } from "@/lib/directory/category-priority";
 import { buildProspectingDatasetJsonLd } from "@/lib/directory/jsonld";
 import { DirectoryListingFilters } from "@/components/directory-listing-filters";
 import {
@@ -49,7 +51,7 @@ interface DirectoryStatePageProps {
   isPro?: boolean;
 }
 
-export function DirectoryStatePage({
+export async function DirectoryStatePage({
   stateSlug,
   state,
   businesses,
@@ -120,6 +122,22 @@ export function DirectoryStatePage({
   const exploreLinks = !isUkRegion
     ? [{ href: "/states", label: "All states" }]
     : [{ href: hubHref, label: "United Kingdom directory" }];
+
+  const popularCategoryLinks =
+    !isUkRegion
+      ? sortCategoriesByPriority(
+          await fetchAllPublishedCategoryLinks(),
+        )
+          .slice(0, 8)
+          .map((c) => ({
+            href: categoryPath(c.categorySlug),
+            label: categoryGridSeoLabel(
+              c.categoryLabel,
+              c.count,
+              c.categorySlug,
+            ),
+          }))
+      : [];
 
   return (
     <div className="space-y-8">
@@ -220,6 +238,13 @@ export function DirectoryStatePage({
           pageSize={pageSize}
           totalPages={totalPages}
           isPro={isPro}
+        />
+      ) : null}
+
+      {popularCategoryLinks.length > 0 ? (
+        <DirectoryExploreMore
+          heading={`Popular categories in ${displayState}`}
+          links={popularCategoryLinks}
         />
       ) : null}
 

@@ -22,7 +22,7 @@ export function buildSiteOrganizationJsonLd(
     name: SITE_ORGANIZATION_NAME,
     url: origin,
     description:
-      "B2B prospecting platform and export-ready lead lists for web designers and agencies targeting local businesses without standalone websites.",
+      "B2B prospecting platform and export-ready lead lists for web designers and agencies targeting businesses without a website — including restaurants without a website nationwide.",
     audience: {
       "@type": "Audience",
       audienceType: SITE_AUDIENCE_TYPE,
@@ -39,7 +39,7 @@ export function buildSiteWebSiteJsonLd(
     name: SITE_ORGANIZATION_NAME,
     url: origin,
     description:
-      "B2B lead lists and prospecting CRM for web designers finding businesses without websites.",
+      "B2B lead lists and prospecting CRM for web designers finding businesses without a website — including restaurants without a website and salons without a website.",
     publisher: { "@id": siteOrganizationId(origin) },
     audience: {
       "@type": "Audience",

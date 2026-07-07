@@ -14,10 +14,11 @@ import {
   fetchCategoryGroupTaxonomy,
   fallbackCategoryGroupTaxonomy,
 } from "@/lib/directory/category-groups";
-import { categoryGridLabel } from "@/lib/directory/labels";
+import { categoryGridSeoLabel } from "@/lib/directory/labels";
 import { directoryCardLinkClass } from "@/lib/directory/ui-classes";
 import { DIRECTORY_MIN_CATEGORY_LISTINGS } from "@/lib/directory/types";
 import { absoluteUrl } from "@/lib/site-url";
+import { directoryOpenGraph } from "@/lib/site-metadata";
 
 export const revalidate = 3600;
 
@@ -29,10 +30,13 @@ export async function generateMetadata(): Promise<Metadata> {
     // omit freshness from meta when directory data is unavailable
   }
   const updated = lastUpdatedLabel ? ` Updated ${lastUpdatedLabel}.` : "";
+  const title = "Businesses Without a Website by Category | Web Designer Leads";
+  const description = `Browse restaurants without a website, salons without a website, and other category lead lists — B2B prospecting data for web design agencies.${updated}`;
   return {
-    title: { absolute: "Businesses Without a Website by Category | Web Designer Leads" },
-    description: `Browse restaurants without a website, salons without a website, and other category lead lists — B2B prospecting data for web design agencies.${updated}`,
+    title: { absolute: title },
+    description,
     alternates: { canonical: absoluteUrl("/categories") },
+    ...directoryOpenGraph({ title, description, path: "/categories" }),
   };
 }
 
@@ -64,12 +68,13 @@ export default async function CategoriesIndexPage() {
         />
         <DirectoryHubNav active="categories" />
         <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          All categories
+          Businesses Without a Website by Category
         </h1>
         <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
-          Each category page lists no-website businesses nationwide in that trade,
-          grouped by city, with ratings, phones, and Google Maps links. Pages require
-          at least {DIRECTORY_MIN_CATEGORY_LISTINGS} listings.
+          Browse restaurants without a website, salons without a website, and
+          other nationwide category lists. Each page groups no-website businesses
+          by city with ratings, phones, and Google Maps links. Pages require at
+          least {DIRECTORY_MIN_CATEGORY_LISTINGS} listings nationwide.
         </p>
       </header>
 
@@ -107,10 +112,11 @@ export default async function CategoriesIndexPage() {
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block font-medium text-zinc-900 dark:text-zinc-100">
-                          {categoryGridLabel(cat.categoryLabel)}
-                        </span>
-                        <span className="tabular-nums text-xs text-zinc-500">
-                          {cat.count.toLocaleString()} nationwide
+                          {categoryGridSeoLabel(
+                            cat.categoryLabel,
+                            cat.count,
+                            cat.categorySlug,
+                          )}
                         </span>
                       </span>
                     </Link>

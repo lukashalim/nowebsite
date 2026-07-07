@@ -16,8 +16,8 @@ import { DirectoryLastUpdated } from "@/components/directory-last-updated";
 import { DirectoryListingFilters } from "@/components/directory-listing-filters";
 import { DirectoryStatePage } from "@/components/directory-state-page";
 import {
-  categoryLinkLabel,
   categoryPath,
+  cityCategoryLinkLabel,
   cityHubCategoryH2,
   cityHubCategoryIntro,
   cityHubHeaderSubcopy,
@@ -51,9 +51,10 @@ import {
   parseDirectoryPageParam,
   statePathWithPage,
 } from "@/lib/directory/pagination";
-import { categoryContentMetaDescription } from "@/lib/directory/category-content";
+import { categoryContentMetaDescription, resolveCategoryPitch } from "@/lib/directory/category-content";
 import { buildProspectingDatasetJsonLd } from "@/lib/directory/jsonld";
 import { absoluteUrl } from "@/lib/site-url";
+import { directoryOpenGraph } from "@/lib/site-metadata";
 import { getAuthenticatedUserProfile, isPro } from "@/lib/subscription";
 import { createDirectoryContactAccess } from "@/lib/directory/contact-access";
 import {
@@ -100,9 +101,10 @@ export async function generateMetadata({
       data.page > 1 ? data.page : undefined,
       slugLower,
     );
+    const descriptionPitch = resolveCategoryPitch(slugLower, data.content);
     const description =
-      data.page === 1 && data.content?.pitch?.trim()
-        ? categoryContentMetaDescription(data.content.pitch)
+      data.page === 1 && descriptionPitch
+        ? categoryContentMetaDescription(descriptionPitch)
         : nationwideCategoryMetaDescription(
             data.categoryLabel,
             data.totalCount,
@@ -120,6 +122,7 @@ export async function generateMetadata({
       title: { absolute: title },
       description,
       alternates: { canonical: absoluteUrl(canonicalPath) },
+      ...directoryOpenGraph({ title, description, path: canonicalPath }),
     };
   }
 
@@ -141,6 +144,7 @@ export async function generateMetadata({
       title: { absolute: title },
       description,
       alternates: { canonical: absoluteUrl(canonicalPath) },
+      ...directoryOpenGraph({ title, description, path: canonicalPath }),
     };
   }
 
@@ -167,6 +171,7 @@ export async function generateMetadata({
       title: { absolute: title },
       description,
       alternates: { canonical: absoluteUrl(canonicalPath) },
+      ...directoryOpenGraph({ title, description, path: canonicalPath }),
     };
   }
 
@@ -286,14 +291,15 @@ export default async function SlugDirectoryPage({
       const inner = (
         <>
           <span className="font-medium text-zinc-900 dark:text-zinc-100">
-            {categoryLinkLabel(cat.categoryLabel)}
+            {cityCategoryLinkLabel(
+              cat.categoryLabel,
+              cat.listingCount,
+              cat.categorySlug,
+            )}
           </span>
           <span className="tabular-nums text-zinc-500">
-            {cat.listingCount}
             {!hasPage ? (
-              <span className="ml-1 text-xs font-normal text-zinc-400">
-                (in table)
-              </span>
+              <span className="text-xs font-normal text-zinc-400">(in table)</span>
             ) : null}
           </span>
         </>
@@ -324,6 +330,9 @@ export default async function SlugDirectoryPage({
       );
     };
 
+    const restaurantInHub = hub.categories.some(
+      (c) => c.categorySlug === "restaurant",
+    );
     const cityJsonLd = buildProspectingDatasetJsonLd({
       name: h1,
       description: cityHubMetaDescription(
@@ -336,7 +345,12 @@ export default async function SlugDirectoryPage({
       path: `/${lower}`,
       recordCount: cityData.unfilteredCount,
       spatialCoverage: place,
-      keywords: ["businesses without website near me", "businesses without website"],
+      keywords: [
+        "businesses without a website near me",
+        "businesses without website near me",
+        "businesses without website",
+        ...(restaurantInHub ? ["restaurants without a website"] : []),
+      ],
     });
 
     const stateSlug = stateNameToSlug(hub.state);
@@ -395,6 +409,7 @@ export default async function SlugDirectoryPage({
               place,
               hub.city,
               cityData.unfilteredCount,
+              topCategory,
             )}
           </p>
         </header>

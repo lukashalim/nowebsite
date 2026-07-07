@@ -65,3 +65,24 @@ export function categoryContentMetaDescription(pitch: string): string {
   const lastSpace = cut.lastIndexOf(" ");
   return (lastSpace > 80 ? cut.slice(0, lastSpace) : cut).trimEnd() + "…";
 }
+
+const CATEGORY_PITCH_FALLBACKS: Record<string, string> = {
+  restaurant:
+    "Nationwide restaurants without a website — export-ready B2B lead lists for web designers. Find restaurants without a website near you in Houston, Chicago, Los Angeles, and other major markets. Sorted by review volume with reveal-gated contact fields for cold outreach.",
+};
+
+/** Static pitch when no category_content row exists (or pitch is empty). */
+export function categoryPitchFallback(categorySlug: string): string | null {
+  const slug = canonicalCategorySlug(categorySlug.trim().toLowerCase());
+  return CATEGORY_PITCH_FALLBACKS[slug] ?? null;
+}
+
+/** Pitch for meta and on-page copy: DB content first, then static fallback. */
+export function resolveCategoryPitch(
+  categorySlug: string,
+  content: CategoryContent | null | undefined,
+): string | null {
+  const fromDb = content?.pitch?.trim();
+  if (fromDb) return fromDb;
+  return categoryPitchFallback(categorySlug);
+}

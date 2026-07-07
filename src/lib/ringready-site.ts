@@ -4,6 +4,9 @@ import { tenantDemoPublicPath } from "@/lib/demo-slug";
 
 export const RING_READY_ORIGIN = "https://ringreadysite.com";
 
+/** Local dev: `npm run dev:ringready` → http://localhost:3001 */
+export const RING_READY_DEV_PORT = "3001";
+
 export const RING_READY_LEGAL_PATHS = [
   "/privacy",
   "/terms",
@@ -35,8 +38,21 @@ export const RING_READY_RESERVED_FIRST_SEGMENTS = new Set([
   "united-kingdom",
 ]);
 
+function getHostPort(host: string): string | null {
+  const lastColon = host.lastIndexOf(":");
+  if (lastColon === -1) return null;
+  return host.slice(lastColon + 1);
+}
+
 export function isRingReadyHost(host: string): boolean {
-  return host.includes("ringreadysite.com");
+  if (host.includes("ringreadysite.com")) return true;
+  if (
+    process.env.NODE_ENV === "development" &&
+    getHostPort(host) === RING_READY_DEV_PORT
+  ) {
+    return true;
+  }
+  return false;
 }
 
 export function ringReadyAbsoluteUrl(path: string): string {

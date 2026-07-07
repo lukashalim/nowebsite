@@ -6,14 +6,19 @@ import { DownloadCsvButton } from "@/components/download-csv-button";
 import { DirectoryProspectingAboutData } from "@/components/directory-city-page-copy";
 import { DirectoryBreadcrumbs } from "@/components/directory-breadcrumbs";
 import { DirectoryExploreMore } from "@/components/directory-explore-more";
-import type { CategoryContent } from "@/lib/directory/category-content";
+import {
+  resolveCategoryPitch,
+  type CategoryContent,
+} from "@/lib/directory/category-content";
 import {
   categoryAboutPlaceLabel,
   categoryHubAboutCopy,
-  categoryLinkLabel,
+  categoryGridSeoLabel,
   categoryPath,
   categorySeoPlural,
   categoryWithoutWebsiteTitle,
+  cityPath,
+  formatLocationLabel,
   nationwideCategoryPageTitle,
   pluralCategoryForTitle,
 } from "@/lib/directory/labels";
@@ -101,8 +106,9 @@ export async function DirectoryCategoryPage({
   const range = directoryPageRange(page, pageSize, totalCount);
   const hrefForPage = (p: number) =>
     categoryPathWithPage(categorySlug, p, filters);
+  const pitch = resolveCategoryPitch(categorySlug, content);
   const showPitch = Boolean(
-    content?.pitch?.trim() && page === 1 && !hasActiveDirectoryListingFilters(filters),
+    pitch && page === 1 && !hasActiveDirectoryListingFilters(filters),
   );
   const filtersActive = hasActiveDirectoryListingFilters(filters);
 
@@ -124,8 +130,28 @@ export async function DirectoryCategoryPage({
     .slice(0, 6)
     .map((c) => ({
       href: categoryPath(c.categorySlug),
-      label: categoryLinkLabel(c.categoryLabel),
+      label: categoryGridSeoLabel(
+        c.categoryLabel,
+        c.count,
+        c.categorySlug,
+      ),
     }));
+
+  const topCityLinks = cityGroups
+    .filter((g) => publishedCitySlugs?.has(g.citySlug))
+    .map((g) => ({
+      href: cityPath(g.citySlug),
+      label: `${categoryWithoutWebsiteTitle(categoryLabel, categorySlug)} in ${formatLocationLabel(
+        g.city,
+        g.state,
+        g.country,
+        g.region,
+      )}`,
+      count: g.businesses.length,
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8)
+    .map(({ href, label }) => ({ href, label }));
 
   const breadcrumbItems = [
     { label: "Home", href: "/" },
@@ -152,9 +178,9 @@ export async function DirectoryCategoryPage({
           ) : null}
         </h1>
 
-        {showPitch && content ? (
+        {showPitch && pitch ? (
           <p className="max-w-2xl whitespace-pre-line text-base text-zinc-600 dark:text-zinc-400">
-            {content.pitch}
+            {pitch}
           </p>
         ) : (
           <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
@@ -269,6 +295,13 @@ export async function DirectoryCategoryPage({
           pageSize={pageSize}
           totalPages={totalPages}
           isPro={isPro}
+        />
+      ) : null}
+
+      {topCityLinks.length > 0 && !paginated ? (
+        <DirectoryExploreMore
+          heading={`Top cities for ${keywordPhrase}`}
+          links={topCityLinks}
         />
       ) : null}
 

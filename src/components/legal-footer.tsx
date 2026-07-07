@@ -49,7 +49,7 @@ export function LegalFooter() {
           <span aria-hidden className="text-zinc-300 dark:text-zinc-600">
             |
           </span>
-          <Link href="/#sms-optin" className={linkClass}>
+          <Link href="/compliance" className={linkClass}>
             Subscribe to SMS
           </Link>
         </nav>

@@ -36,7 +36,7 @@ function renderCompliancePage(options: {
   error?: "invalid" | "rate_limit";
 }): string {
   const statusMessage = options.subscribed
-    ? "<p>Thank you. You are signed up for SMS updates.</p>"
+    ? "<p>Thank you. You are signed up for RingReadySite demo alerts.</p>"
     : options.error === "rate_limit"
       ? "<p>Too many attempts. Please try again later.</p>"
       : options.error === "invalid"

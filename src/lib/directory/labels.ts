@@ -87,6 +87,12 @@ const CATEGORY_SEO_PLURAL_BY_SLUG: Record<string, string> = {
   "hair-salon": "Salons",
   "beauty-salon": "Salons",
   "nail-salon": "Salons",
+  plumber: "Plumbers",
+  roofer: "Roofers",
+  "hvac-contractor": "HVAC Contractors",
+  "barber-shop": "Barbers",
+  dentist: "Dentists",
+  contractor: "Contractors",
 };
 
 export function categorySeoPlural(
@@ -360,9 +366,9 @@ export function cityHubMetaTitle(
 ): string {
   const place = cityHubPlaceLabel(city, state, country, region);
   if (place.length > CITY_HUB_META_TITLE_MAX_PLACE) {
-    return `${city.trim()} Businesses Without a Website Near You | ${SITE_BRAND}`;
+    return `${city.trim()} Businesses Without a Website Near Me | ${SITE_BRAND}`;
   }
-  return `Businesses Without a Website Near You in ${place} | ${SITE_BRAND}`;
+  return `Businesses Without a Website Near Me in ${place} | ${SITE_BRAND}`;
 }
 
 /** Visible page H1 — intentionally differs from meta title for natural variation. */
@@ -396,15 +402,25 @@ export function cityHubMetaDescription(
 ): string {
   const place = cityHubPlaceLabel(city, state, country, region);
   const updated = lastUpdatedLabel ? ` Updated ${lastUpdatedLabel}.` : "";
-  return `${listingCount.toLocaleString()} businesses without a website near you in ${place} — B2B lead list for web designers and agencies. Export-ready prospecting data sorted by review volume.${updated}`;
+  return `${listingCount.toLocaleString()} businesses without a website near me in ${place} — B2B lead list for web designers and agencies. Pick your city for businesses without a website near you. Export-ready prospecting data sorted by review volume.${updated}`;
+}
+
+export interface CityHubTopCategory {
+  categorySlug: string;
+  categoryLabel: string;
 }
 
 export function cityHubHeaderSubcopy(
   place: string,
   city: string,
   count: number,
+  topCategory?: CityHubTopCategory | null,
 ): string {
-  return `${count.toLocaleString()} businesses without a website near you in ${place} — a B2B lead list for web design outreach in ${city}. Browse restaurants, salons, and other categories below, or scan the full export-ready table.`;
+  const countLine = `${count.toLocaleString()} businesses without a website near you in ${place}`;
+  if (topCategory?.categorySlug === "restaurant") {
+    return `${countLine} — including restaurants without a website and other categories. Browse below or scan the full export-ready table.`;
+  }
+  return `${countLine} — a B2B lead list for web design outreach in ${city}. Browse restaurants, salons, and other categories below, or scan the full export-ready table.`;
 }
 
 export function cityHubCategoryH2(city: string): string {
@@ -523,6 +539,26 @@ export function categoryHubAboutCopy(
 
 export function categoryLinkLabel(categoryLabel: string): string {
   return pluralCategoryForTitle(formatCategoryDisplayName(categoryLabel));
+}
+
+/** SEO anchor text for city category links, e.g. "Restaurants without a website (42)". */
+export function cityCategoryLinkLabel(
+  categoryLabel: string,
+  count: number,
+  categorySlug?: string,
+): string {
+  const plural = categorySeoPlural(categoryLabel, categorySlug);
+  return `${plural} without a website (${count.toLocaleString()})`;
+}
+
+/** SEO label for category grids, e.g. "Restaurants without a website (4,288)". */
+export function categoryGridSeoLabel(
+  categoryLabel: string,
+  count: number,
+  categorySlug?: string,
+): string {
+  const plural = categorySeoPlural(categoryLabel, categorySlug);
+  return `${plural} without a website (${count.toLocaleString()})`;
 }
 
 /** Short singular-style label for grids (e.g. "Painter", "Event Services"). */

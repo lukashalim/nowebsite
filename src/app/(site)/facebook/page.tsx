@@ -32,6 +32,7 @@ import {
 } from "@/lib/directory/pagination";
 import { DIRECTORY_MIN_CITY_LISTINGS } from "@/lib/directory/types";
 import { absoluteUrl } from "@/lib/site-url";
+import { directoryOpenGraph } from "@/lib/site-metadata";
 import { getAuthenticatedUserProfile, isPro } from "@/lib/subscription";
 import { createDirectoryContactAccess } from "@/lib/directory/contact-access";
 import { listingScopeForFacebook } from "@/lib/directory/listing-scope";
@@ -62,17 +63,18 @@ export async function generateMetadata({
   const canonicalPath = hasActiveDirectoryListingFilters(filters)
     ? facebookPathWithPage(1)
     : facebookPathWithPage(page, filters);
+  const title = facebookHubMetaTitle(page > 1 ? page : undefined);
+  const description = facebookHubMetaDescription(
+    lastUpdatedLabel,
+    totalPages > 1
+      ? { current: page, totalPages, totalCount }
+      : undefined,
+  );
   return {
-    title: {
-      absolute: facebookHubMetaTitle(page > 1 ? page : undefined),
-    },
-    description: facebookHubMetaDescription(
-      lastUpdatedLabel,
-      totalPages > 1
-        ? { current: page, totalPages, totalCount }
-        : undefined,
-    ),
+    title: { absolute: title },
+    description,
     alternates: { canonical: absoluteUrl(canonicalPath) },
+    ...directoryOpenGraph({ title, description, path: canonicalPath }),
   };
 }
 

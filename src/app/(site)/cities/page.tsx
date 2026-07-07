@@ -7,8 +7,11 @@ import { fetchAllDirectoryCities, fetchDirectoryLastUpdatedLabel } from "@/lib/d
 import { cityPath, formatCityState } from "@/lib/directory/labels";
 import { directoryRowLinkClass } from "@/lib/directory/ui-classes";
 import { absoluteUrl } from "@/lib/site-url";
+import { directoryOpenGraph } from "@/lib/site-metadata";
 
 export const revalidate = 3600;
+
+const TOP_CITY_LINKS = 10;
 
 export async function generateMetadata(): Promise<Metadata> {
   let lastUpdatedLabel: string | null = null;
@@ -18,10 +21,13 @@ export async function generateMetadata(): Promise<Metadata> {
     // omit freshness from meta when directory data is unavailable
   }
   const updated = lastUpdatedLabel ? ` Updated ${lastUpdatedLabel}.` : "";
+  const title = "Businesses Without a Website by City | Near-You Lead Lists";
+  const description = `Browse city-level lists of businesses without a website near you — B2B prospecting data for web design agencies.${updated}`;
   return {
-    title: { absolute: "Businesses Without a Website by City | Near-You Lead Lists" },
-    description: `Browse city-level lists of businesses without a website near you — B2B prospecting data for web design agencies.${updated}`,
+    title: { absolute: title },
+    description,
     alternates: { canonical: absoluteUrl("/cities") },
+    ...directoryOpenGraph({ title, description, path: "/cities" }),
   };
 }
 
@@ -39,6 +45,8 @@ export default async function CitiesIndexPage() {
     loadError = e instanceof Error ? e.message : "Could not load cities.";
   }
 
+  const featuredCities = cities.slice(0, TOP_CITY_LINKS);
+
   return (
     <div className="space-y-8">
       <header className="space-y-3">
@@ -48,12 +56,28 @@ export default async function CitiesIndexPage() {
         />
         <DirectoryHubNav active="cities" />
         <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          All cities
+          Businesses Without a Website by City
         </h1>
         <p className="max-w-2xl text-base text-zinc-600 dark:text-zinc-400">
-          Each city page lists every no-website business we have in that market,
-          grouped by category where enough listings exist for a dedicated page.
+          Pick your city for businesses without a website near you — or browse
+          businesses without a website near me in major markets. Each city page
+          lists every no-website business we have in that market, grouped by
+          category where enough listings exist for a dedicated page.
         </p>
+        {featuredCities.length > 0 ? (
+          <ul className="flex flex-wrap gap-2 pt-1">
+            {featuredCities.map((c) => (
+              <li key={c.citySlug}>
+                <Link
+                  href={cityPath(c.citySlug)}
+                  className="inline-flex rounded-lg border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900/50"
+                >
+                  Businesses without a website in {formatCityState(c.city, c.state)}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </header>
 
       <DirectoryLastUpdated label={lastUpdatedLabel} />

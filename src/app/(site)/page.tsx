@@ -5,7 +5,7 @@ import { LayoutTemplate, Search, Workflow } from "lucide-react";
 import { RingReadyHome } from "@/components/ringready-home";
 import { CategoryGroupIcon } from "@/components/category-group-icon";
 import { CategoryIcon } from "@/components/category-icon";
-import { categoryGridLabel, cityPath, statePath } from "@/lib/directory/labels";
+import { categoryGridSeoLabel, cityPath, formatCityState, statePath } from "@/lib/directory/labels";
 import { stateAbbrToDisplayName, stateToAbbr } from "@/lib/directory/slugs";
 import {
   fetchAllDirectoryCities,
@@ -27,6 +27,8 @@ import {
   ringReadyAbsoluteUrl,
 } from "@/lib/ringready-site";
 import { absoluteUrl } from "@/lib/site-url";
+import { directoryOpenGraph } from "@/lib/site-metadata";
+import { buildProspectingDatasetJsonLd } from "@/lib/directory/jsonld";
 import {
   directoryCardLinkClass,
   directoryOutlineButtonClass,
@@ -73,9 +75,9 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = (await headers()).get("host") ?? "";
   if (isRingReadyHost(host)) {
     return {
-      title: { absolute: "RingReadySite" },
+      title: { absolute: "RingReadySite — AI Demo Websites for Cold Outreach" },
       description:
-        "Demo websites for cold outreach — show local businesses what their site could look like.",
+        "Generate live preview websites from Google Maps business data for web designers and agencies. Show prospects their reviews, photos, and location before pitching a full site build.",
       alternates: { canonical: ringReadyAbsoluteUrl("/") },
       robots: { index: true, follow: true },
     };
@@ -88,13 +90,14 @@ export async function generateMetadata(): Promise<Metadata> {
     // omit freshness from meta when directory data is unavailable
   }
   const updated = lastUpdatedLabel ? ` Updated ${lastUpdatedLabel}.` : "";
+  const title =
+    "Businesses Without a Website | Restaurants, Salons & More — Web Designer Leads";
+  const description = `Find businesses without a website — including restaurants without a website and salons without a website. Browse by city for businesses without a website near you. B2B lead lists for web designers and agencies.${updated}`;
   return {
-    title: {
-      absolute:
-        "Businesses Without a Website | Restaurants, Salons & More — Web Designer Leads",
-    },
-    description: `Find businesses without a website — including restaurants without a website and salons without a website. Browse by city for businesses without a website near you. B2B lead lists for web designers and agencies.${updated}`,
+    title: { absolute: title },
+    description,
     alternates: { canonical: absoluteUrl("/") },
+    ...directoryOpenGraph({ title, description, path: "/" }),
   };
 }
 
@@ -105,8 +108,7 @@ export default async function HomePage({
 }) {
   const host = (await headers()).get("host") ?? "";
   if (isRingReadyHost(host)) {
-    const params = await searchParams;
-    return <RingReadyHome searchParams={params} />;
+    return <RingReadyHome />;
   }
 
   let cities: Awaited<ReturnType<typeof fetchAllDirectoryCities>> = [];
@@ -144,18 +146,47 @@ export default async function HomePage({
 
   const topCategories = publishedCategories.slice(0, HOME_TOP_CATEGORIES);
   const topCities = cities.slice(0, HOME_TOP_CITIES);
+  const restaurantCategory = publishedCategories.find(
+    (c) => c.categorySlug === "restaurant",
+  );
+  const restaurantCityLinks = topCities.slice(0, 3);
   const totalCategoryCount =
     summary?.categoryPageCount ?? publishedCategories.length;
   const totalCityCount = summary?.cityHubCount ?? cities.length;
   const totalStateCount = summary?.statePageCount ?? topStates.length;
   const listingCount = summary?.totalListings ?? null;
 
+  const homeJsonLd =
+    listingCount !== null
+      ? buildProspectingDatasetJsonLd({
+          name: "Businesses Without a Website",
+          description:
+            "Verified B2B lead lists of businesses without a website — restaurants without a website, salons without a website, and businesses without a website near you by city.",
+          path: "/",
+          recordCount: listingCount,
+          keywords: [
+            "businesses without a website",
+            "businesses without a website near me",
+            "restaurants without a website",
+          ],
+        })
+      : null;
+
   return (
     <div className="space-y-12">
+      {homeJsonLd ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(homeJsonLd) }}
+        />
+      ) : null}
       <section className="space-y-4">
         <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-4xl">
-          The Prospecting Tool for Web Designers
+          Businesses Without a Website
         </h1>
+        <p className="text-lg font-medium text-zinc-700 dark:text-zinc-300">
+          The prospecting tool for web designers
+        </p>
         <p className="max-w-2xl text-[17px] leading-relaxed text-[#4A4A4A] dark:text-zinc-300">
           {listingCount !== null
             ? `Access ${listingCount.toLocaleString()} verified businesses without a website — restaurants, salons, contractors, and more. Sort by city for businesses without a website near you, track outreach, and close clients faster.`
@@ -246,6 +277,43 @@ export default async function HomePage({
             </Link>
           ) : null}
 
+          {restaurantCategory ? (
+            <section className="space-y-4">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                Restaurants without a website
+              </h2>
+              <p className="max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
+                Browse{" "}
+                {restaurantCategory.count.toLocaleString()} restaurants without a
+                website nationwide — or explore major markets by city.
+              </p>
+              <ul className="flex flex-wrap gap-2">
+                <li>
+                  <Link
+                    href={restaurantCategory.href}
+                    className="inline-flex rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-900/50"
+                  >
+                    {categoryGridSeoLabel(
+                      restaurantCategory.categoryLabel,
+                      restaurantCategory.count,
+                      restaurantCategory.categorySlug,
+                    )}
+                  </Link>
+                </li>
+                {restaurantCityLinks.map((c) => (
+                  <li key={c.citySlug}>
+                    <Link
+                      href={cityPath(c.citySlug)}
+                      className="inline-flex rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-900/50"
+                    >
+                      Restaurants without a website in {formatCityState(c.city, c.state)}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
           <section className="space-y-4">
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
               Categories
@@ -281,11 +349,13 @@ export default async function HomePage({
                       />
                       <span>
                         <span className="block font-medium text-zinc-900 dark:text-zinc-100">
-                          {categoryGridLabel(cat.categoryLabel)}
+                          {categoryGridSeoLabel(
+                            cat.categoryLabel,
+                            cat.count,
+                            cat.categorySlug,
+                          )}
                         </span>
-                        <span className="text-xs text-zinc-500">
-                          {cat.count.toLocaleString()} nationwide
-                        </span>
+                        <span className="text-xs text-zinc-500">nationwide</span>
                       </span>
                     </Link>
                   </li>
@@ -362,7 +432,7 @@ export default async function HomePage({
           <section className="space-y-4">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-                Cities
+                Businesses without a website near you
               </h2>
               {totalCityCount > 0 ? (
                 <Link
@@ -373,6 +443,11 @@ export default async function HomePage({
                 </Link>
               ) : null}
             </div>
+            <p className="max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
+              Pick your city for businesses without a website near you — or
+              search for businesses without a website near me in major markets
+              like Houston, Chicago, and Los Angeles.
+            </p>
             {topCities.length === 0 ? (
               <p className="text-sm text-zinc-500">
                 No city hubs yet (need {DIRECTORY_MIN_CITY_LISTINGS}+ listings per
@@ -387,7 +462,7 @@ export default async function HomePage({
                       className="flex items-center justify-between rounded-lg border border-zinc-200 px-4 py-3 text-sm hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900/50"
                     >
                       <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                        {c.city}, {c.state}
+                        Businesses without a website in {formatCityState(c.city, c.state)}
                       </span>
                       <span className="tabular-nums text-zinc-500">
                         {c.listingCount.toLocaleString()} listings
@@ -414,8 +489,25 @@ export default async function HomePage({
                 ready for outreach
               </p>
               <p className="mt-4 text-base text-zinc-600 dark:text-zinc-400">
-                Browse businesses without a website near you by city or state —
-                including restaurants without a website and salons without a website.
+                Browse{" "}
+                <Link
+                  href="/cities"
+                  className="font-medium text-zinc-800 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900 dark:text-zinc-200"
+                >
+                  businesses without a website near you
+                </Link>
+                {" "}by city or state — including{" "}
+                {restaurantCategory ? (
+                  <Link
+                    href={restaurantCategory.href}
+                    className="font-medium text-zinc-800 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900 dark:text-zinc-200"
+                  >
+                    restaurants without a website
+                  </Link>
+                ) : (
+                  "restaurants without a website"
+                )}
+                {" "}and salons without a website.
               </p>
               {summary.lastUpdatedLabel ? (
                 <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
