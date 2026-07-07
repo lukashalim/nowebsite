@@ -1,6 +1,7 @@
 import { formatCategoryDisplayName } from "@/lib/directory/labels";
 import { directoryCategoryLabel } from "@/lib/directory/slugs";
 import type { CrmWebPresence } from "@/lib/crm-params";
+import { RING_READY_ORIGIN } from "@/lib/ringready-site";
 
 /** Strip legal suffixes; keep up to ~3 words / 28 chars for casual outreach. */
 export function shortenBusinessNameForOutreach(full: string | null): string {
@@ -65,7 +66,10 @@ export function isEligibleForCrmSpintax(
 }
 
 export const SPINTAX_PREVIEW_SAMPLE_NAME = "Joe's Pizza";
+export const SPINTAX_PREVIEW_SAMPLE_OWNER_NAME = "Joe";
 export const SPINTAX_PREVIEW_SAMPLE_CATEGORY = "plumber";
+export const SPINTAX_PREVIEW_SAMPLE_DEMO_LINK = `${RING_READY_ORIGIN}/demo/joes-pizza`;
+export const SPINTAX_PREVIEW_SAMPLE_SENDER_NAME = "Alex";
 
 export function categoryLabelForOutreach(
   mainCategory: string | null | undefined,
@@ -76,9 +80,10 @@ export function categoryLabelForOutreach(
   return formatCategoryDisplayName(raw).toLowerCase();
 }
 
-/** Pick one random option from each `{a|b|c}` group. */
+/** Pick one random option from each `{a|b|c}` group (groups without `|` are left intact). */
 export function resolveSpintax(template: string): string {
-  return template.replace(/\{([^{}]+)\}/g, (_, group: string) => {
+  return template.replace(/\{([^{}]+)\}/g, (match, group: string) => {
+    if (!group.includes("|")) return match;
     const options = group
       .split("|")
       .map((s) => s.trim())
@@ -90,20 +95,46 @@ export function resolveSpintax(template: string): string {
 
 export interface OutreachTokenOpts {
   name: string | null;
+  ownerName?: string | null;
   mainCategory?: string | null;
   businessType?: string | null;
+  demoLink?: string | null;
+  senderName?: string | null;
+}
+
+function outreachNameToken(opts: OutreachTokenOpts): string {
+  const owner = opts.ownerName?.trim();
+  if (owner) return owner;
+  const business = opts.name?.trim();
+  if (business) return business;
+  return "there";
+}
+
+function outreachBusinessNameToken(opts: OutreachTokenOpts): string {
+  return opts.name?.trim() || "your business";
 }
 
 export function applyOutreachTokens(
   template: string,
   opts: OutreachTokenOpts,
 ): string {
-  const shortName = shortenBusinessNameForOutreach(opts.name);
+  const nameToken = outreachNameToken(opts);
+  const businessName = outreachBusinessNameToken(opts);
   const category = categoryLabelForOutreach(
     opts.mainCategory,
     opts.businessType,
   );
-  return template.replaceAll("[Name]", shortName).replaceAll("[category]", category);
+  const demoLink = opts.demoLink?.trim() || SPINTAX_PREVIEW_SAMPLE_DEMO_LINK;
+  const senderName =
+    opts.senderName?.trim() || SPINTAX_PREVIEW_SAMPLE_SENDER_NAME;
+
+  return template
+    .replaceAll("[Name]", nameToken)
+    .replaceAll("{Name}", nameToken)
+    .replaceAll("[category]", category)
+    .replaceAll("{Business Name}", businessName)
+    .replaceAll("{demo_link}", demoLink)
+    .replaceAll("{Your name}", senderName);
 }
 
 export function buildOutreachMessage(
@@ -113,10 +144,23 @@ export function buildOutreachMessage(
   return resolveSpintax(applyOutreachTokens(template, opts));
 }
 
-export function buildSpintaxPreview(template: string): string {
-  return buildOutreachMessage(template, {
+export function defaultSpintaxPreviewOpts(
+  overrides?: Partial<OutreachTokenOpts>,
+): OutreachTokenOpts {
+  return {
     name: SPINTAX_PREVIEW_SAMPLE_NAME,
+    ownerName: SPINTAX_PREVIEW_SAMPLE_OWNER_NAME,
     mainCategory: SPINTAX_PREVIEW_SAMPLE_CATEGORY,
     businessType: null,
-  });
+    demoLink: SPINTAX_PREVIEW_SAMPLE_DEMO_LINK,
+    senderName: SPINTAX_PREVIEW_SAMPLE_SENDER_NAME,
+    ...overrides,
+  };
+}
+
+export function buildSpintaxPreview(
+  template: string,
+  overrides?: Partial<OutreachTokenOpts>,
+): string {
+  return buildOutreachMessage(template, defaultSpintaxPreviewOpts(overrides));
 }

@@ -14,7 +14,8 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata(): Promise<Metadata> {
   return {
     title: "Spintax templates | Outreach Engine",
-    description: "Edit saved Facebook DM and SMS spintax templates for CRM outreach.",
+    description:
+      "Edit saved Facebook DM, SMS, call script, and email spintax templates for CRM outreach.",
   };
 }
 
@@ -51,8 +52,9 @@ export default async function CrmSpintaxPage() {
           Spintax Templates
         </h1>
         <p className="max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
-          Edit Facebook DM and SMS outreach templates by lead type. Use{" "}
-          {"{a|b|c}"} for variations and [Name] / [category] for lead tokens.
+          Edit Facebook DM, SMS, call script, and email outreach templates by lead
+          type. Use {"{a|b|c}"} for variations and [Name] / [category] for lead
+          tokens.
         </p>
       </header>
 
@@ -66,7 +68,12 @@ export default async function CrmSpintaxPage() {
           {result.error}
         </div>
       ) : (
-        <SpintaxTemplateEditor initialTemplates={result.templates} />
+        <SpintaxTemplateEditor
+          initialTemplates={result.templates}
+          senderPreviewName={
+            profile?.email?.split("@")[0]?.trim() || null
+          }
+        />
       )}
     </div>
   );

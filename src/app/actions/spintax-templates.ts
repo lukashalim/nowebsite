@@ -112,7 +112,9 @@ export async function updateSpintaxTemplate(
       name: name.trim(),
       template,
       pivot_template:
-        channel === "call" ? (pivotTemplate?.trim() ?? null) : null,
+        channel === "call" || channel === "email"
+          ? (pivotTemplate?.trim() ?? null)
+          : null,
       offer_template:
         channel === "call" ? (offerTemplate?.trim() ?? null) : null,
       audience,
@@ -167,7 +169,9 @@ export async function createSpintaxTemplate(
       name: name.trim(),
       template,
       pivot_template:
-        channel === "call" ? (pivotTemplate?.trim() ?? null) : null,
+        channel === "call" || channel === "email"
+          ? (pivotTemplate?.trim() ?? null)
+          : null,
       offer_template:
         channel === "call" ? (offerTemplate?.trim() ?? null) : null,
       audience,

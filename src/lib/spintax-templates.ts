@@ -10,6 +10,7 @@ import {
 } from "@/lib/spintax-channel";
 import {
   DEFAULT_CALL_SPINTAX_TEMPLATES,
+  DEFAULT_EMAIL_SPINTAX_TEMPLATES,
   DEFAULT_FACEBOOK_SPINTAX_TEMPLATES,
   DEFAULT_SMS_SPINTAX_TEMPLATES,
 } from "@/lib/spintax-defaults";
@@ -67,6 +68,7 @@ export async function ensureDefaultSpintaxTemplates(
   const facebookAudiencesPresent = new Set<SpintaxAudience>();
   let hasSmsTemplates = false;
   let hasCallTemplates = false;
+  let hasEmailTemplates = false;
 
   for (const row of rows ?? []) {
     const record = row as { audience?: string; channel?: string };
@@ -78,6 +80,10 @@ export async function ensureDefaultSpintaxTemplates(
     }
     if (channel === "call") {
       hasCallTemplates = true;
+      continue;
+    }
+    if (channel === "email") {
+      hasEmailTemplates = true;
       continue;
     }
     const audienceRaw = String(record.audience ?? "facebook");
@@ -116,6 +122,16 @@ export async function ensureDefaultSpintaxTemplates(
           template: t.template,
           pivot_template: t.pivot_template ?? null,
           offer_template: t.offer_template ?? null,
+          audience: t.audience,
+          channel: t.channel,
+        }))),
+    ...(hasEmailTemplates
+      ? []
+      : DEFAULT_EMAIL_SPINTAX_TEMPLATES.map((t) => ({
+          user_id: userId,
+          name: t.name,
+          template: t.template,
+          pivot_template: t.pivot_template ?? null,
           audience: t.audience,
           channel: t.channel,
         }))),
@@ -186,8 +202,14 @@ export function validateSpintaxTemplateInput(
   if (!trimmedName) return "Name is required";
   if (trimmedName.length > 200) return "Name must be 200 characters or less";
 
-  const hookError = validateTemplateField(template, "Hook template");
-  if (hookError) return hookError;
+  const templateLabel =
+    channel === "call"
+      ? "Hook template"
+      : channel === "email"
+        ? "Subject"
+        : "Template";
+  const templateError = validateTemplateField(template, templateLabel);
+  if (templateError) return templateError;
 
   if (audience !== undefined && !isSpintaxAudience(audience)) {
     return "Invalid lead type";
@@ -207,6 +229,11 @@ export function validateSpintaxTemplateInput(
       "Offer template",
     );
     if (offerError) return offerError;
+  }
+
+  if (channel === "email") {
+    const bodyError = validateTemplateField(pivotTemplate ?? "", "Body");
+    if (bodyError) return bodyError;
   }
 
   return null;

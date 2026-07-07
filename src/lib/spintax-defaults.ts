@@ -93,6 +93,21 @@ export const DEFAULT_SPINTAX_TEMPLATES: DefaultSpintaxTemplate[] = [
     offer_template:
       "{I put together a quick demo of what a simple site could look like for you. Mind if I text you the link?|I made a short preview you can check on your phone. OK if I send it?}",
   },
+  {
+    name: "Demo link",
+    channel: "email",
+    audience: "any",
+    template: "Your demo — {Business Name}",
+    pivot_template: `Hi {Name},
+
+Here's the link to what your site could look like:
+
+{demo_link}
+
+Take a look when you get a sec — if you want to go live with it, there's a button right on the page to activate it.
+
+{Your name}`,
+  },
 ];
 
 export const DEFAULT_FACEBOOK_SPINTAX_TEMPLATES = DEFAULT_SPINTAX_TEMPLATES.filter(
@@ -105,4 +120,8 @@ export const DEFAULT_SMS_SPINTAX_TEMPLATES = DEFAULT_SPINTAX_TEMPLATES.filter(
 
 export const DEFAULT_CALL_SPINTAX_TEMPLATES = DEFAULT_SPINTAX_TEMPLATES.filter(
   (t) => t.channel === "call",
+);
+
+export const DEFAULT_EMAIL_SPINTAX_TEMPLATES = DEFAULT_SPINTAX_TEMPLATES.filter(
+  (t) => t.channel === "email",
 );

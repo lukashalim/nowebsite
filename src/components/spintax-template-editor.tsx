@@ -9,6 +9,7 @@ import {
   updateSpintaxTemplate,
 } from "@/app/actions/spintax-templates";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
+import { buildEmailSpintaxPreview } from "@/lib/email-template-steps";
 import { buildSpintaxPreview } from "@/lib/outreach-spintax";
 import {
   SPINTAX_AUDIENCE_LABELS,
@@ -24,6 +25,7 @@ import type { SpintaxTemplate } from "@/lib/spintax-templates";
 
 interface SpintaxTemplateEditorProps {
   initialTemplates: SpintaxTemplate[];
+  senderPreviewName?: string | null;
 }
 
 function firstTemplateInChannel(
@@ -39,6 +41,7 @@ function defaultAudienceForChannel(channel: SpintaxChannel): SpintaxAudience {
 
 export function SpintaxTemplateEditor({
   initialTemplates,
+  senderPreviewName,
 }: SpintaxTemplateEditorProps) {
   const router = useRouter();
   const [templates, setTemplates] = useState(initialTemplates);
@@ -64,6 +67,8 @@ export function SpintaxTemplateEditor({
   const [preview, setPreview] = useState("");
   const [previewPivot, setPreviewPivot] = useState("");
   const [previewOffer, setPreviewOffer] = useState("");
+  const [previewEmailSubject, setPreviewEmailSubject] = useState("");
+  const [previewEmailBody, setPreviewEmailBody] = useState("");
   const [previewSeed, setPreviewSeed] = useState(0);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -102,17 +107,43 @@ export function SpintaxTemplateEditor({
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setPreview(buildSpintaxPreview(template));
-      if (activeChannel === "call") {
-        setPreviewPivot(buildSpintaxPreview(pivotTemplate));
-        setPreviewOffer(buildSpintaxPreview(offerTemplate));
-      } else {
+      const previewOverrides = senderPreviewName?.trim()
+        ? { senderName: senderPreviewName.trim() }
+        : undefined;
+
+      if (activeChannel === "email") {
+        const emailPreview = buildEmailSpintaxPreview(
+          template,
+          pivotTemplate,
+          previewOverrides,
+        );
+        setPreviewEmailSubject(emailPreview.subject);
+        setPreviewEmailBody(emailPreview.body);
+        setPreview("");
         setPreviewPivot("");
         setPreviewOffer("");
+      } else {
+        setPreview(buildSpintaxPreview(template, previewOverrides));
+        if (activeChannel === "call") {
+          setPreviewPivot(buildSpintaxPreview(pivotTemplate, previewOverrides));
+          setPreviewOffer(buildSpintaxPreview(offerTemplate, previewOverrides));
+        } else {
+          setPreviewPivot("");
+          setPreviewOffer("");
+        }
+        setPreviewEmailSubject("");
+        setPreviewEmailBody("");
       }
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [template, pivotTemplate, offerTemplate, previewSeed, activeChannel]);
+  }, [
+    template,
+    pivotTemplate,
+    offerTemplate,
+    previewSeed,
+    activeChannel,
+    senderPreviewName,
+  ]);
 
   function selectTemplate(next: SpintaxTemplate) {
     setSelectedId(next.id);
@@ -169,7 +200,9 @@ export function SpintaxTemplateEditor({
               name: name.trim(),
               template,
               pivot_template:
-                activeChannel === "call" ? pivotTemplate.trim() || null : null,
+                activeChannel === "call" || activeChannel === "email"
+                  ? pivotTemplate.trim() || null
+                  : null,
               offer_template:
                 activeChannel === "call" ? offerTemplate.trim() || null : null,
               audience,
@@ -189,14 +222,20 @@ export function SpintaxTemplateEditor({
     const defaultPivot =
       activeChannel === "call"
         ? "When mobile searchers tap through Google listings, businesses without a clear website link often get skipped."
-        : null;
+        : activeChannel === "email"
+          ? "Hi {Name},\n\n{Your message here}.\n\n{Your name}"
+          : null;
     const defaultOffer =
       activeChannel === "call"
         ? "I put together a quick demo for your listing. Mind if I text you the link?"
         : null;
+    const defaultTemplate =
+      activeChannel === "email"
+        ? "Your demo — {Business Name}"
+        : "{Hey|Hi} [Name] - {your message here}.";
     const res = await createSpintaxTemplate(
-      "New template",
-      "{Hey|Hi} [Name] - {your message here}.",
+      activeChannel === "email" ? "New email" : "New template",
+      defaultTemplate,
       defaultAudienceForChannel(activeChannel),
       activeChannel,
       defaultPivot,
@@ -382,7 +421,9 @@ export function SpintaxTemplateEditor({
                     ? "Facebook listing templates show for leads using Facebook as their website. No Facebook templates show for plain no-website leads."
                     : activeChannel === "sms"
                       ? "SMS templates can target Facebook leads, no-Facebook leads, or any lead type."
-                      : "Call scripts can target Facebook leads, no-Facebook leads, or any lead type."}
+                      : activeChannel === "email"
+                        ? "Email templates can target Facebook leads, no-Facebook leads, or any lead type."
+                        : "Call scripts can target Facebook leads, no-Facebook leads, or any lead type."}
                 </span>
               </label>
 
@@ -400,55 +441,94 @@ export function SpintaxTemplateEditor({
                 />
               </label>
 
-              <label className="flex flex-col gap-1 text-sm">
-                <span className="font-medium text-zinc-800 dark:text-zinc-200">
-                  {activeChannel === "call" ? "Hook" : "Template"}
-                </span>
-                <textarea
-                  rows={activeChannel === "call" ? 5 : 10}
-                  value={template}
-                  disabled={pending}
-                  maxLength={4000}
-                  onChange={(e) => setTemplate(e.target.value)}
-                  className="font-mono rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-                />
-                <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Use {"{option A|option B}"} for spintax and [Name] / [category] for
-                  lead tokens.
-                </span>
-              </label>
-
-              {activeChannel === "call" ? (
+              {activeChannel === "email" ? (
                 <>
                   <label className="flex flex-col gap-1 text-sm">
                     <span className="font-medium text-zinc-800 dark:text-zinc-200">
-                      Pivot
+                      Subject
+                    </span>
+                    <input
+                      type="text"
+                      value={template}
+                      disabled={pending}
+                      maxLength={4000}
+                      onChange={(e) => setTemplate(e.target.value)}
+                      className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="font-medium text-zinc-800 dark:text-zinc-200">
+                      Body
                     </span>
                     <textarea
-                      rows={5}
+                      rows={10}
                       value={pivotTemplate}
                       disabled={pending}
                       maxLength={4000}
                       onChange={(e) => setPivotTemplate(e.target.value)}
                       className="font-mono rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
                     />
-                  </label>
-
-                  <label className="flex flex-col gap-1 text-sm">
-                    <span className="font-medium text-zinc-800 dark:text-zinc-200">
-                      Offer
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                      Use {"{option A|option B}"} for spintax. Tokens: [Name],
+                      [category], {"{Business Name}"}, {"{demo_link}"},{" "}
+                      {"{Your name}"}.
                     </span>
-                    <textarea
-                      rows={5}
-                      value={offerTemplate}
-                      disabled={pending}
-                      maxLength={4000}
-                      onChange={(e) => setOfferTemplate(e.target.value)}
-                      className="font-mono rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-                    />
                   </label>
                 </>
-              ) : null}
+              ) : (
+                <>
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="font-medium text-zinc-800 dark:text-zinc-200">
+                      {activeChannel === "call" ? "Hook" : "Template"}
+                    </span>
+                    <textarea
+                      rows={activeChannel === "call" ? 5 : 10}
+                      value={template}
+                      disabled={pending}
+                      maxLength={4000}
+                      onChange={(e) => setTemplate(e.target.value)}
+                      className="font-mono rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+                    />
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                      Use {"{option A|option B}"} for spintax and [Name] /
+                      [category] for lead tokens.
+                    </span>
+                  </label>
+
+                  {activeChannel === "call" ? (
+                    <>
+                      <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium text-zinc-800 dark:text-zinc-200">
+                          Pivot
+                        </span>
+                        <textarea
+                          rows={5}
+                          value={pivotTemplate}
+                          disabled={pending}
+                          maxLength={4000}
+                          onChange={(e) => setPivotTemplate(e.target.value)}
+                          className="font-mono rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+                        />
+                      </label>
+
+                      <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium text-zinc-800 dark:text-zinc-200">
+                          Offer
+                        </span>
+                        <textarea
+                          rows={5}
+                          value={offerTemplate}
+                          disabled={pending}
+                          maxLength={4000}
+                          onChange={(e) => setOfferTemplate(e.target.value)}
+                          className="font-mono rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+                        />
+                      </label>
+                    </>
+                  ) : null}
+                </>
+              )}
 
               <section className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/40">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -464,7 +544,26 @@ export function SpintaxTemplateEditor({
                     Refresh preview
                   </button>
                 </div>
-                {activeChannel === "call" ? (
+                {activeChannel === "email" ? (
+                  <div className="space-y-3 text-sm text-zinc-700 dark:text-zinc-300">
+                    <div>
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        Subject
+                      </p>
+                      <p className="whitespace-pre-wrap">
+                        {previewEmailSubject || "…"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        Body
+                      </p>
+                      <p className="whitespace-pre-wrap">
+                        {previewEmailBody || "…"}
+                      </p>
+                    </div>
+                  </div>
+                ) : activeChannel === "call" ? (
                   <div className="space-y-3 text-sm text-zinc-700 dark:text-zinc-300">
                     <div>
                       <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
