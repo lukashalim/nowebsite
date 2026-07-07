@@ -23,8 +23,9 @@ export async function generateMetadata(): Promise<Metadata> {
   return buildRingReadyLegalPageMetadata(
     {
       title: "Terms of Service",
-      description:
-        "Terms of Service for our B2B SaaS platform providing website and outreach tools for local businesses.",
+      description: isRingReady
+        ? "Terms of Service for RingReadySite — AI demo preview websites from Google Maps data."
+        : "Terms of Service for our B2B SaaS platform providing website and outreach tools for local businesses.",
     },
     {
       isRingReady,
@@ -35,7 +36,10 @@ export async function generateMetadata(): Promise<Metadata> {
   );
 }
 
-export default function TermsPage() {
+export default async function TermsPage() {
+  const host = (await headers()).get("host") ?? "";
+  const isRingReady = isRingReadyHost(host);
+
   return (
     <LegalPageShell title="Terms of Service">
       <LegalSection title="Agreement to Terms">
@@ -47,9 +51,19 @@ export default function TermsPage() {
           These Terms of Service (&quot;Terms&quot;) govern your access to and
           use of the websites, applications, and services provided by{" "}
           {LEGAL_COMPANY_NAME} (&quot;Company,&quot; &quot;we,&quot;
-          &quot;us,&quot; or &quot;our&quot;). Our Services help agencies and
-          contractors create websites, manage leads, and communicate with local
-          businesses.
+          &quot;us,&quot; or &quot;our&quot;).{" "}
+          {isRingReady ? (
+            <>
+              Our Services help agencies and contractors generate AI-powered demo
+              preview websites from Google Maps business data for outreach to
+              local businesses.
+            </>
+          ) : (
+            <>
+              Our Services help agencies and contractors create websites, manage
+              leads, and communicate with local businesses.
+            </>
+          )}
         </p>
         <p>
           By creating an account or using the Services, you agree to these
@@ -109,12 +123,19 @@ export default function TermsPage() {
       <LegalSection title="SMS Messaging Terms">
         <p>
           By opting into SMS updates from {LEGAL_COMPANY_NAME}, you agree to
-          receive text messages regarding project updates and business
-          notifications.
+          receive text messages regarding{" "}
+          {isRingReady
+            ? "updates about demo site requests, such as when a preview is ready to view"
+            : "project updates and business notifications"}
+          .
         </p>
         <p>
           {LEGAL_COMPANY_NAME}, a business entity operating within the United
-          States, may send you project-related SMS updates when you opt in at{" "}
+          States, may send you{" "}
+          {isRingReady
+            ? "SMS updates about your RingReadySite demo requests"
+            : "project-related SMS updates"}{" "}
+          when you opt in at{" "}
           <a
             href={RING_READY_SMS_OPT_IN_URL}
             className="font-medium text-blue-600 hover:underline dark:text-blue-400"
@@ -132,13 +153,14 @@ export default function TermsPage() {
         <ul className="list-disc space-y-2 pl-6">
           <li>
             <strong>Message Frequency:</strong> Message frequency varies based
-            on project activity.
+            on {isRingReady ? "demo generation activity" : "project activity"}.
           </li>
           <li>
             <strong>Opt Out:</strong> You may opt out at any time by replying
             STOP to any message you receive. After you send STOP, we will send a
-            confirmation and no further project-update texts unless you opt in
-            again.
+            confirmation and no further{" "}
+            {isRingReady ? "demo-status" : "project-update"} texts unless you
+            opt in again.
           </li>
           <li>
             <strong>Help:</strong> Reply HELP for assistance.
@@ -172,25 +194,27 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="Directory and Lead Data" id="directory-data">
-        <p>
-          Directory listings, lead lists, and related export data are compiled
-          by {LEGAL_COMPANY_NAME} from publicly available sources. You may
-          browse directory pages on the site for prospecting research. Bulk
-          export (including CSV downloads) requires an account and, where
-          applicable, an active subscription.
-        </p>
-        <p>
-          Directory and lead data is provided &quot;as is&quot; without warranty
-          of completeness or accuracy. You may not scrape, resell, or
-          redistribute the dataset or substantial portions of it without our
-          prior written permission.
-        </p>
-        <p>
-          No open-data license (such as Creative Commons) applies to this
-          content. Use of directory and lead data is governed by these Terms.
-        </p>
-      </LegalSection>
+      {!isRingReady ? (
+        <LegalSection title="Directory and Lead Data" id="directory-data">
+          <p>
+            Directory listings, lead lists, and related export data are compiled
+            by {LEGAL_COMPANY_NAME} from publicly available sources. You may
+            browse directory pages on the site for prospecting research. Bulk
+            export (including CSV downloads) requires an account and, where
+            applicable, an active subscription.
+          </p>
+          <p>
+            Directory and lead data is provided &quot;as is&quot; without warranty
+            of completeness or accuracy. You may not scrape, resell, or
+            redistribute the dataset or substantial portions of it without our
+            prior written permission.
+          </p>
+          <p>
+            No open-data license (such as Creative Commons) applies to this
+            content. Use of directory and lead data is governed by these Terms.
+          </p>
+        </LegalSection>
+      ) : null}
 
       <LegalSection title="Intellectual Property">
         <p>
@@ -207,7 +231,10 @@ export default function TermsPage() {
           AVAILABLE&quot; WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS OR
           IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE,
           AND NON-INFRINGEMENT. WE DO NOT WARRANT THAT THE SERVICES WILL BE
-          UNINTERRUPTED, ERROR-FREE, OR THAT LEAD OR LISTING DATA IS COMPLETE OR
+          UNINTERRUPTED, ERROR-FREE, OR THAT{" "}
+          {isRingReady
+            ? "DEMO OR LISTING DATA DISPLAYED ON PREVIEW SITES IS COMPLETE OR"
+            : "LEAD OR LISTING DATA IS COMPLETE OR"}{" "}
           ACCURATE.
         </p>
       </LegalSection>

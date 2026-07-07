@@ -22,8 +22,9 @@ export async function generateMetadata(): Promise<Metadata> {
   const metadata = buildRingReadyLegalPageMetadata(
     {
       title: "Privacy Policy",
-      description:
-        "Privacy Policy for our B2B SaaS platform providing website and outreach tools for local businesses.",
+      description: isRingReady
+        ? "Privacy Policy for RingReadySite — AI demo preview websites from Google Maps data."
+        : "Privacy Policy for our B2B SaaS platform providing website and outreach tools for local businesses.",
     },
     {
       isRingReady,
@@ -36,7 +37,10 @@ export async function generateMetadata(): Promise<Metadata> {
   return metadata;
 }
 
-export default function PrivacyPage() {
+export default async function PrivacyPage() {
+  const host = (await headers()).get("host") ?? "";
+  const isRingReady = isRingReadyHost(host);
+
   return (
     <LegalPageShell title="Privacy Policy">
       <LegalSection title="Introduction">
@@ -46,12 +50,24 @@ export default function PrivacyPage() {
         </p>
         <p>
           {LEGAL_COMPANY_NAME} (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;)
-          operates a business-to-business software platform that helps agencies
-          and contractors build websites, manage leads, and communicate with
-          local businesses. This Privacy Policy explains how we collect, use,
-          disclose, and safeguard information when you use our website,
-          applications, and related services (collectively, the
-          &quot;Services&quot;).
+          {isRingReady ? (
+            <>
+              {" "}
+              operates RingReadySite, a business-to-business demo-site generator
+              that creates AI-powered preview websites from Google Maps business
+              data for web designers and agencies doing cold outreach.
+            </>
+          ) : (
+            <>
+              {" "}
+              operates a business-to-business software platform that helps agencies
+              and contractors build websites, manage leads, and communicate with
+              local businesses.
+            </>
+          )}{" "}
+          This Privacy Policy explains how we collect, use, disclose, and
+          safeguard information when you use our website, applications, and
+          related services (collectively, the &quot;Services&quot;).
         </p>
         <p>
           By accessing or using the Services, you agree to this Privacy Policy.
@@ -68,9 +84,20 @@ export default function PrivacyPage() {
             registering or managing your account.
           </li>
           <li>
-            <strong>Business and lead data:</strong> information about local
-            businesses, including business names, addresses, phone numbers,
-            public listing data, and notes you store in our CRM or demo tools.
+            {isRingReady ? (
+              <>
+                <strong>Business and demo data:</strong> information about local
+                businesses used to generate demo preview sites, including business
+                names, addresses, phone numbers, and public Google Maps listing
+                data displayed on generated preview pages.
+              </>
+            ) : (
+              <>
+                <strong>Business and lead data:</strong> information about local
+                businesses, including business names, addresses, phone numbers,
+                public listing data, and notes you store in our CRM or demo tools.
+              </>
+            )}
           </li>
           <li>
             <strong>Communications data:</strong> messages sent through our
@@ -107,8 +134,9 @@ export default function PrivacyPage() {
           We do not share, sell, or otherwise provide your mobile phone number
           or messaging consent information to any third parties or affiliates for
           marketing or promotional purposes. SMS delivery providers (such as
-          Twilio) process messages solely to deliver opted-in project updates on
-          our behalf.
+          Twilio) process messages solely to deliver opted-in{" "}
+          {isRingReady ? "demo-status updates" : "project updates"} on our
+          behalf.
         </p>
       </LegalSection>
 
@@ -117,7 +145,11 @@ export default function PrivacyPage() {
         <ul className="list-disc space-y-2 pl-6">
           <li>Provide, maintain, and improve the Services;</li>
           <li>Authenticate users and manage subscriptions;</li>
-          <li>Enable outreach, demo sites, and CRM functionality;</li>
+          <li>
+            {isRingReady
+              ? "Generate and host AI-powered demo preview websites from Google Maps business data;"
+              : "Enable outreach, demo sites, and CRM functionality;"}
+          </li>
           <li>Process payments and send transactional communications;</li>
           <li>Monitor usage, prevent fraud, and enforce our Terms of Service;</li>
           <li>Comply with legal obligations and respond to lawful requests.</li>
