@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Loader2, Mail, MessageSquare, PhoneOff } from "lucide-react";
+import { Loader2, Mail, MessageSquare, PhoneOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { updateContactEmail } from "@/app/actions/update-contact-email";
@@ -35,14 +35,11 @@ export interface CallLeadData {
 
 export type CallModalPhase = "IDLE" | "CONNECTING" | "TALKING" | "COMPLETED";
 
-type ScriptStepKey = keyof CallScriptSteps;
-
-const SCRIPT_STEP_ORDER: ScriptStepKey[] = ["hook", "pivot", "offer"];
-const SCRIPT_STEP_LABELS: Record<ScriptStepKey, string> = {
-  hook: "Hook",
-  pivot: "Pivot",
-  offer: "Offer",
-};
+const SCRIPT_SECTIONS: { key: keyof CallScriptSteps; label: string }[] = [
+  { key: "hook", label: "Hook" },
+  { key: "pivot", label: "Pivot" },
+  { key: "offer", label: "Offer" },
+];
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -117,7 +114,6 @@ export function CallSessionOverlay({
   const [draftEmail, setDraftEmail] = useState("");
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
-  const [scriptStepIndex, setScriptStepIndex] = useState(0);
   const [callError, setCallError] = useState<string | null>(null);
   const [smsError, setSmsError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
@@ -138,7 +134,6 @@ export function CallSessionOverlay({
       setCallError(null);
       setSmsError(null);
       setEmailError(null);
-      setScriptStepIndex(0);
       return;
     }
     setDraftNotes(leadData.existingNotes ?? "");
@@ -199,9 +194,6 @@ export function CallSessionOverlay({
   }
 
   const leadLabel = displayName(leadData.name);
-  const currentStepKey = SCRIPT_STEP_ORDER[scriptStepIndex] ?? "hook";
-  const currentStepLabel = SCRIPT_STEP_LABELS[currentStepKey];
-  const currentStepText = leadData.scriptSteps[currentStepKey];
   const effectiveEmail = resolveEffectiveEmail(
     leadData.contactEmail,
     leadData.enrichmentEmail,
@@ -457,46 +449,20 @@ export function CallSessionOverlay({
 
           {phase === "TALKING" || phase === "COMPLETED" ? (
             <>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-bold uppercase tracking-wider text-amber-400">
-                    Script — {currentStepLabel}
-                  </p>
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
-                    {scriptStepIndex + 1} / {SCRIPT_STEP_ORDER.length}
-                  </span>
-                </div>
-                <div className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-3 text-base leading-snug text-zinc-100">
-                  {currentStepText}
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    disabled={scriptStepIndex === 0}
-                    onClick={() =>
-                      setScriptStepIndex((index) => Math.max(0, index - 1))
-                    }
-                    className="inline-flex flex-1 items-center justify-center gap-1 rounded-md border border-zinc-600 px-2 py-1.5 text-xs font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-40"
-                  >
-                    <ChevronLeft className="size-3.5" aria-hidden />
-                    Back
-                  </button>
-                  <button
-                    type="button"
-                    disabled={
-                      scriptStepIndex >= SCRIPT_STEP_ORDER.length - 1
-                    }
-                    onClick={() =>
-                      setScriptStepIndex((index) =>
-                        Math.min(SCRIPT_STEP_ORDER.length - 1, index + 1),
-                      )
-                    }
-                    className="inline-flex flex-1 items-center justify-center gap-1 rounded-md border border-amber-500/60 bg-amber-500/10 px-2 py-1.5 text-xs font-semibold text-amber-300 hover:bg-amber-500/20 disabled:opacity-40"
-                  >
-                    Next Step
-                    <ChevronRight className="size-3.5" aria-hidden />
-                  </button>
-                </div>
+              <div className="space-y-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-amber-400">
+                  Script
+                </p>
+                {SCRIPT_SECTIONS.map(({ key, label }) => (
+                  <div key={key} className="space-y-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                      {label}
+                    </p>
+                    <div className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-3 text-base leading-snug whitespace-pre-wrap text-zinc-100">
+                      {leadData.scriptSteps[key]}
+                    </div>
+                  </div>
+                ))}
               </div>
 
               <label className="flex flex-col gap-1 text-sm">
