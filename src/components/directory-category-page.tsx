@@ -205,7 +205,7 @@ export async function DirectoryCategoryPage({
         )}
 
         {!isPro && totalCount > 0 ? (
-          <BuyFullListCta variant="secondary" />
+          <BuyFullListCta />
         ) : null}
 
         {content && page === 1 && content.websiteAdoptionPct != null ? (
@@ -294,16 +294,14 @@ export async function DirectoryCategoryPage({
       ) : null}
 
       {totalCount > 0 ? (
-        <div className="flex flex-col items-center gap-2 sm:items-start">
-          <DownloadCsvButton
-            exportAccess={exportAccess}
-            pagePath={path}
-            pageSize={pageSize}
-            totalPages={totalPages}
-            isPro={isPro}
-          />
-          {!isPro ? <BuyFullListCta variant="export" /> : null}
-        </div>
+        <DownloadCsvButton
+          exportAccess={exportAccess}
+          pagePath={path}
+          pageSize={pageSize}
+          totalPages={totalPages}
+          totalCount={totalCount}
+          isPro={isPro}
+        />
       ) : null}
 
       {topCityLinks.length > 0 && !paginated ? (

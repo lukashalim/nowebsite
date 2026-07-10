@@ -237,6 +237,7 @@ export async function DirectoryStatePage({
           pagePath={path}
           pageSize={pageSize}
           totalPages={totalPages}
+          totalCount={totalCount}
           isPro={isPro}
         />
       ) : null}

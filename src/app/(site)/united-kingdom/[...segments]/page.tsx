@@ -285,6 +285,7 @@ export default async function UnitedKingdomNestedPage({ params }: PageProps) {
             pagePath={gbCityPath(citySlug)}
             pageSize={businesses.length || 1}
             totalPages={1}
+            totalCount={businesses.length}
             isPro={userIsPro}
           />
         ) : null}

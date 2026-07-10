@@ -414,7 +414,7 @@ export default async function SlugDirectoryPage({
             )}
           </p>
           {!userIsPro && cityData.unfilteredCount > 0 ? (
-            <BuyFullListCta variant="secondary" />
+            <BuyFullListCta />
           ) : null}
         </header>
 
@@ -486,16 +486,14 @@ export default async function SlugDirectoryPage({
         </section>
 
         {businesses.length > 0 ? (
-          <div className="flex flex-col items-center gap-2 sm:items-start">
-            <DownloadCsvButton
-              exportAccess={contactAccess}
-              pagePath={`/${lower}`}
-              pageSize={cityData.pageSize}
-              totalPages={cityData.totalPages}
-              isPro={userIsPro}
-            />
-            {!userIsPro ? <BuyFullListCta variant="export" /> : null}
-          </div>
+          <DownloadCsvButton
+            exportAccess={contactAccess}
+            pagePath={`/${lower}`}
+            pageSize={cityData.pageSize}
+            totalPages={cityData.totalPages}
+            totalCount={cityData.totalCount}
+            isPro={userIsPro}
+          />
         ) : null}
 
         <DirectoryExploreMore
