@@ -12,6 +12,7 @@ import {
   DirectoryCityRevealCopy,
 } from "@/components/directory-city-page-copy";
 import { DownloadCsvButton } from "@/components/download-csv-button";
+import { BuyFullListCta } from "@/components/buy-full-list-cta";
 import { DirectoryLastUpdated } from "@/components/directory-last-updated";
 import { DirectoryListingFilters } from "@/components/directory-listing-filters";
 import { DirectoryStatePage } from "@/components/directory-state-page";
@@ -412,6 +413,9 @@ export default async function SlugDirectoryPage({
               topCategory,
             )}
           </p>
+          {!userIsPro && cityData.unfilteredCount > 0 ? (
+            <BuyFullListCta variant="secondary" />
+          ) : null}
         </header>
 
         <DirectoryLastUpdated label={hub.lastUpdatedLabel} />
@@ -482,13 +486,16 @@ export default async function SlugDirectoryPage({
         </section>
 
         {businesses.length > 0 ? (
-          <DownloadCsvButton
-            exportAccess={contactAccess}
-            pagePath={`/${lower}`}
-            pageSize={cityData.pageSize}
-            totalPages={cityData.totalPages}
-            isPro={userIsPro}
-          />
+          <div className="flex flex-col items-center gap-2 sm:items-start">
+            <DownloadCsvButton
+              exportAccess={contactAccess}
+              pagePath={`/${lower}`}
+              pageSize={cityData.pageSize}
+              totalPages={cityData.totalPages}
+              isPro={userIsPro}
+            />
+            {!userIsPro ? <BuyFullListCta variant="export" /> : null}
+          </div>
         ) : null}
 
         <DirectoryExploreMore

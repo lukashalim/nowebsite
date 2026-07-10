@@ -3,6 +3,7 @@ import { DirectoryGroupedByCity } from "@/components/directory-grouped-by-city";
 import { DirectoryBusinessList } from "@/components/directory-business-list";
 import { DirectoryPagination } from "@/components/directory-pagination";
 import { DownloadCsvButton } from "@/components/download-csv-button";
+import { BuyFullListCta } from "@/components/buy-full-list-cta";
 import { DirectoryProspectingAboutData } from "@/components/directory-city-page-copy";
 import { DirectoryBreadcrumbs } from "@/components/directory-breadcrumbs";
 import { DirectoryExploreMore } from "@/components/directory-explore-more";
@@ -203,6 +204,10 @@ export async function DirectoryCategoryPage({
           </p>
         )}
 
+        {!isPro && totalCount > 0 ? (
+          <BuyFullListCta variant="secondary" />
+        ) : null}
+
         {content && page === 1 && content.websiteAdoptionPct != null ? (
           <p className="max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
             About {content.websiteAdoptionPct.toLocaleString()}% of{" "}
@@ -289,13 +294,16 @@ export async function DirectoryCategoryPage({
       ) : null}
 
       {totalCount > 0 ? (
-        <DownloadCsvButton
-          exportAccess={exportAccess}
-          pagePath={path}
-          pageSize={pageSize}
-          totalPages={totalPages}
-          isPro={isPro}
-        />
+        <div className="flex flex-col items-center gap-2 sm:items-start">
+          <DownloadCsvButton
+            exportAccess={exportAccess}
+            pagePath={path}
+            pageSize={pageSize}
+            totalPages={totalPages}
+            isPro={isPro}
+          />
+          {!isPro ? <BuyFullListCta variant="export" /> : null}
+        </div>
       ) : null}
 
       {topCityLinks.length > 0 && !paginated ? (
