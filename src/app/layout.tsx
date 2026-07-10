@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { headers } from "next/headers";
 import { CrispChat } from "@/components/crisp-chat";
+import { GoogleAnalytics } from "@/components/google-analytics";
 import { LegalFooter } from "@/components/legal-footer";
 import { SiteJsonLdScript } from "@/components/site-jsonld-script";
 import {
@@ -65,6 +66,7 @@ export default async function RootLayout({
         <LegalFooter />
         {!isRingReady ? <CrispChat /> : null}
       </body>
+      {!isRingReady ? <GoogleAnalytics /> : null}
     </html>
   );
 }
