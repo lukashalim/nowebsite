@@ -12,6 +12,7 @@ import { DownloadCsvButton } from "@/components/download-csv-button";
 import { DirectoryLastUpdated } from "@/components/directory-last-updated";
 import { DirectoryStatePage } from "@/components/directory-state-page";
 import { buildProspectingDatasetJsonLd } from "@/lib/directory/jsonld";
+import { DIRECTORY_CITY_PAGE_SIZE, totalDirectoryPages } from "@/lib/directory/pagination";
 import {
   categoryLinkLabel,
   cityHubCategoryH2,
@@ -283,8 +284,11 @@ export default async function UnitedKingdomNestedPage({ params }: PageProps) {
           <DownloadCsvButton
             exportAccess={contactAccess}
             pagePath={gbCityPath(citySlug)}
-            pageSize={businesses.length || 1}
-            totalPages={1}
+            pageSize={DIRECTORY_CITY_PAGE_SIZE}
+            totalPages={totalDirectoryPages(
+              businesses.length,
+              DIRECTORY_CITY_PAGE_SIZE,
+            )}
             totalCount={businesses.length}
             isPro={userIsPro}
           />

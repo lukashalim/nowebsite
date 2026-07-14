@@ -5,8 +5,8 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { DirectoryContactAccess } from "@/lib/directory/contact-fields";
 import { buildDirectoryCsvDownloadUrl } from "@/lib/directory/csv-download-url";
 import { BUY_FULL_LIST_STRIPE_URL } from "@/lib/directory/buy-full-list";
-import { FREE_DIRECTORY_CSV_MAX_PAGES } from "@/lib/directory-csv-limits";
 import { directoryOutlineButtonClass } from "@/lib/directory/ui-classes";
+import { trackCsvPurchaseClick } from "@/lib/analytics";
 
 interface DownloadCsvButtonProps {
   exportAccess: DirectoryContactAccess;
@@ -14,6 +14,8 @@ interface DownloadCsvButtonProps {
   pageSize: number;
   totalPages: number;
   totalCount: number;
+  /** Slug for GA4 csv_purchase_click (category/city pages). */
+  categoryOrCity?: string;
   isPro?: boolean;
   label?: string;
   className?: string;
@@ -25,6 +27,7 @@ export function DownloadCsvButton({
   pageSize,
   totalPages,
   totalCount,
+  categoryOrCity,
   isPro = false,
   label = "Download CSV",
   className,
@@ -35,8 +38,8 @@ export function DownloadCsvButton({
   const buttonClass = className ?? `${directoryOutlineButtonClass} gap-2`;
 
   const freeLabel =
-    totalPages > FREE_DIRECTORY_CSV_MAX_PAGES
-      ? "Current page — Free (first 5 pages max)"
+    totalCount > pageSize
+      ? "Current page — Free (100 max)"
       : "Current page — Free";
 
   const paidLabel = `Full list (${totalCount.toLocaleString()} results) — $9`;
@@ -135,7 +138,12 @@ export function DownloadCsvButton({
             role="menuitem"
             target="_blank"
             rel="noopener noreferrer"
-            onClick={closeMenu}
+            onClick={() => {
+              if (categoryOrCity) {
+                trackCsvPurchaseClick(categoryOrCity, "bottom");
+              }
+              closeMenu();
+            }}
             className="flex w-full border-t border-zinc-100 px-4 py-3 text-left text-sm text-zinc-800 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-900"
           >
             {paidLabel}

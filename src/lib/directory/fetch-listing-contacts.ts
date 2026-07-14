@@ -22,7 +22,7 @@ export async function fetchDirectoryBusinessesForScope(
 ): Promise<DirectoryBusiness[] | null> {
   switch (scope.kind) {
     case "city": {
-      const data = await fetchCityListings(scope.slug, { filters });
+      const data = await fetchCityListings(scope.slug, { page, filters });
       return data ? data.businesses : null;
     }
     case "category": {
@@ -59,7 +59,7 @@ export async function fetchDirectoryContactsForScope(
 ): Promise<DirectoryContactRow[] | null> {
   switch (scope.kind) {
     case "city": {
-      const data = await fetchCityListings(scope.slug, { filters });
+      const data = await fetchCityListings(scope.slug, { page, filters });
       return data ? toContactRows(data.businesses) : null;
     }
     case "category": {

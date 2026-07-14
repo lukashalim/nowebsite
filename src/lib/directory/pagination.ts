@@ -4,6 +4,9 @@ import { directoryListingPathWithQuery } from "@/lib/directory/listing-filters";
 /** Listings per page on nationwide category hubs (keeps ISR payloads under Vercel limits). */
 export const DIRECTORY_CATEGORY_PAGE_SIZE = 100;
 
+/** Listings per page on US city directory hubs. */
+export const DIRECTORY_CITY_PAGE_SIZE = 100;
+
 /** Listings per page on US state directory hubs. */
 export const DIRECTORY_STATE_PAGE_SIZE = 100;
 
@@ -94,4 +97,13 @@ export function cityPathWithQuery(
 ): string {
   const base = `/${citySlug.trim().toLowerCase()}`;
   return directoryListingPathWithQuery(base, { filters });
+}
+
+export function cityPathWithPage(
+  citySlug: string,
+  page: number,
+  filters?: DirectoryListingFilters,
+): string {
+  const base = `/${citySlug.trim().toLowerCase()}`;
+  return directoryListingPathWithQuery(base, { page, filters });
 }

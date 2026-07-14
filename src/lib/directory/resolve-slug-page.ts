@@ -77,7 +77,7 @@ export const resolveDirectorySlugPage = cache(async function resolveDirectorySlu
   if (parseCitySlug(lower)) {
     const [hub, cityData] = await Promise.all([
       fetchCityHub(lower),
-      fetchCityListings(lower, { filters }),
+      fetchCityListings(lower, { page, filters }),
     ]);
     if (hub && cityData)
       return { kind: "city", hub, businesses: cityData.businesses, cityData };

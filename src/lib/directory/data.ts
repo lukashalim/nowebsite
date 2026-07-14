@@ -54,6 +54,7 @@ import {
 import {
   clampDirectoryPage,
   DIRECTORY_CATEGORY_PAGE_SIZE,
+  DIRECTORY_CITY_PAGE_SIZE,
   DIRECTORY_FACEBOOK_PAGE_SIZE,
   DIRECTORY_STATE_PAGE_SIZE,
   totalDirectoryPages,
@@ -470,7 +471,11 @@ export async function fetchTopStates(
 
 export async function fetchCityListings(
   citySlug: string,
-  opts?: { filters?: DirectoryListingFilters },
+  opts?: {
+    page?: number;
+    pageSize?: number;
+    filters?: DirectoryListingFilters;
+  },
 ): Promise<DirectoryListingsPageSlice | null> {
   const parsed = parseCitySlug(citySlug);
   if (!parsed) return null;
@@ -512,8 +517,8 @@ export async function fetchCityListings(
   const allBusinesses = rows.map(rowToBusiness).sort(sortByReviewsDesc);
 
   return paginateDirectoryCohort(allBusinesses, {
-    page: 1,
-    pageSize: allBusinesses.length || 1,
+    page: opts?.page ?? 1,
+    pageSize: opts?.pageSize ?? DIRECTORY_CITY_PAGE_SIZE,
     filters: opts?.filters,
     filterMode: "reviewsOnly",
   });
@@ -542,26 +547,29 @@ export async function fetchCityHub(citySlug: string): Promise<{
     cityRef.state,
   );
 
-  const categories: DirectoryCategoryRef[] = sortCategoriesByPriority(
-    cityCategoryRows
-      .map((row) => {
-        const resolved = resolveCategoryForRow(
-          row.main_category,
-          row.business_type,
-        );
-        if (!resolved) return null;
-        const label = directoryCategoryLabel(
-          row.main_category,
-          row.business_type,
-        );
-        return {
-          categorySlug: resolved.slug,
-          categoryLabel: label ?? resolved.label,
-          listingCount: row.listing_count,
-        };
-      })
-      .filter((c): c is DirectoryCategoryRef => c !== null),
-  );
+  // Multiple raw Maps categories can resolve to the same slug (e.g. contractor).
+  const categoryCounts = new Map<string, DirectoryCategoryRef>();
+  for (const row of cityCategoryRows) {
+    const resolved = resolveCategoryForRow(
+      row.main_category,
+      row.business_type,
+    );
+    if (!resolved) continue;
+    const label = directoryCategoryLabel(row.main_category, row.business_type);
+    const existing = categoryCounts.get(resolved.slug);
+    if (existing) {
+      existing.listingCount += row.listing_count;
+    } else {
+      categoryCounts.set(resolved.slug, {
+        categorySlug: resolved.slug,
+        categoryLabel: label ?? resolved.label,
+        listingCount: row.listing_count,
+      });
+    }
+  }
+  const categories: DirectoryCategoryRef[] = sortCategoriesByPriority([
+    ...categoryCounts.values(),
+  ]);
 
   const publishedCategorySlugs = new Set(
     index.categories

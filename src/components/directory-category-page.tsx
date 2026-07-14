@@ -205,7 +205,7 @@ export async function DirectoryCategoryPage({
         )}
 
         {!isPro && totalCount > 0 ? (
-          <BuyFullListCta />
+          <BuyFullListCta categoryOrCity={categorySlug} />
         ) : null}
 
         {content && page === 1 && content.websiteAdoptionPct != null ? (
@@ -300,6 +300,7 @@ export async function DirectoryCategoryPage({
           pageSize={pageSize}
           totalPages={totalPages}
           totalCount={totalCount}
+          categoryOrCity={categorySlug}
           isPro={isPro}
         />
       ) : null}

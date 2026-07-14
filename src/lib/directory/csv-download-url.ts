@@ -1,4 +1,5 @@
 import type { DirectoryContactAccess } from "@/lib/directory/contact-fields";
+import { clampDirectoryCsvPageSize } from "@/lib/directory-csv-limits";
 
 export function buildDirectoryCsvDownloadUrl(params: {
   exportAccess: DirectoryContactAccess;
@@ -10,7 +11,7 @@ export function buildDirectoryCsvDownloadUrl(params: {
   const sp = new URLSearchParams({
     scope: exportAccess.scope,
     token: exportAccess.token,
-    pageSize: String(pageSize),
+    pageSize: String(clampDirectoryCsvPageSize(pageSize)),
     totalPages: String(totalPages),
     pageUrl: pagePath,
   });

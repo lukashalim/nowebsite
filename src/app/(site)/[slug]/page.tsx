@@ -48,7 +48,8 @@ import { hasActiveDirectoryListingFilters } from "@/lib/directory/listing-filter
 import { parseDirectoryListingFilters } from "@/lib/directory/listing-filters";
 import {
   categoryPathWithPage,
-  cityPathWithQuery,
+  cityPathWithPage,
+  directoryPageRange,
   parseDirectoryPageParam,
   statePathWithPage,
 } from "@/lib/directory/pagination";
@@ -58,6 +59,7 @@ import { absoluteUrl } from "@/lib/site-url";
 import { directoryOpenGraph } from "@/lib/site-metadata";
 import { getAuthenticatedUserProfile, isPro } from "@/lib/subscription";
 import { createDirectoryContactAccess } from "@/lib/directory/contact-access";
+import { DirectoryPagination } from "@/components/directory-pagination";
 import {
   listingScopeForCategory,
   listingScopeForCity,
@@ -139,8 +141,8 @@ export async function generateMetadata({
       hub.country,
     );
     const canonicalPath = hasActiveDirectoryListingFilters(filters)
-      ? `/${slugLower}`
-      : cityPathWithQuery(slugLower, cityData.filters);
+      ? cityPathWithPage(slugLower, 1)
+      : cityPathWithPage(slugLower, cityData.page, cityData.filters);
     return {
       title: { absolute: title },
       description,
@@ -271,6 +273,11 @@ export default async function SlugDirectoryPage({
     const { hub, businesses, cityData } = resolved;
     const contactAccess = createDirectoryContactAccess(
       listingScopeForCity(lower),
+      cityData.page,
+      cityData.filters,
+    );
+    const exportAccess = createDirectoryContactAccess(
+      listingScopeForCity(lower),
       1,
       cityData.filters,
     );
@@ -390,6 +397,15 @@ export default async function SlugDirectoryPage({
       { label: place },
     ];
 
+    const cityPaginated = cityData.totalPages > 1;
+    const cityRange = directoryPageRange(
+      cityData.page,
+      cityData.pageSize,
+      cityData.totalCount,
+    );
+    const cityHrefForPage = (p: number) =>
+      cityPathWithPage(lower, p, cityData.filters);
+
     return (
       <div className="space-y-8">
         <script
@@ -414,7 +430,7 @@ export default async function SlugDirectoryPage({
             )}
           </p>
           {!userIsPro && cityData.unfilteredCount > 0 ? (
-            <BuyFullListCta />
+            <BuyFullListCta categoryOrCity={lower} />
           ) : null}
         </header>
 
@@ -473,6 +489,17 @@ export default async function SlugDirectoryPage({
             count={cityData.unfilteredCount}
             categoryCount={hub.categories.length}
           />
+          {cityPaginated ? (
+            <DirectoryPagination
+              hrefForPage={cityHrefForPage}
+              page={cityData.page}
+              totalPages={cityData.totalPages}
+              totalCount={cityData.totalCount}
+              rangeStart={cityRange.start}
+              rangeEnd={cityRange.end}
+              ariaLabel="City listings pagination"
+            />
+          ) : null}
           {businesses.length > 0 ? (
             <DirectoryBusinessList
               businesses={businesses}
@@ -483,15 +510,27 @@ export default async function SlugDirectoryPage({
               No listings match these filters.
             </p>
           )}
+          {cityPaginated ? (
+            <DirectoryPagination
+              hrefForPage={cityHrefForPage}
+              page={cityData.page}
+              totalPages={cityData.totalPages}
+              totalCount={cityData.totalCount}
+              rangeStart={cityRange.start}
+              rangeEnd={cityRange.end}
+              ariaLabel="City listings pagination"
+            />
+          ) : null}
         </section>
 
         {businesses.length > 0 ? (
           <DownloadCsvButton
-            exportAccess={contactAccess}
+            exportAccess={exportAccess}
             pagePath={`/${lower}`}
             pageSize={cityData.pageSize}
             totalPages={cityData.totalPages}
             totalCount={cityData.totalCount}
+            categoryOrCity={lower}
             isPro={userIsPro}
           />
         ) : null}

@@ -14,6 +14,7 @@ import {
   getClientIp,
   rateLimitHeaders,
 } from "@/lib/rate-limit";
+import { DIRECTORY_CSV_MAX_PAGE_SIZE } from "@/lib/directory-csv-limits";
 import { getAuthenticatedUserProfile, isPro } from "@/lib/subscription";
 import { logUsageEvent } from "@/lib/log-usage-event";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
@@ -24,7 +25,7 @@ export const dynamic = "force-dynamic";
 const querySchema = z.object({
   scope: z.string().min(3).max(200),
   token: z.string().min(10).max(500),
-  pageSize: z.coerce.number().int().min(1).max(500),
+  pageSize: z.coerce.number().int().min(1).max(DIRECTORY_CSV_MAX_PAGE_SIZE),
   totalPages: z.coerce.number().int().min(1).max(10_000),
   pageUrl: z.string().min(1).max(500),
   state: z.string().optional(),
