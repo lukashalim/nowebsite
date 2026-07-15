@@ -28,7 +28,7 @@ export async function generateMetadata(): Promise<Metadata> {
     {
       title: "SMS Disclosure",
       description:
-        "SMS messaging disclosure for services provided by Suite300 LLC.",
+        "SMS messaging disclosure for services provided by Savvy Data Science LLC.",
     },
     {
       isRingReady,

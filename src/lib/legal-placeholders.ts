@@ -1,16 +1,16 @@
-export const LEGAL_COMPANY_NAME = "Suite300 LLC";
-export const LEGAL_CONTACT_EMAIL = "lukas@nowebsitebusinessleads.com";
+export const LEGAL_COMPANY_NAME = "Savvy Data Science LLC";
+export const LEGAL_CONTACT_EMAIL = "lukas@ringreadysite.com";
 export const LEGAL_BUSINESS_ADDRESS = "6107 43rd Ave, Hyattsville, MD";
 
 export const DATASET_LICENSE_PATH = "/terms#directory-data";
 
-export const COMPLIANCE_BRAND_NAME = "Suite300 LLC";
+export const COMPLIANCE_BRAND_NAME = "Savvy Data Science LLC";
 export const COMPLIANCE_SERVICE_DOMAIN = "ringreadysite.com";
 export const COMPLIANCE_SERVICE_ATTRIBUTION =
-  "RingReadySite is a service of Suite300 LLC.";
-export const COMPLIANCE_COPYRIGHT = "© 2026 Suite300 LLC. All rights reserved.";
+  "RingReadySite is a product of Suite300, a DBA of Savvy Data Science LLC.";
+export const COMPLIANCE_COPYRIGHT = "© 2026 Savvy Data Science LLC. All rights reserved.";
 export const COMPLIANCE_SMS_DISCLOSURE =
-  "SMS Updates: By providing your phone number to Suite300 LLC, you agree to receive SMS updates about your RingReadySite demo requests. Message frequency varies. Reply HELP for assistance or STOP to opt out. Message and data rates may apply.";
+  "SMS Updates: By providing your phone number to Savvy Data Science LLC, you agree to receive SMS updates about your RingReadySite demo requests. Message frequency varies. Reply HELP for assistance or STOP to opt out. Message and data rates may apply.";
 
 export const COMPLIANCE_US_ONLY_NOTICE =
   "SMS opt-in is available to users located in the United States only. U.S. mobile numbers are required.";
@@ -23,11 +23,11 @@ export const RING_READY_SMS_NO_SHARING_NOTICE =
   "Mobile information will not be shared with third parties for marketing or promotional purposes.";
 
 export const RING_READY_SMS_OPT_IN_DISCLOSURE =
-  "By submitting this form, you agree to receive SMS updates from Suite300 LLC about your RingReadySite demo requests, such as when a demo is ready to view or when a business's listing information is refreshed. Message and data rates may apply. Frequency varies. Reply HELP for help, STOP to opt out. " +
+  "By submitting this form, you agree to receive SMS updates from Savvy Data Science LLC about your RingReadySite demo requests, such as when a demo is ready to view or when a business's listing information is refreshed. Message and data rates may apply. Frequency varies. Reply HELP for help, STOP to opt out. " +
   RING_READY_SMS_NO_SHARING_NOTICE;
 
 export const RING_READY_SMS_OPT_IN_CHECKBOX_LABEL =
-  "I agree to receive SMS updates from Suite300 LLC about RingReadySite demo requests. Msg frequency varies. Msg & data rates may apply. Reply STOP to opt out.";
+  "I agree to receive SMS updates from Savvy Data Science LLC about RingReadySite demo requests. Msg frequency varies. Msg & data rates may apply. Reply STOP to opt out.";
 
 export const RING_READY_COMPLIANCE_URL =
   "https://www.ringreadysite.com/compliance";
@@ -35,10 +35,10 @@ export const RING_READY_COMPLIANCE_URL =
 export const RING_READY_SMS_OPT_IN_URL = RING_READY_COMPLIANCE_URL;
 
 export const RING_READY_COMPLIANCE_DISCLOSURE =
-  "By submitting this form, you agree to receive recurring SMS updates from Suite300 LLC about your RingReadySite demo requests, such as when a demo is ready to view or when a business's listing information is refreshed. Message frequency varies. Message and data rates may apply. Reply HELP for help, STOP to opt out. Mobile information will not be shared with third parties for marketing or promotional purposes.";
+  "By submitting this form, you agree to receive recurring SMS updates from Savvy Data Science LLC about your RingReadySite demo requests, such as when a demo is ready to view or when a business's listing information is refreshed. Message frequency varies. Message and data rates may apply. Reply HELP for help, STOP to opt out. Mobile information will not be shared with third parties for marketing or promotional purposes.";
 
 export const RING_READY_COMPLIANCE_CHECKBOX_TEXT =
-  "I agree to receive recurring SMS updates from Suite300 LLC about RingReadySite demo requests, such as when a demo is ready to view. Message frequency varies. Message and data rates may apply. Reply HELP for help, STOP to opt-out.";
+  "I agree to receive recurring SMS updates from Savvy Data Science LLC about RingReadySite demo requests, such as when a demo is ready to view. Message frequency varies. Message and data rates may apply. Reply HELP for help, STOP to opt-out.";
 
 export const RING_READY_COMPLIANCE_CONSENT_VERSION = "2026-07-compliance-page-v3";
 
