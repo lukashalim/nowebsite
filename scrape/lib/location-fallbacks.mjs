@@ -96,6 +96,39 @@ function titleCaseWords(s) {
     .join(" ");
 }
 
+/** Street/district numbers mis-parsed as city (e.g. "8", "1, Fork"). */
+export function isLikelyBadUsCity(city) {
+  if (city == null) return false;
+  const raw = String(city).trim();
+  if (!raw) return false;
+  if (/^\d+$/.test(raw)) return true;
+  if (/^\d+\s*,\s*.+$/.test(raw)) return true;
+  return false;
+}
+
+/**
+ * Strip census/district prefixes like "1, Fork" → "Fork"; reject numeric-only cities.
+ * @param {string|null|undefined} city
+ * @returns {string|null}
+ */
+export function sanitizeParsedUsCity(city) {
+  if (city == null) return null;
+  const raw = String(city).trim();
+  if (!raw) return null;
+
+  const districtPrefix = raw.match(/^(\d+)\s*,\s*(.+)$/);
+  if (districtPrefix) {
+    const rest = districtPrefix[2].trim();
+    if (rest && !/^\d+$/.test(rest)) {
+      return titleCaseWords(rest);
+    }
+    return null;
+  }
+
+  if (/^\d+$/.test(raw)) return null;
+  return titleCaseWords(raw);
+}
+
 /**
  * Normalize to full state name (e.g. "CA" → "California") for DB consistency.
  * @param {string|null|undefined} value
@@ -139,7 +172,7 @@ export function parseCityStateFromFormattedAddress(formatted) {
   if (zipOnly && parts.length >= 3) {
     out.postal_code = zipOnly[1];
     out.state = normalizeUsStateName(prev);
-    out.city = titleCaseWords(parts[parts.length - 3]);
+    out.city = sanitizeParsedUsCity(parts[parts.length - 3]);
     return out;
   }
 
@@ -147,13 +180,15 @@ export function parseCityStateFromFormattedAddress(formatted) {
   if (stateZip) {
     out.state = normalizeUsStateName(stateZip[1].trim());
     out.postal_code = stateZip[2];
-    out.city = titleCaseWords(prev);
+    out.city = sanitizeParsedUsCity(prev);
     return out;
   }
 
   if (/^[A-Za-z]{2}$/.test(last)) {
     out.state = normalizeUsStateName(last);
-    out.city = titleCaseWords(prev);
+    out.city =
+      sanitizeParsedUsCity(prev) ??
+      (parts.length >= 3 ? sanitizeParsedUsCity(parts[parts.length - 3]) : null);
     return out;
   }
 
@@ -161,11 +196,22 @@ export function parseCityStateFromFormattedAddress(formatted) {
     const stateKey = last.toLowerCase().replace(/\./g, "");
     if (STATE_NAME_TO_ABBR[stateKey] || last.length === 2) {
       out.state = normalizeUsStateName(last);
-      out.city = titleCaseWords(prev);
+      out.city =
+        sanitizeParsedUsCity(prev) ??
+        (parts.length >= 3 ? sanitizeParsedUsCity(parts[parts.length - 3]) : null);
     }
   }
 
   return out;
+}
+
+function isUsableGeoPlaceName(name) {
+  if (name == null) return false;
+  const raw = String(name).trim();
+  if (!raw) return false;
+  if (/^\d+$/.test(raw)) return false;
+  if (/^\d+\s*,/.test(raw)) return false;
+  return true;
 }
 
 function firstGeoName(geos, layerPattern) {
@@ -177,7 +223,7 @@ function firstGeoName(geos, layerPattern) {
     const row = arr[0];
     const name =
       row.BASENAME ?? row.NAME ?? row.PLACE_NAME ?? row.COUNTY_NAME ?? null;
-    if (name != null && String(name).trim()) {
+    if (name != null && isUsableGeoPlaceName(name)) {
       return String(name).trim();
     }
   }
@@ -326,6 +372,9 @@ function normalizeLocationByCountry(base) {
     return base;
   }
   if (base.state) base.state = normalizeUsStateName(base.state);
+  if (base.city) {
+    base.city = sanitizeParsedUsCity(base.city);
+  }
   if (base.postal_code) {
     const d = String(base.postal_code).replace(/\D/g, "").slice(0, 5);
     base.postal_code = d.length === 5 ? d : base.postal_code;
@@ -434,13 +483,13 @@ export async function enrichLocationAsync(base, opts = {}) {
     return normalizeLocationByCountry(base);
   }
 
-  const needsCity = !base.city;
+  const needsCity = !base.city || isLikelyBadUsCity(base.city);
   const needsState = !base.state;
   const needsZip = !base.postal_code;
 
   if ((needsCity || needsState || needsZip) && base.latitude != null && base.longitude != null) {
     const geo = await reverseGeocodeLocalityCensus(base.longitude, base.latitude);
-    if (!base.city && geo.city) base.city = geo.city;
+    if (needsCity && geo.city) base.city = geo.city;
     if (!base.state && geo.state) base.state = geo.state;
     if (!base.postal_code && geo.postal_code) base.postal_code = geo.postal_code;
   }
@@ -457,6 +506,8 @@ export async function enrichLocationAsync(base, opts = {}) {
     }
   }
 
-  base.country = base.country ?? COUNTRY_US;
+  if (!base.city || isLikelyBadUsCity(base.city)) {
+    base.city = null;
+  }
   return normalizeLocationByCountry(base);
 }

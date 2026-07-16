@@ -504,6 +504,7 @@ export const fetchCrmFilterOptions = cache(
       .sort((a, b) => a.label.localeCompare(b.label));
 
     const states = [...stateSet]
+      .filter((value) => stateToAbbr(value) != null)
       .map((value) => ({
         value,
         label: stateAbbrToDisplayName(stateToAbbr(value) ?? value),

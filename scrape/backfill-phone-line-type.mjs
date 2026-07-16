@@ -4,9 +4,11 @@
  *   node --import ./scrape/env-nowebsite-queue.mjs ./scrape/backfill-phone-line-type.mjs
  *   node ./scrape/backfill-phone-line-type.mjs --dry-run --limit 100
  *   node ./scrape/backfill-phone-line-type.mjs --force --limit 50
+ *   node ./scrape/backfill-phone-line-type.mjs --states=Maryland,"District Of Columbia"
  *
  * Env: TELNYX_API_KEY or telnyx_api_key (required), Supabase via loadEnvLocal().
- * Optional: PHONE_LINE_BACKFILL_BATCH (default 25), PHONE_LINE_BACKFILL_SLEEP_MS (default 300).
+ * Optional: PHONE_LINE_BACKFILL_BATCH (default 25), PHONE_LINE_BACKFILL_SLEEP_MS (default 300),
+ *   PHONE_LINE_BACKFILL_STATES (comma-separated state names, e.g. Maryland,District Of Columbia).
  */
 
 import { loadEnvLocal, getSupabase } from "./lib/scrape-pipeline/index.mjs";
@@ -35,6 +37,50 @@ function parseLimit(argv) {
     if (Number.isFinite(n) && n > 0) return n;
   }
   return null;
+}
+
+/** Map common aliases to exact businesses_nowebsite.state values. */
+const STATE_ALIAS_TO_DB = new Map([
+  ["md", "Maryland"],
+  ["maryland", "Maryland"],
+  ["dc", "District Of Columbia"],
+  ["district of columbia", "District Of Columbia"],
+]);
+
+function parseStatesArg(argv) {
+  for (const arg of argv.slice(2)) {
+    const m = /^--states=(.*)$/i.exec(arg);
+    if (m) {
+      return m[1]
+        .split(",")
+        .map((s) => s.replace(/^['"]|['"]$/g, "").trim())
+        .filter(Boolean);
+    }
+  }
+  const env = process.env.PHONE_LINE_BACKFILL_STATES?.trim();
+  if (!env) return null;
+  return env
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function resolveStateFilterValues(rawStates) {
+  if (!rawStates?.length) return null;
+  const resolved = new Set();
+  for (const raw of rawStates) {
+    const key = raw.trim().toLowerCase();
+    const mapped = STATE_ALIAS_TO_DB.get(key);
+    if (mapped) {
+      resolved.add(mapped);
+      continue;
+    }
+    resolved.add(raw.trim());
+  }
+  if (resolved.has("Maryland")) {
+    resolved.add("MD");
+  }
+  return [...resolved];
 }
 
 function resolveCountry(raw) {
@@ -67,6 +113,10 @@ async function main() {
 
   const supabase = getSupabase();
   const homeServicesSlugs = await fetchHomeServicesSlugs(supabase);
+  const stateFilter = resolveStateFilterValues(parseStatesArg(process.argv));
+  if (stateFilter?.length) {
+    console.log(`State filter: ${stateFilter.join(", ")}`);
+  }
   let scanned = 0;
   let updated = 0;
   let skipped = 0;
@@ -75,14 +125,20 @@ async function main() {
   for (;;) {
     if (cap != null && scanned >= cap) break;
 
+    const rangeStart = force ? offset : 0;
+
     let q = supabase
       .from(TABLE)
-      .select("place_id, name, phone, country, phone_line_type")
+      .select("place_id, name, phone, country, phone_line_type, state")
       .eq("is_invalid", false)
       .in("directory_category_slug", homeServicesSlugs)
       .not("phone", "is", null)
       .order("place_id", { ascending: true })
-      .range(offset, offset + BATCH - 1);
+      .range(rangeStart, rangeStart + BATCH - 1);
+
+    if (stateFilter?.length) {
+      q = q.in("state", stateFilter);
+    }
 
     if (!force) {
       q = q.is("phone_line_type", null);
@@ -180,7 +236,9 @@ async function main() {
     }
 
     if (rows.length < BATCH) break;
-    offset += BATCH;
+    if (force) {
+      offset += BATCH;
+    }
   }
 
   console.log(
