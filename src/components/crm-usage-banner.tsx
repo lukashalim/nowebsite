@@ -11,7 +11,7 @@ interface CrmUsageBannerProps {
 }
 
 function formatActionBreakdown(usage: CrmUsageSummary): string {
-  const parts = (["dm", "sms", "demo_click"] as CrmUsageAction[]).map(
+  const parts = (["dm", "sms", "demo_click", "mail"] as CrmUsageAction[]).map(
     (action) =>
       `${usage.byAction[action].toLocaleString()} ${CRM_USAGE_ACTION_LABELS[action]}`,
   );

@@ -38,7 +38,7 @@ export function CrmLeadsTableShell({
               <th className="px-3 py-3">Location</th>
               <th className="px-3 py-3">Rating</th>
               <th className="px-3 py-3">Reviews</th>
-              <th className="px-3 py-3">Phone</th>
+              <th className="px-3 py-3">Outreach</th>
               <th className="px-3 py-3">DM Spintax</th>
               <th className="px-3 py-3">Demo</th>
               <th className="px-3 py-3">Stage</th>

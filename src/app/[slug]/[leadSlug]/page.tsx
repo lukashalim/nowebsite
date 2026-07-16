@@ -38,6 +38,7 @@ export const dynamicParams = true;
 
 interface PageProps {
   params: Promise<{ slug: string; leadSlug: string }>;
+  searchParams: Promise<{ postcard?: string }>;
 }
 
 function serviceLabel(b: {
@@ -115,6 +116,8 @@ export async function generateMetadata({
 
 const SUMMARY_PREVIEW_LEN = 320;
 const MIN_REVIEW_EXCERPTS = 3;
+/** Postcard/screenshot mode: show a review with fewer excerpts. */
+const MIN_REVIEW_EXCERPTS_POSTCARD = 1;
 
 function SocialIcon() {
   return <Share2 className="size-4" aria-hidden />;
@@ -154,8 +157,14 @@ function formatBusinessDisplayName(name: string | null, service: string): string
   return toTitleCaseWords(base);
 }
 
-export default async function TenantDemoLeadPage({ params }: PageProps) {
+export default async function TenantDemoLeadPage({
+  params,
+  searchParams,
+}: PageProps) {
   const { slug: username, leadSlug } = await params;
+  const query = await searchParams;
+  const postcardMode =
+    query.postcard === "1" || query.postcard === "true";
   const result = await fetchTenantDemoLead(username, leadSlug);
   if (!result) {
     notFound();
@@ -192,10 +201,16 @@ export default async function TenantDemoLeadPage({ params }: PageProps) {
   const weakness = b.competitive_weakness?.trim();
   const callHref = b.phone?.trim() ? `tel:${b.phone.replace(/\s/g, "")}` : null;
   const reviews = (b.review_highlights ?? []).slice(0, 10);
-  const hasReviewCarousel = reviews.length >= MIN_REVIEW_EXCERPTS;
+  const minReviews = postcardMode
+    ? MIN_REVIEW_EXCERPTS_POSTCARD
+    : MIN_REVIEW_EXCERPTS;
+  const hasReviewCarousel = reviews.length >= minReviews;
   const services = b.services_offered ?? [];
   const hours = b.hours ?? [];
   const areaServedBits = [b.city, b.state, b.postal_code].filter(Boolean);
+  /** Postcard art: hero + reviews; fall back to services if no review excerpts. */
+  const showFullBody = !postcardMode;
+  const showPostcardServicesFallback = postcardMode && !hasReviewCarousel;
 
   return (
     <>
@@ -204,7 +219,11 @@ export default async function TenantDemoLeadPage({ params }: PageProps) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <article
-        className="mx-auto min-h-screen max-w-3xl flex-1 bg-white px-5 py-12 pb-28 text-zinc-900 sm:px-8 sm:py-14 sm:pb-32"
+        className={
+          postcardMode
+            ? "mx-auto min-h-screen max-w-3xl flex-1 bg-white px-5 py-8 text-zinc-900 sm:px-8"
+            : "mx-auto min-h-screen max-w-3xl flex-1 bg-white px-5 py-12 pb-28 text-zinc-900 sm:px-8 sm:py-14 sm:pb-32"
+        }
         style={{ fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}
       >
         <header className="mb-16 space-y-4 border-b border-zinc-200 pb-10">
@@ -261,6 +280,38 @@ export default async function TenantDemoLeadPage({ params }: PageProps) {
 
         {hasReviewCarousel ? <DemoReviewCarousel reviews={reviews} /> : null}
 
+        {showPostcardServicesFallback ? (
+          <section className="mb-14 space-y-4" aria-labelledby="services-heading">
+            <h2
+              id="services-heading"
+              className="text-lg font-semibold text-zinc-900"
+            >
+              Services
+            </h2>
+            {services.length > 0 ? (
+              <ul className="grid gap-3 text-zinc-700 sm:grid-cols-2">
+                {services.slice(0, 8).map((item) => (
+                  <li
+                    key={item}
+                    className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-medium shadow-sm"
+                  >
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="leading-relaxed text-zinc-700">
+                {b.name ?? "We"} provide {service.toLowerCase()} for homes and
+                businesses
+                {locLine ? ` in and around ${locLine}` : " in your area"}. Contact
+                us for a quote or to schedule service.
+              </p>
+            )}
+          </section>
+        ) : null}
+
+        {showFullBody ? (
+          <>
         {salesSummary ? (
           <section
             className="mb-10 space-y-2"
@@ -494,8 +545,12 @@ export default async function TenantDemoLeadPage({ params }: PageProps) {
           Preview demo site — not affiliated with{" "}
           {b.name?.trim() || "this business"}.
         </p>
+          </>
+        ) : null}
       </article>
-      <TenantActivationBanner paymentLink={paymentLink} />
+      {postcardMode ? null : (
+        <TenantActivationBanner paymentLink={paymentLink} />
+      )}
     </>
   );
 }

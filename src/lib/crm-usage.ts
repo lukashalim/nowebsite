@@ -28,7 +28,8 @@ export async function getCrmUsageSummary(
 ): Promise<CrmUsageSummary> {
   const rows = await fetchCrmUsageMonthlySummary(userId);
   const byAction = crmUsageSummaryFromRows(rows);
-  const used = byAction.dm + byAction.sms + byAction.demo_click;
+  const used =
+    byAction.dm + byAction.sms + byAction.demo_click + byAction.mail;
 
   return {
     used,
@@ -62,7 +63,7 @@ export async function recordCrmUsage(
     if (used >= FREE_MONTHLY_OUTREACH_LIMIT) {
       return {
         ok: false,
-        error: "Monthly outreach limit reached. Upgrade to Pro for unlimited DMs, SMS, and demo links.",
+        error: "Monthly outreach limit reached. Upgrade to Pro for unlimited DMs, SMS, demo links, and postcards.",
         remaining: 0,
       };
     }

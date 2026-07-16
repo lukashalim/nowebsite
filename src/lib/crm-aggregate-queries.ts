@@ -40,7 +40,12 @@ export function crmUsageSummaryFromRows(
   const byAction: CrmUsageByAction = { ...EMPTY_CRM_USAGE_BY_ACTION };
   for (const row of rows) {
     const action = row.action_type;
-    if (action === "dm" || action === "sms" || action === "demo_click") {
+    if (
+      action === "dm" ||
+      action === "sms" ||
+      action === "demo_click" ||
+      action === "mail"
+    ) {
       byAction[action as CrmUsageAction] += row.event_count;
     }
   }

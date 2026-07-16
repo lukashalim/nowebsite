@@ -35,6 +35,7 @@ scrape/_extract_last_run.log
 scrape/logs/
 scrape/error_logs/
 scrape/output/
+scrape/out/
 scrape/stderr.txt
 scrape/python/vendor/
 scrape/python/__pycache__/

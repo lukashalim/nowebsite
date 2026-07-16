@@ -1,4 +1,19 @@
--- Monthly CRM outreach usage aggregates (replaces per-row fetch + JS count).
+-- Allow postcard_sent usage events and include them in CRM monthly outreach totals.
+
+ALTER TABLE public.usage_events
+  DROP CONSTRAINT IF EXISTS usage_events_event_type_check;
+
+ALTER TABLE public.usage_events
+  ADD CONSTRAINT usage_events_event_type_check CHECK (event_type IN (
+    'demo_site_created',
+    'facebook_dm_copied',
+    'sms_sent',
+    'csv_page_exported',
+    'user_login',
+    'phone_call_initiated',
+    'lead_contact_revealed',
+    'postcard_sent'
+  ));
 
 CREATE OR REPLACE FUNCTION public.crm_usage_monthly_summary(p_user_id uuid)
 RETURNS TABLE(

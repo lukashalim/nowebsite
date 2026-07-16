@@ -8,7 +8,7 @@ import {
   Star,
 } from "lucide-react";
 import { ContactCountSelect } from "@/components/contact-count-select";
-import { CrmPhonePopover } from "@/components/crm-phone-popover";
+import { CrmOutreachPopover } from "@/components/crm-outreach-popover";
 import { MarkInvalidButton } from "@/components/mark-invalid-button";
 import { NotesCell } from "@/components/notes-cell";
 import { OutreachSpintaxButton } from "@/components/outreach-spintax-button";
@@ -158,28 +158,28 @@ export function CrmLeadsTableBody({
               {b.reviews ?? "—"}
             </td>
             <td className="px-3 py-3">
-              {b.phone ? (
-                <CrmPhonePopover
-                  phone={b.phone}
-                  country={b.country}
-                  userId={userId}
-                  placeId={b.place_id}
-                  businessName={b.name}
-                  mainCategory={b.main_category}
-                  businessType={b.business_type}
-                  ownerName={b.owner_name}
-                  contactEmail={b.contact_email}
-                  enrichmentEmail={b.enrichment_email}
-                  senderName={senderName}
-                  leadAudience={spintaxLeadAudience}
-                  templates={spintaxTemplates}
-                  existingNotes={b.notes}
-                  outreachRemaining={outreachRemaining}
-                  onOutreachRecorded={handleOutreachRecorded}
-                />
-              ) : (
-                "—"
-              )}
+              <CrmOutreachPopover
+                phone={b.phone}
+                country={b.country}
+                userId={userId}
+                placeId={b.place_id}
+                businessName={b.name}
+                mainCategory={b.main_category}
+                businessType={b.business_type}
+                ownerName={b.owner_name}
+                contactEmail={b.contact_email}
+                enrichmentEmail={b.enrichment_email}
+                senderName={senderName}
+                address={b.address}
+                city={b.city}
+                state={b.state}
+                postalCode={b.postal_code}
+                leadAudience={spintaxLeadAudience}
+                templates={spintaxTemplates}
+                existingNotes={b.notes}
+                outreachRemaining={outreachRemaining}
+                onOutreachRecorded={handleOutreachRecorded}
+              />
             </td>
             <td className="px-3 py-3 align-top">
               <OutreachSpintaxButton

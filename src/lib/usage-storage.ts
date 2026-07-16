@@ -22,6 +22,7 @@ export const USAGE_EVENT_TYPES = [
   "user_login",
   "phone_call_initiated",
   "lead_contact_revealed",
+  "postcard_sent",
 ] as const;
 
 export type UsageEventType = (typeof USAGE_EVENT_TYPES)[number];
@@ -30,6 +31,7 @@ export const OUTREACH_USAGE_EVENT_TYPES = [
   "facebook_dm_copied",
   "sms_sent",
   "demo_site_created",
+  "postcard_sent",
 ] as const satisfies readonly UsageEventType[];
 
 export function isUsageEventType(value: string): value is UsageEventType {
