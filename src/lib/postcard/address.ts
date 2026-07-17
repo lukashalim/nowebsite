@@ -142,21 +142,33 @@ export function leadToLobAddress(input: {
   state: string;
   postal_code: string;
   country?: string | null;
+  address_line2?: string | null;
 }): LobAddress {
-  const name =
-    input.ownerName?.trim() ||
-    input.name?.trim() ||
-    "Business Owner";
+  const business = input.name?.trim() || "";
+  const owner = input.ownerName?.trim() || "";
   const rawState = input.state.trim();
   const abbr = stateToAbbr(rawState);
-  return {
-    name,
+  const line2 = input.address_line2?.trim() || "";
+
+  const base = {
     address_line1: input.address.trim(),
+    ...(line2 ? { address_line2: line2 } : {}),
     address_city: input.city.trim(),
     address_state: (abbr ?? rawState).toUpperCase(),
     address_zip: input.postal_code.trim(),
     address_country: (input.country?.trim() || "US").toUpperCase(),
   };
+
+  if (owner && business) {
+    return { name: owner, company: business, ...base };
+  }
+  if (owner) {
+    return { name: owner, ...base };
+  }
+  if (business) {
+    return { name: business, ...base };
+  }
+  return { name: "Business Owner", ...base };
 }
 
 export function formatLeadAddressLines(input: {

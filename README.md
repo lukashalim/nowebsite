@@ -73,27 +73,16 @@ node --import ./scrape/env-nowebsite-queue.mjs ./scrape/backfill-phone-line-type
 
 Use `--force` to re-lookup rows that already have `phone_line_type`. Optional env: `PHONE_LINE_BACKFILL_BATCH` (default 25), `PHONE_LINE_BACKFILL_SLEEP_MS` (default 300), `PHONE_LINE_BACKFILL_STATES` (comma-separated state names).
 
-### Postcard demo screenshots (Lob 4×6)
-
-Batch-capture personalized RingReady demo pages as print-ready images for Lob postcards. Output is **1275×1875** (4.25″×6.25″ bleed @ 300 DPI, portrait).
-
-1. Install scrape deps once: `npm install` then `npx playwright install chromium`.
-2. Dry run, then capture locally:
-
-```bash
-node --import ./scrape/env-nowebsite-queue.mjs ./scrape/generate-postcard-screenshots.mjs --username=YOURCRMUSER --dry-run --limit 5
-node --import ./scrape/env-nowebsite-queue.mjs ./scrape/generate-postcard-screenshots.mjs --username=YOURCRMUSER --local-only --limit 20
-```
-
-3. Omit `--local-only` to also upload to the public Supabase Storage bucket `postcard-screenshots` (created automatically if missing).
-
-Single-URL test: `--url=https://www.ringreadysite.com/user/slug --local-only` (script appends `?postcard=1` so the demo shows reviews instead of Services). Other flags: `--force`, `--format=png`, `--place-id=`, `--states=Maryland`. Files land in `scrape/out/postcard-screenshots/` with `manifest.jsonl`. Optional env: `POSTCARD_SCREENSHOT_BATCH`, `POSTCARD_SCREENSHOT_SLEEP_MS`, `POSTCARD_SCREENSHOT_STATES`.
-
-Requires a deploy of the demo page’s `?postcard=1` mode (hero + reviews; Services only if no review excerpts).
-
 ### CRM Lob postcards (Mail channel)
 
-CRM **Outreach** column: **Call | Text | Mail**. Mail sends a Lob 4×6 postcard (screenshot front, QR back → live demo).
+CRM **Outreach** column: **Call | Text | Mail**. Mail sends a Lob 4×6 postcard:
+
+- **Front:** HTML built from listing data (name, category, location, rating, review quote)
+- **Back:** pitch + QR → live RingReady demo
+- **To address:** owner first name (auto-Suggest from reviews if not saved yet) + business as Lob `company` when both exist; otherwise business name alone
+- **`use_type`:** always `marketing`
+
+Lob US address verification runs before create; undeliverable addresses return a clear 422. For scraped Google addresses, set Lob account deliverability strictness to **Normal** (or **Relaxed** for test keys) at [Account settings](https://dashboard.lob.com/#/settings/account).
 
 Env (`.env.local`):
 
@@ -103,7 +92,17 @@ RETURN_ADDRESS={"name":"...","address_line1":"...","address_city":"...","address
 # or comma form: Name, 123 Main St, City, ST 12345
 ```
 
-Also run [`scrape/sql/add-postcard-sent-usage.sql`](scrape/sql/add-postcard-sent-usage.sql) if not already applied (adds `postcard_sent` to free-tier outreach usage). Playwright + Chromium required on the server that handles `/api/crm-postcard`.
+Also run [`scrape/sql/add-postcard-sent-usage.sql`](scrape/sql/add-postcard-sent-usage.sql) if not already applied (adds `postcard_sent` to free-tier outreach usage).
+
+### Postcard demo screenshots (optional)
+
+Optional batch-capture of personalized RingReady demos as 1275×1875 JPGs (legacy / creative experiments). CRM Mail does **not** require these.
+
+```bash
+npm run postcard:screenshots -- --username=YOURCRMUSER --origin=http://localhost:3001 --limit 20
+```
+
+Flags: `--dry-run`, `--local-only`, `--force`, `--format=png`, `--place-id=`, `--states=Maryland`. Env: `POSTCARD_DEMO_ORIGIN`, `POSTCARD_SCREENSHOT_BATCH`, `POSTCARD_SCREENSHOT_SLEEP_MS`, `POSTCARD_SCREENSHOT_STATES`.
 
 ## Related
 

@@ -50,6 +50,8 @@ interface CrmOutreachPopoverProps {
   templates: SpintaxTemplate[];
   existingNotes: string | null;
   outreachRemaining: number | null;
+  /** Page-level CRM outreach mode from ?outreachMode= */
+  pageOutreachMode?: "all" | "call" | "text" | "mail";
   onOutreachRecorded?: (
     remaining: number | null,
     action: CrmUsageAction,
@@ -86,7 +88,13 @@ function pickDefaultChannel(input: {
   hasPhone: boolean;
   mailable: boolean;
   stored: string | null;
+  pageMode?: "all" | "call" | "text" | "mail";
 }): OutreachChannel {
+  const pageMode = input.pageMode ?? "all";
+  if (pageMode === "call" && input.hasPhone) return "call";
+  if (pageMode === "text" && input.hasPhone) return "text";
+  if (pageMode === "mail" && input.mailable) return "mail";
+
   const stored =
     input.stored === "call" || input.stored === "text" || input.stored === "mail"
       ? input.stored
@@ -119,6 +127,7 @@ export function CrmOutreachPopover({
   templates,
   existingNotes,
   outreachRemaining,
+  pageOutreachMode = "all",
   onOutreachRecorded,
 }: CrmOutreachPopoverProps) {
   const hasPhone = Boolean(phone?.trim());
@@ -168,8 +177,15 @@ export function CrmOutreachPopover({
 
   useEffect(() => {
     const stored = window.localStorage.getItem(lastChannelStorageKey(userId));
-    setChannel(pickDefaultChannel({ hasPhone, mailable, stored }));
-  }, [userId, hasPhone, mailable]);
+    setChannel(
+      pickDefaultChannel({
+        hasPhone,
+        mailable,
+        stored,
+        pageMode: pageOutreachMode,
+      }),
+    );
+  }, [userId, hasPhone, mailable, pageOutreachMode]);
 
   useEffect(() => {
     if (smsTemplates.length === 0) return;
@@ -719,8 +735,9 @@ export function CrmOutreachPopover({
                 ) : (
                   <>
                     <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                      Sends a 4×6 Lob postcard (demo screenshot front, QR back).
-                      Test keys do not mail physically.
+                      Sends a 4×6 marketing postcard (HTML front, QR back).
+                      Addressed to the owner when Suggest finds one, plus the
+                      business name. Lob must accept the street address.
                     </p>
                     {mailError ? (
                       <p

@@ -1,30 +1,38 @@
 /**
  * Capture Lob-ready 4×6 portrait screenshots of personalized RingReady demo pages.
  *
- *   node --import ./scrape/env-nowebsite-queue.mjs ./scrape/generate-postcard-screenshots.mjs \
- *     --username=YOURCRMUSER --limit 20
+ *   npm run postcard:screenshots -- --username=YOURCRMUSER --limit 20
  *
- *   node --import ./scrape/env-nowebsite-queue.mjs ./scrape/generate-postcard-screenshots.mjs \
- *     --username=YOURCRMUSER --dry-run --limit 5
+ *   npm run postcard:screenshots -- --username=YOURCRMUSER --dry-run --limit 5
  *
- *   node --import ./scrape/env-nowebsite-queue.mjs ./scrape/generate-postcard-screenshots.mjs \
- *     --url=https://www.ringreadysite.com/user/slug --local-only
+ *   npm run postcard:screenshots -- --url=https://www.ringreadysite.com/user/slug --local-only
  *
- * Output: 1275×1875 JPG (Lob 4.25″×6.25″ bleed @ 300 DPI). PNG via --format=png.
+ * Default uploads to Supabase Storage `postcard-screenshots/{username}/{placeId}.jpg`
+ * (used by CRM Mail). Re-running without --local-only uploads existing local files that
+ * are missing remotely. Output: 1275×1875 JPG. PNG via --format=png.
  * Requires: playwright + sharp (optionalDeps) and `npx playwright install chromium`.
  *
- * Env: Supabase via loadEnvLocal(). Optional: POSTCARD_SCREENSHOT_BATCH,
- *   POSTCARD_SCREENSHOT_SLEEP_MS, POSTCARD_SCREENSHOT_STATES.
+ * Prefer local capture while RingReady is running:
+ *   npm run postcard:screenshots -- --username=lukas --origin=http://localhost:3001 --limit 20
+ *
+ * Env: Supabase via loadEnvLocal(). Optional: POSTCARD_DEMO_ORIGIN,
+ *   POSTCARD_SCREENSHOT_BATCH, POSTCARD_SCREENSHOT_SLEEP_MS, POSTCARD_SCREENSHOT_STATES.
  */
 
-import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadEnvLocal, getSupabase } from "./lib/scrape-pipeline/index.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TABLE = process.env.BUSINESSES_TABLE ?? "businesses_nowebsite";
-const RING_READY_ORIGIN = "https://www.ringreadysite.com";
+const DEFAULT_DEMO_ORIGIN = "https://www.ringreadysite.com";
 const STORAGE_BUCKET = "postcard-screenshots";
 const OUT_DIR = resolve(__dirname, "out", "postcard-screenshots");
 const MANIFEST_PATH = join(OUT_DIR, "manifest.jsonl");
@@ -116,13 +124,29 @@ function resolveStateFilterValues(rawStates) {
   return [...resolved];
 }
 
+function normalizeOrigin(raw) {
+  const trimmed = String(raw ?? "").trim().replace(/\/$/, "");
+  if (!trimmed) return DEFAULT_DEMO_ORIGIN;
+  try {
+    const u = new URL(trimmed);
+    if (u.protocol !== "http:" && u.protocol !== "https:") {
+      throw new Error("origin must be http(s)");
+    }
+    return u.origin;
+  } catch {
+    throw new Error(
+      `Invalid --origin / POSTCARD_DEMO_ORIGIN: ${raw}. Example: http://localhost:3001`,
+    );
+  }
+}
+
 function tenantDemoPublicPath(username, slug) {
   return `/${encodeURIComponent(username.trim())}/${encodeURIComponent(slug.trim())}`;
 }
 
-function buildDemoUrl(username, slug) {
+function buildDemoUrl(origin, username, slug) {
   const path = tenantDemoPublicPath(username, slug);
-  return `${RING_READY_ORIGIN}${path}?postcard=1`;
+  return `${origin}${path}?postcard=1`;
 }
 
 function withPostcardQuery(url) {
@@ -194,6 +218,24 @@ async function uploadToStorage(supabase, objectPath, buffer, contentType) {
     throw new Error(`Storage upload failed (${objectPath}): ${error.message}`);
   }
   return publicStorageUrl(supabase, objectPath);
+}
+
+async function storageObjectExists(supabase, folder, fileName) {
+  const { data, error } = await supabase.storage
+    .from(STORAGE_BUCKET)
+    .list(folder, { search: fileName.replace(/\.[^.]+$/, "") });
+  if (error) return false;
+  return (data ?? []).some((f) => f.name === fileName);
+}
+
+function contentTypeForExt(ext) {
+  return ext === "png" ? "image/png" : "image/jpeg";
+}
+
+function storageObjectPath(username, singleUrl, fileBase, ext) {
+  if (username) return `${username.trim()}/${fileBase}.${ext}`;
+  if (singleUrl) return `manual/${fileBase}.${ext}`;
+  return null;
 }
 
 /**
@@ -323,6 +365,9 @@ async function main() {
   const username = parseArgValue(argv, "username");
   const singleUrl = parseArgValue(argv, "url");
   const placeId = parseArgValue(argv, "place-id");
+  const demoOrigin = normalizeOrigin(
+    parseArgValue(argv, "origin") ?? process.env.POSTCARD_DEMO_ORIGIN,
+  );
   const formatRaw = (parseArgValue(argv, "format") ?? "jpg").toLowerCase();
   const format = formatRaw === "png" ? "png" : "jpg";
   const stateFilter = resolveStateFilterValues(parseStatesArg(argv));
@@ -363,7 +408,7 @@ async function main() {
       place_id: row.place_id,
       name: row.name,
       demo_slug: row.demo_slug,
-      demo_url: buildDemoUrl(username, row.demo_slug.trim()),
+      demo_url: buildDemoUrl(demoOrigin, username, row.demo_slug.trim()),
     }));
   }
 
@@ -373,7 +418,7 @@ async function main() {
   }
 
   console.log(
-    `Jobs: ${jobs.length} format=${format} localOnly=${localOnly}${dryRun ? " dry-run" : ""}`,
+    `Jobs: ${jobs.length} format=${format} origin=${demoOrigin} localOnly=${localOnly}${dryRun ? " dry-run" : ""}`,
   );
 
   if (dryRun) {
@@ -415,45 +460,86 @@ async function main() {
   try {
     for (const job of jobs) {
       const fileBase = sanitizePlaceIdForFilename(job.place_id);
-      const localPath = join(OUT_DIR, `${fileBase}.${format}`);
-
-      if (!force && existsSync(localPath)) {
-        skipped += 1;
-        console.log(
-          JSON.stringify({
-            place_id: job.place_id,
-            skipped: "exists",
-            local_path: localPath,
-          }),
-        );
-        continue;
-      }
+      const ext = format === "png" ? "png" : "jpg";
+      const localPath = join(OUT_DIR, `${fileBase}.${ext}`);
+      const objectPath = storageObjectPath(username, singleUrl, fileBase, ext);
+      const contentType = contentTypeForExt(ext);
 
       try {
-        const rawPng = await captureDemoScreenshot(page, job.demo_url);
-        const { buffer, contentType, ext } = await toLobCanvas(
-          sharp,
-          rawPng,
-          format,
-        );
-        writeFileSync(localPath, buffer);
+        const localExists = !force && existsSync(localPath);
 
-        let publicUrl = null;
-        if (supabase && username) {
-          const objectPath = `${username.trim()}/${fileBase}.${ext}`;
-          publicUrl = await uploadToStorage(
+        if (localExists && supabase && objectPath) {
+          const folder = objectPath.includes("/")
+            ? objectPath.slice(0, objectPath.lastIndexOf("/"))
+            : "";
+          const fileName = objectPath.slice(objectPath.lastIndexOf("/") + 1);
+          const remoteExists = await storageObjectExists(
+            supabase,
+            folder,
+            fileName,
+          );
+          if (remoteExists) {
+            skipped += 1;
+            console.log(
+              JSON.stringify({
+                place_id: job.place_id,
+                skipped: "exists",
+                local_path: localPath,
+                public_url: publicStorageUrl(supabase, objectPath),
+              }),
+            );
+            continue;
+          }
+
+          const buffer = readFileSync(localPath);
+          const publicUrl = await uploadToStorage(
             supabase,
             objectPath,
             buffer,
             contentType,
           );
-        } else if (supabase && singleUrl) {
-          const objectPath = `manual/${fileBase}.${ext}`;
+          const manifestRow = {
+            place_id: job.place_id,
+            name: job.name ?? null,
+            demo_url: job.demo_url,
+            local_path: localPath,
+            public_url: publicUrl,
+            width: LOB_WIDTH,
+            height: LOB_HEIGHT,
+            format: ext,
+            uploaded_existing: true,
+            generated_at: new Date().toISOString(),
+          };
+          appendManifest(manifestRow);
+          console.log(JSON.stringify(manifestRow));
+          ok += 1;
+          if (SLEEP_MS > 0) await sleep(SLEEP_MS);
+          continue;
+        }
+
+        if (localExists) {
+          skipped += 1;
+          console.log(
+            JSON.stringify({
+              place_id: job.place_id,
+              skipped: "exists",
+              local_path: localPath,
+            }),
+          );
+          continue;
+        }
+
+        const rawPng = await captureDemoScreenshot(page, job.demo_url);
+        const lob = await toLobCanvas(sharp, rawPng, format);
+        writeFileSync(localPath, lob.buffer);
+
+        let publicUrl = null;
+        if (supabase && objectPath) {
           publicUrl = await uploadToStorage(
             supabase,
             objectPath,
-            buffer,
-            contentType,
+            lob.buffer,
+            lob.contentType,
           );
         }
 
@@ -465,7 +551,7 @@ async function main() {
           public_url: publicUrl,
           width: LOB_WIDTH,
           height: LOB_HEIGHT,
-          format: ext,
+          format: lob.ext,
           generated_at: new Date().toISOString(),
         };
         appendManifest(manifestRow);

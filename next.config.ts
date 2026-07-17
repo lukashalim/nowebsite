@@ -9,6 +9,11 @@ const repoRoot = appDir;
 /** Repo root `.env.local` (may be overwritten when Next resets `process.env`). */
 loadEnvConfig(repoRoot, process.env.NODE_ENV !== "production");
 
-const nextConfig: NextConfig = {};
+const nextConfig: NextConfig = {
+  // Allow concurrent `next dev` for CRM (:3000) and RingReady (:3001).
+  ...(process.env.NEXT_DIST_DIR
+    ? { distDir: process.env.NEXT_DIST_DIR }
+    : {}),
+};
 
 export default nextConfig;

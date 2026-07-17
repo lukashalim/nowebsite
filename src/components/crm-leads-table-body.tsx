@@ -18,7 +18,7 @@ import type { CrmOutreachRecordedHandler } from "@/components/crm-free-usage-lay
 import { useCrmOutreachRecorded } from "@/components/crm-free-usage-layout";
 import type { BusinessLead } from "@/lib/business";
 import type { CrmUsageAction } from "@/lib/crm-limits";
-import type { CrmWebPresence } from "@/lib/crm-params";
+import type { CrmOutreachMode, CrmWebPresence } from "@/lib/crm-params";
 import {
   isEligibleForCrmSpintax,
   resolveFacebookPageUrl,
@@ -30,6 +30,7 @@ interface CrmLeadsTableBodyProps {
   rows: BusinessLead[];
   userId: string;
   webPresence: CrmWebPresence;
+  pageOutreachMode?: CrmOutreachMode;
   spintaxTemplates: SpintaxTemplate[];
   isPro: boolean;
   initialOutreachRemaining: number | null;
@@ -47,6 +48,7 @@ export function CrmLeadsTableBody({
   rows,
   userId,
   webPresence,
+  pageOutreachMode = "all",
   spintaxTemplates,
   isPro,
   initialOutreachRemaining,
@@ -178,6 +180,7 @@ export function CrmLeadsTableBody({
                 templates={spintaxTemplates}
                 existingNotes={b.notes}
                 outreachRemaining={outreachRemaining}
+                pageOutreachMode={pageOutreachMode}
                 onOutreachRecorded={handleOutreachRecorded}
               />
             </td>

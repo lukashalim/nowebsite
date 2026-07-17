@@ -255,6 +255,35 @@ function applyPhoneLineTypeFilter<
   }
 }
 
+function applyOutreachModeFilter<
+  T extends {
+    not: (column: string, operator: string, value: unknown) => T;
+    neq: (column: string, value: unknown) => T;
+  },
+>(q: T, outreachMode: CrmSearchParams["outreachMode"]): T {
+  switch (outreachMode) {
+    case "all":
+      return q;
+    case "call":
+    case "text":
+      return q.not("phone", "is", null).neq("phone", "");
+    case "mail":
+      return q
+        .not("address", "is", null)
+        .neq("address", "")
+        .not("city", "is", null)
+        .neq("city", "")
+        .not("state", "is", null)
+        .neq("state", "")
+        .not("postal_code", "is", null)
+        .neq("postal_code", "");
+    default: {
+      const _x: never = outreachMode;
+      return _x;
+    }
+  }
+}
+
 function applyCategoryGroupFilter<
   T extends {
     in: (column: string, values: string[]) => T;
@@ -431,6 +460,7 @@ export async function fetchCrmBusinessRows(
     }
 
     q = applyPhoneLineTypeFilter(q, p.phoneLineType);
+    q = applyOutreachModeFilter(q, p.outreachMode);
 
     q = applyReviewExcerptsExtractedFilter(q);
 

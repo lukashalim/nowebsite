@@ -1,15 +1,22 @@
 import { NextResponse } from "next/server";
+import { suggestOwnerNameFromReviews } from "@/app/actions/suggest-owner-name";
 import { demoPathSegment } from "@/lib/demo-slug";
 import { DEMO_DETAIL_COLUMNS } from "@/lib/crm-cohort";
 import { recordCrmUsage } from "@/lib/crm-usage";
-import { createLobPostcard, isLobTestMode } from "@/lib/lob";
+import {
+  createLobPostcard,
+  isAcceptableUsDeliverability,
+  isLobTestMode,
+  verifyUsAddress,
+  type LobAddress,
+} from "@/lib/lob";
 import {
   isMailableLeadAddress,
   leadToLobAddress,
   parseReturnAddressFromEnv,
 } from "@/lib/postcard/address";
 import { buildPostcardBackHtml } from "@/lib/postcard/back-html";
-import { ensurePostcardFrontUrl } from "@/lib/postcard/capture";
+import { buildPostcardFrontHtml } from "@/lib/postcard/front-html";
 import { demoUrlToQrDataUri } from "@/lib/postcard/qr";
 import { ensureProfileUsername } from "@/lib/profile-username";
 import { ringReadyTenantDemoUrl } from "@/lib/ringready-site";
@@ -19,7 +26,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServerClient();
@@ -33,13 +40,11 @@ export async function POST(request: Request) {
 
   let body: {
     placeId?: string;
-    force?: boolean;
     ownerName?: string | null;
   };
   try {
     body = (await request.json()) as {
       placeId?: string;
-      force?: boolean;
       ownerName?: string | null;
     };
   } catch {
@@ -99,7 +104,16 @@ export async function POST(request: Request) {
     typeof row.postal_code === "string" ? row.postal_code : null;
   const country = typeof row.country === "string" ? row.country : null;
   const name = typeof row.name === "string" ? row.name : null;
-  const ownerName = body.ownerName?.trim() || null;
+  const category =
+    (typeof row.main_category === "string" && row.main_category.trim()
+      ? row.main_category
+      : null) ||
+    (typeof row.business_type === "string" && row.business_type.trim()
+      ? row.business_type
+      : null);
+  const rating = row.rating != null ? Number(row.rating) : null;
+  const reviewCount = row.reviews != null ? Number(row.reviews) : null;
+  const phone = typeof row.phone === "string" ? row.phone : null;
 
   if (!isMailableLeadAddress({ address, city, state, postal_code })) {
     return NextResponse.json(
@@ -111,6 +125,14 @@ export async function POST(request: Request) {
     );
   }
 
+  let ownerName = body.ownerName?.trim() || null;
+  if (!ownerName) {
+    const suggested = await suggestOwnerNameFromReviews(placeId);
+    if (suggested.ok && suggested.ownerName?.trim()) {
+      ownerName = suggested.ownerName.trim();
+    }
+  }
+
   const slug = demoPathSegment({
     place_id: placeId,
     demo_slug: typeof row.demo_slug === "string" ? row.demo_slug : null,
@@ -119,27 +141,17 @@ export async function POST(request: Request) {
     username,
     decodeURIComponent(slug),
   );
-  const captureUrl = `${liveDemoUrl}${liveDemoUrl.includes("?") ? "&" : "?"}postcard=1`;
 
-  let frontUrl: string;
-  try {
-    frontUrl = await ensurePostcardFrontUrl({
-      username,
-      placeId,
-      captureUrl,
-      force: body.force === true,
-    });
-  } catch (err) {
-    return NextResponse.json(
-      {
-        error:
-          err instanceof Error
-            ? `Screenshot failed: ${err.message}`
-            : "Screenshot failed",
-      },
-      { status: 502 },
-    );
-  }
+  const frontHtml = buildPostcardFrontHtml({
+    businessName: name?.trim() || "your business",
+    category,
+    city,
+    state,
+    rating: Number.isFinite(rating) ? rating : null,
+    reviewCount: Number.isFinite(reviewCount) ? reviewCount : null,
+    reviewHighlights: row.review_highlights,
+    phone,
+  });
 
   let qrDataUri: string;
   try {
@@ -162,7 +174,7 @@ export async function POST(request: Request) {
     demoUrl: liveDemoUrl,
   });
 
-  const to = leadToLobAddress({
+  let to: LobAddress = leadToLobAddress({
     name,
     ownerName,
     address: address!,
@@ -172,15 +184,59 @@ export async function POST(request: Request) {
     country,
   });
 
+  try {
+    const verified = await verifyUsAddress({
+      primary_line: to.address_line1,
+      secondary_line: to.address_line2,
+      city: to.address_city,
+      state: to.address_state,
+      zip_code: to.address_zip,
+    });
+
+    if (!isAcceptableUsDeliverability(verified.deliverability)) {
+      return NextResponse.json(
+        {
+          error: `Address failed Lob deliverability check (${verified.deliverability}). Fix the street/city/state/ZIP, or set Lob account strictness to Normal/Relaxed for testing.`,
+          deliverability: verified.deliverability,
+        },
+        { status: 422 },
+      );
+    }
+
+    to = {
+      name: to.name,
+      ...(to.company ? { company: to.company } : {}),
+      address_line1: verified.primary_line,
+      ...(verified.secondary_line
+        ? { address_line2: verified.secondary_line }
+        : {}),
+      address_city: verified.city,
+      address_state: verified.state.toUpperCase(),
+      address_zip: verified.zip_code,
+      address_country: "US",
+    };
+  } catch (err) {
+    return NextResponse.json(
+      {
+        error:
+          err instanceof Error
+            ? `Address verification failed: ${err.message}`
+            : "Address verification failed",
+      },
+      { status: 502 },
+    );
+  }
+
   let postcard;
   try {
     postcard = await createLobPostcard({
       description: `CRM postcard for ${name ?? placeId}`,
       to,
       from,
-      front: frontUrl,
+      front: frontHtml,
       back: backHtml,
       size: "4x6",
+      useType: "marketing",
     });
   } catch (err) {
     return NextResponse.json(
@@ -212,7 +268,7 @@ export async function POST(request: Request) {
     expectedDeliveryDate: postcard.expected_delivery_date,
     testMode: isLobTestMode(),
     remaining: usage.remaining,
-    frontUrl,
     demoUrl: liveDemoUrl,
+    to,
   });
 }

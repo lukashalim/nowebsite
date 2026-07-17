@@ -8,6 +8,7 @@ import { CrmLeadsTableShell } from "@/components/crm-leads-table-shell";
 import { CrmLoadError } from "@/components/crm-load-error";
 import { CrmLogin } from "@/components/crm-login";
 import { CrmNav } from "@/components/crm-nav";
+import { CrmOutreachModeToggle } from "@/components/crm-outreach-mode-toggle";
 import { fetchCrmBusinessRows, fetchCrmFilterOptions } from "@/lib/crm-cohort";
 import { fetchCategoryGroupTaxonomy } from "@/lib/directory/category-groups";
 import { getCrmUsageSummary } from "@/lib/crm-usage";
@@ -112,13 +113,16 @@ export default async function CrmPage({ searchParams }: PageProps) {
   const spintaxTemplates = spintaxResult.ok ? spintaxResult.templates : [];
 
   const filters = (
-    <CrmFilters
-      params={p}
-      groups={taxonomy.groups}
-      categories={filterOptions.categories}
-      states={filterOptions.states}
-      isPro={userIsPro}
-    />
+    <div className="flex flex-col gap-3">
+      <CrmOutreachModeToggle params={p} />
+      <CrmFilters
+        params={p}
+        groups={taxonomy.groups}
+        categories={filterOptions.categories}
+        states={filterOptions.states}
+        isPro={userIsPro}
+      />
+    </div>
   );
 
   const tableShell = loadError ? (
@@ -144,9 +148,8 @@ export default async function CrmPage({ searchParams }: PageProps) {
           No-website leads
         </h1>
         <p className="max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
-          Browse verified local businesses without websites. Filter by category,
-          rating, and outreach stage. Use the DM Spintax button to copy a
-          personalized cold outreach message.
+          Browse verified local businesses without websites. Use Outreach mode
+          (Call, Text, or Mail) to show only leads you can reach that way.
         </p>
       </header>
 

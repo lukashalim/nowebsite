@@ -80,6 +80,10 @@ export const crmPhoneLineTypeValues = [
 ] as const;
 export type CrmPhoneLineType = (typeof crmPhoneLineTypeValues)[number];
 
+/** Top-of-CRM outreach mode: filters the lead list by reachable surface. */
+export const crmOutreachModeValues = ["all", "call", "text", "mail"] as const;
+export type CrmOutreachMode = (typeof crmOutreachModeValues)[number];
+
 export { CRM_TIMEZONE_VALUES, type CrmTimezone };
 
 function parseTimezonesParam(
@@ -110,6 +114,7 @@ export const crmSearchParamsSchema = z
     /** All = broad no-website cohort; Facebook / WhatsApp narrow by Maps listing; Yes = has a real site. */
     webPresence: z.enum(crmWebPresenceValues).default("all"),
     phoneLineType: z.enum(crmPhoneLineTypeValues).default("all"),
+    outreachMode: z.enum(crmOutreachModeValues).default("all"),
     page: intInRange(1, 1, 1_000_000),
     pageSize: intInRange(50, 1, 100),
     contactMin: optionalInt,
@@ -190,6 +195,7 @@ function rawToFlat(raw: Record<string, string | string[] | undefined>) {
     minRating: firstParam(raw.minRating),
     webPresence: normalizeWebPresence(raw),
     phoneLineType: firstParam(raw.phoneLineType),
+    outreachMode: firstParam(raw.outreachMode),
     page: firstParam(raw.page),
     pageSize: firstParam(raw.pageSize),
     contactMin: firstParam(raw.contactMin),
@@ -226,6 +232,8 @@ function appendCrmFilterParams(sp: URLSearchParams, params: CrmSearchParams): vo
     sp.set("webPresence", params.webPresence);
   if (params.phoneLineType !== "all")
     sp.set("phoneLineType", params.phoneLineType);
+  if (params.outreachMode !== "all")
+    sp.set("outreachMode", params.outreachMode);
   if (params.contactMin !== undefined)
     sp.set("contactMin", String(params.contactMin));
   if (params.contactMax !== undefined)

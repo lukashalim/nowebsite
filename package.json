@@ -16,7 +16,8 @@
     "demo:backfill-seo": "node --import ./scrape/env-nowebsite-queue.mjs --import tsx ./scrape/backfill-demo-seo-dispatch.mjs",
     "demo:pipeline": "node --import ./scrape/env-nowebsite-pipeline-cohort.mjs --import tsx ./scrape/pipeline.mjs",
     "demo:poller": "node --import ./scrape/env-nowebsite-queue.mjs --import tsx ./scrape/poller.mjs",
-    "demo:dispatch": "node --import ./scrape/env-nowebsite-queue.mjs --import tsx ./scrape/dispatch.mjs"
+    "demo:dispatch": "node --import ./scrape/env-nowebsite-queue.mjs --import tsx ./scrape/dispatch.mjs",
+    "postcard:screenshots": "node --import ./scrape/env-nowebsite-queue.mjs ./scrape/generate-postcard-screenshots.mjs"
   },
   "dependencies": {
     "@next/third-parties": "^16.2.10",

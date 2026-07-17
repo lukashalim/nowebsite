@@ -90,6 +90,9 @@ export function CrmFilters({
         method="get"
         className="flex flex-wrap items-end gap-x-3 gap-y-3"
       >
+        {params.outreachMode !== "all" ? (
+          <input type="hidden" name="outreachMode" value={params.outreachMode} />
+        ) : null}
         <label className={labelClass}>
           Reviews
           <span className="flex items-center gap-1.5">
