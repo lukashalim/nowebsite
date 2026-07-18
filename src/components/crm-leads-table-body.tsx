@@ -16,6 +16,9 @@ import { OwnerNameInput } from "@/components/owner-name-input";
 import { StageSelect } from "@/components/stage-select";
 import type { CrmOutreachRecordedHandler } from "@/components/crm-free-usage-layout";
 import { useCrmOutreachRecorded } from "@/components/crm-free-usage-layout";
+import type {
+  PostcardMailGating,
+} from "@/components/crm-outreach-popover";
 import type { BusinessLead } from "@/lib/business";
 import type { CrmUsageAction } from "@/lib/crm-limits";
 import type { CrmOutreachMode, CrmWebPresence } from "@/lib/crm-params";
@@ -34,6 +37,7 @@ interface CrmLeadsTableBodyProps {
   spintaxTemplates: SpintaxTemplate[];
   isPro: boolean;
   initialOutreachRemaining: number | null;
+  postcardMail: PostcardMailGating;
   senderName?: string | null;
   onOutreachRecorded?: CrmOutreachRecordedHandler;
 }
@@ -52,6 +56,7 @@ export function CrmLeadsTableBody({
   spintaxTemplates,
   isPro,
   initialOutreachRemaining,
+  postcardMail: initialPostcardMail,
   senderName,
   onOutreachRecorded: onOutreachRecordedProp,
 }: CrmLeadsTableBodyProps) {
@@ -63,6 +68,7 @@ export function CrmLeadsTableBody({
   const [outreachRemaining, setOutreachRemaining] = useState(
     initialOutreachRemaining,
   );
+  const [postcardMail, setPostcardMail] = useState(initialPostcardMail);
 
   function setContactCountForPlace(placeId: string, next: number) {
     setContactCounts((prev) => ({ ...prev, [placeId]: next }));
@@ -74,6 +80,17 @@ export function CrmLeadsTableBody({
   ) {
     if (!isPro && remaining !== null) {
       setOutreachRemaining(remaining);
+    }
+    if (action === "mail" && !postcardMail.lifetimeUnlimited) {
+      setPostcardMail((prev) => {
+        if (prev.lobKeyMode === "test") {
+          return { ...prev, testRemaining: 0 };
+        }
+        if (prev.lobKeyMode === "live") {
+          return { ...prev, liveRemaining: 0 };
+        }
+        return prev;
+      });
     }
     onOutreachRecorded?.(remaining, action);
   }
@@ -181,6 +198,7 @@ export function CrmLeadsTableBody({
                 existingNotes={b.notes}
                 outreachRemaining={outreachRemaining}
                 pageOutreachMode={pageOutreachMode}
+                postcardMail={postcardMail}
                 onOutreachRecorded={handleOutreachRecorded}
               />
             </td>

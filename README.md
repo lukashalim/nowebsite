@@ -82,17 +82,13 @@ CRM **Outreach** column: **Call | Text | Mail**. Mail sends a Lob 4×6 postcard:
 - **To address:** owner first name (auto-Suggest from reviews if not saved yet) + business as Lob `company` when both exist; otherwise business name alone
 - **`use_type`:** always `marketing`
 
-Lob US address verification runs before create; undeliverable addresses return a clear 422. For scraped Google addresses, set Lob account deliverability strictness to **Normal** (or **Relaxed** for test keys) at [Account settings](https://dashboard.lob.com/#/settings/account).
+Lob US address verification runs before create on **live** keys; undeliverable addresses return a clear 422. Lob **`test_` keys do not verify real addresses** (USAV always returns undeliverable), so CRM skips that gate in test mode. For live scraped Google addresses, set Lob account deliverability strictness to **Normal** (or **Relaxed**) at [Account settings](https://dashboard.lob.com/#/settings/account).
 
-Env (`.env.local`):
+Env (`.env.local`): none required for Lob — each user sets their **Lob API key** and **return address** in Settings.
 
-```bash
-LOB_SECRET_KEY=test_...   # or LOB_API_KEY; test_ keys never mail physically
-RETURN_ADDRESS={"name":"...","address_line1":"...","address_city":"...","address_state":"XX","address_zip":"#####"}
-# or comma form: Name, 123 Main St, City, ST 12345
-```
+Lifetime cap (free only): **one test** and **one live** postcard. Pro is unlimited. Live free sends also count toward the free monthly outreach pool.
 
-Also run [`scrape/sql/add-postcard-sent-usage.sql`](scrape/sql/add-postcard-sent-usage.sql) if not already applied (adds `postcard_sent` to free-tier outreach usage).
+Also run [`scrape/sql/add-postcard-sent-usage.sql`](scrape/sql/add-postcard-sent-usage.sql), [`scrape/sql/add-profiles-lob-api-key.sql`](scrape/sql/add-profiles-lob-api-key.sql), and [`scrape/sql/add-profiles-postcard-return-address.sql`](scrape/sql/add-profiles-postcard-return-address.sql) if not already applied.
 
 ### Postcard demo screenshots (optional)
 

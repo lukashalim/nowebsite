@@ -23,6 +23,9 @@ export const USAGE_EVENT_TYPES = [
   "phone_call_initiated",
   "lead_contact_revealed",
   "postcard_sent",
+  "postcard_scanned",
+  "postcard_sent_test",
+  "postcard_scanned_test",
 ] as const;
 
 export type UsageEventType = (typeof USAGE_EVENT_TYPES)[number];

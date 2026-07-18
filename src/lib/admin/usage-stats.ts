@@ -72,6 +72,9 @@ export const USAGE_EVENT_LABELS: Record<UsageEventType, string> = {
   phone_call_initiated: "Phone call initiated",
   lead_contact_revealed: "Lead contact revealed",
   postcard_sent: "Postcard sent",
+  postcard_scanned: "Postcard QR scanned",
+  postcard_sent_test: "Postcard sent (test)",
+  postcard_scanned_test: "Postcard QR scanned (test)",
 };
 
 const OUTREACH_EVENT_SET = new Set<string>(OUTREACH_USAGE_EVENT_TYPES);

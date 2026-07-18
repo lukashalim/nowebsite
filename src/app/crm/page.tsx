@@ -14,7 +14,12 @@ import { fetchCategoryGroupTaxonomy } from "@/lib/directory/category-groups";
 import { getCrmUsageSummary } from "@/lib/crm-usage";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
 import { tryParseCrmSearchParams } from "@/lib/crm-params";
-import { getUserProfile, isPro } from "@/lib/subscription";
+import { getUserPostcardLifetimeSlots } from "@/lib/postcard/limits";
+import {
+  getLobProfilePublic,
+  getUserProfile,
+  isPro,
+} from "@/lib/subscription";
 import { ensureSendFoxProfileForUser } from "@/lib/sendfox-profile-sync";
 import { syncProForUser } from "@/lib/stripe-subscription";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -102,6 +107,19 @@ export default async function CrmPage({ searchParams }: PageProps) {
     raw.limit === "outreach" ||
     (!userIsPro && usageSummary !== null && usageSummary.remaining === 0);
 
+  const [lobProfile, postcardSlots] = await Promise.all([
+    getLobProfilePublic(user.id),
+    getUserPostcardLifetimeSlots(user.id),
+  ]);
+  const postcardMail = {
+    hasLobApiKey: lobProfile.has_lob_api_key,
+    hasReturnAddress: lobProfile.has_return_address,
+    lobKeyMode: lobProfile.lob_key_mode,
+    lifetimeUnlimited: userIsPro,
+    testRemaining: postcardSlots.testRemaining,
+    liveRemaining: postcardSlots.liveRemaining,
+  };
+
   const [{ rows, total, error: loadErr }, spintaxResult, filterOptions, taxonomy] =
     await Promise.all([
       fetchCrmBusinessRows(p, user.id),
@@ -136,6 +154,7 @@ export default async function CrmPage({ searchParams }: PageProps) {
       spintaxTemplates={spintaxTemplates}
       isPro={userIsPro}
       initialOutreachRemaining={usageSummary?.remaining ?? null}
+      postcardMail={postcardMail}
       senderName={profile?.email?.split("@")[0]?.trim() || null}
     />
   );

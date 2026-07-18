@@ -1,10 +1,79 @@
 import type { LobAddress } from "@/lib/lob";
 import { stateToAbbr } from "@/lib/directory/slugs";
 
+export interface PostcardReturnAddressInput {
+  name: string;
+  address_line1: string;
+  address_line2?: string;
+  address_city: string;
+  address_state: string;
+  address_zip: string;
+  address_country?: string;
+}
+
 /**
- * Parse RETURN_ADDRESS from env.
- * Accepts Lob-style JSON, or a single-line US string:
- *   "Name, 123 Main St, City, ST 12345"
+ * Normalize form/DB fields into a Lob from-address.
+ * Returns an error string when required fields are missing.
+ */
+export function normalizePostcardReturnAddress(
+  input: PostcardReturnAddressInput,
+): { ok: true; address: LobAddress } | { ok: false; error: string } {
+  const name = input.name.trim();
+  const address_line1 = input.address_line1.trim();
+  const address_line2 = input.address_line2?.trim() || "";
+  const address_city = input.address_city.trim();
+  const rawState = input.address_state.trim();
+  const address_state = (stateToAbbr(rawState) ?? rawState).toUpperCase();
+  const address_zip = input.address_zip.trim();
+  const address_country = (input.address_country?.trim() || "US").toUpperCase();
+
+  if (!name || !address_line1 || !address_city || !address_state || !address_zip) {
+    return {
+      ok: false,
+      error: "Return address needs name, street, city, state, and ZIP",
+    };
+  }
+  if (address_state.length !== 2) {
+    return { ok: false, error: "State must be a 2-letter abbreviation" };
+  }
+  if (!/^\d{5}(-\d{4})?$/.test(address_zip)) {
+    return { ok: false, error: "ZIP must be ##### or #####-####" };
+  }
+
+  return {
+    ok: true,
+    address: {
+      name,
+      address_line1,
+      ...(address_line2 ? { address_line2 } : {}),
+      address_city,
+      address_state,
+      address_zip,
+      address_country,
+    },
+  };
+}
+
+export function postcardReturnAddressFromUnknown(
+  value: unknown,
+): LobAddress | null {
+  if (!value || typeof value !== "object") return null;
+  const o = value as Record<string, unknown>;
+  const parsed = normalizePostcardReturnAddress({
+    name: String(o.name ?? ""),
+    address_line1: String(o.address_line1 ?? o.line1 ?? o.address ?? ""),
+    address_line2: String(o.address_line2 ?? o.line2 ?? ""),
+    address_city: String(o.address_city ?? o.city ?? ""),
+    address_state: String(o.address_state ?? o.state ?? ""),
+    address_zip: String(o.address_zip ?? o.zip ?? o.postal_code ?? ""),
+    address_country: String(o.address_country ?? o.country ?? "US"),
+  });
+  return parsed.ok ? parsed.address : null;
+}
+
+/**
+ * @deprecated Prefer per-user postcard_return_address on profiles.
+ * Parse RETURN_ADDRESS from env (legacy).
  */
 export function parseReturnAddressFromEnv(): LobAddress {
   const raw = process.env.RETURN_ADDRESS?.trim();
@@ -29,40 +98,13 @@ function parseReturnAddressJson(raw: string): LobAddress {
     );
   }
 
-  if (!parsed || typeof parsed !== "object") {
-    throw new Error("RETURN_ADDRESS JSON must be an object");
-  }
-
-  const o = parsed as Record<string, unknown>;
-  const name = String(o.name ?? "").trim();
-  const address_line1 = String(
-    o.address_line1 ?? o.line1 ?? o.address ?? "",
-  ).trim();
-  const address_line2 = String(o.address_line2 ?? o.line2 ?? "").trim();
-  const address_city = String(o.address_city ?? o.city ?? "").trim();
-  const address_state = String(o.address_state ?? o.state ?? "").trim();
-  const address_zip = String(
-    o.address_zip ?? o.zip ?? o.postal_code ?? "",
-  ).trim();
-  const address_country = String(o.address_country ?? o.country ?? "US")
-    .trim()
-    .toUpperCase();
-
-  if (!name || !address_line1 || !address_city || !address_state || !address_zip) {
+  const address = postcardReturnAddressFromUnknown(parsed);
+  if (!address) {
     throw new Error(
       "RETURN_ADDRESS is missing required fields (name, address_line1, address_city, address_state, address_zip)",
     );
   }
-
-  return {
-    name,
-    address_line1,
-    ...(address_line2 ? { address_line2 } : {}),
-    address_city,
-    address_state,
-    address_zip,
-    address_country: address_country || "US",
-  };
+  return address;
 }
 
 /** "Name, street, City, ST ZIP" or "Name, street, City, ST, ZIP" */
@@ -106,18 +148,17 @@ function parseReturnAddressCsvLine(raw: string): LobAddress {
   const streetParts = parts.slice(1, cityIdx);
   const address_line1 = streetParts.join(", ").trim();
 
-  if (!name || !address_line1 || !address_city || !address_state || !address_zip) {
-    throw new Error("Could not parse RETURN_ADDRESS into a full mailing address");
-  }
-
-  return {
+  const normalized = normalizePostcardReturnAddress({
     name,
     address_line1,
     address_city,
-    address_state: address_state.toUpperCase(),
+    address_state,
     address_zip,
-    address_country: "US",
-  };
+  });
+  if (!normalized.ok) {
+    throw new Error("Could not parse RETURN_ADDRESS into a full mailing address");
+  }
+  return normalized.address;
 }
 
 export function isMailableLeadAddress(input: {

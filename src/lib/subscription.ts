@@ -1,6 +1,10 @@
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { TwilioUserCredentials } from "@/lib/twilio-credentials";
+import {
+  postcardReturnAddressFromUnknown,
+} from "@/lib/postcard/address";
+import type { LobAddress } from "@/lib/lob";
 
 export interface UserProfile {
   id: string;
@@ -27,6 +31,20 @@ export interface TwilioProfilePublic {
   forwarding_number: string;
   has_twilio_auth_token: boolean;
   is_active: boolean;
+}
+
+export interface LobProfilePublic {
+  has_lob_api_key: boolean;
+  lob_key_mode: "test" | "live" | null;
+  has_return_address: boolean;
+  return_address: {
+    name: string;
+    address_line1: string;
+    address_line2: string;
+    address_city: string;
+    address_state: string;
+    address_zip: string;
+  };
 }
 
 export function isPro(profile: UserProfile | null | undefined): boolean {
@@ -162,6 +180,73 @@ export async function getTwilioProfilePublic(
     forwarding_number: forwardingNumber,
     has_twilio_auth_token: hasAuthToken,
     is_active: isActive,
+  };
+}
+
+export async function getUserLobApiKey(userId: string): Promise<string | null> {
+  const supabase = createSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("lob_api_key")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+  const key =
+    typeof data.lob_api_key === "string" ? data.lob_api_key.trim() : "";
+  return key.length > 0 ? key : null;
+}
+
+export async function getUserPostcardReturnAddress(
+  userId: string,
+): Promise<LobAddress | null> {
+  const supabase = createSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("postcard_return_address")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+  return postcardReturnAddressFromUnknown(data.postcard_return_address);
+}
+
+export async function getLobProfilePublic(
+  userId: string,
+): Promise<LobProfilePublic> {
+  const supabase = createSupabaseAdmin();
+  const { data } = await supabase
+    .from("profiles")
+    .select("lob_api_key, postcard_return_address")
+    .eq("id", userId)
+    .maybeSingle();
+
+  const key =
+    typeof data?.lob_api_key === "string" ? data.lob_api_key.trim() : "";
+  const address = postcardReturnAddressFromUnknown(
+    data?.postcard_return_address,
+  );
+
+  return {
+    has_lob_api_key: key.length > 0,
+    lob_key_mode: key
+      ? key.startsWith("test_")
+        ? "test"
+        : "live"
+      : null,
+    has_return_address: address != null,
+    return_address: {
+      name: address?.name ?? "",
+      address_line1: address?.address_line1 ?? "",
+      address_line2: address?.address_line2 ?? "",
+      address_city: address?.address_city ?? "",
+      address_state: address?.address_state ?? "",
+      address_zip: address?.address_zip ?? "",
+    },
   };
 }
 

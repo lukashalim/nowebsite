@@ -7,7 +7,7 @@ import { shouldShowLocalDevTools } from "@/lib/dev-host";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
 
 interface CrmNavProps {
-  active?: "leads" | "spintax" | "settings";
+  active?: "leads" | "spintax" | "postcards" | "settings";
   isPro?: boolean;
 }
 
@@ -58,6 +58,19 @@ export async function CrmNav({ active, isPro = false }: CrmNavProps) {
           className={breadcrumbLinkClass}
         >
           DM Spintax Templates
+        </Link>
+      )}
+      <BreadcrumbSeparator />
+      {active === "postcards" ? (
+        <span className={breadcrumbActiveClass} aria-current="page">
+          Postcards
+        </span>
+      ) : (
+        <Link
+          href={`${CRM_BASE_PATH}/postcards`}
+          className={breadcrumbLinkClass}
+        >
+          Postcards
         </Link>
       )}
       <BreadcrumbSeparator />

@@ -1,6 +1,7 @@
 import { CrmLeadsTableBody } from "@/components/crm-leads-table-body";
 import { CrmPagination } from "@/components/crm-filters";
 import type { CrmOutreachRecordedHandler } from "@/components/crm-free-usage-layout";
+import type { PostcardMailGating } from "@/components/crm-outreach-popover";
 import type { BusinessLead } from "@/lib/business";
 import type { CrmSearchParams } from "@/lib/crm-params";
 import type { SpintaxTemplate } from "@/lib/spintax-templates";
@@ -13,6 +14,7 @@ interface CrmLeadsTableShellProps {
   spintaxTemplates: SpintaxTemplate[];
   isPro: boolean;
   initialOutreachRemaining: number | null;
+  postcardMail: PostcardMailGating;
   senderName?: string | null;
   onOutreachRecorded?: CrmOutreachRecordedHandler;
 }
@@ -25,6 +27,7 @@ export function CrmLeadsTableShell({
   spintaxTemplates,
   isPro,
   initialOutreachRemaining,
+  postcardMail,
   senderName,
   onOutreachRecorded,
 }: CrmLeadsTableShellProps) {
@@ -57,6 +60,7 @@ export function CrmLeadsTableShell({
               spintaxTemplates={spintaxTemplates}
               isPro={isPro}
               initialOutreachRemaining={initialOutreachRemaining}
+              postcardMail={postcardMail}
               senderName={senderName}
               onOutreachRecorded={onOutreachRecorded}
             />

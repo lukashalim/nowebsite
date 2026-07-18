@@ -1,11 +1,17 @@
 import type { Metadata } from "next";
 import { CrmLogin } from "@/components/crm-login";
 import { CrmNav } from "@/components/crm-nav";
+import { LobSettingsForm } from "@/components/lob-settings-form";
 import { ProfileSettingsForm } from "@/components/profile-settings-form";
 import { TwilioSettingsForm } from "@/components/twilio-settings-form";
 import { suggestUsernameFromEmail } from "@/lib/profile-username";
 import { ensureSendFoxProfileForUser } from "@/lib/sendfox-profile-sync";
-import { getTwilioProfilePublic, getUserProfile, isPro } from "@/lib/subscription";
+import {
+  getLobProfilePublic,
+  getTwilioProfilePublic,
+  getUserProfile,
+  isPro,
+} from "@/lib/subscription";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: "Settings | Outreach Engine",
     description:
-      "Configure demo site settings and optional Pro communications via your Twilio account.",
+      "Configure demo site settings, Lob postcards, and optional Pro communications via your Twilio account.",
   };
 }
 
@@ -46,6 +52,7 @@ export default async function DashboardSettingsPage({
     }
   }
   const twilioProfile = await getTwilioProfilePublic(user.id);
+  const lobProfile = await getLobProfilePublic(user.id);
   const userIsPro = isPro(profile);
   const suggestedUsername =
     profile?.username?.trim() ||
@@ -59,8 +66,9 @@ export default async function DashboardSettingsPage({
           Settings
         </h1>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Configure your demo site and optional Pro communications. Save Twilio
-          credentials to send SMS and place calls from your business line in the CRM.
+          Configure your demo site, Lob API key for postcards, and optional Pro
+          communications. Save Twilio credentials to send SMS and place calls from
+          your business line in the CRM.
         </p>
       </header>
 
@@ -77,6 +85,8 @@ export default async function DashboardSettingsPage({
         initialUsername={suggestedUsername}
         initialPaymentLink={profile?.user_payment_link ?? ""}
       />
+
+      <LobSettingsForm initialLob={lobProfile} />
 
       <TwilioSettingsForm initialTwilio={twilioProfile} />
     </div>

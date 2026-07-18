@@ -87,6 +87,8 @@ export function isRingReadyDemoPath(pathname: string): boolean {
 export function isRingReadyInfrastructurePath(pathname: string): boolean {
   return (
     pathname.startsWith("/_next/") ||
+    pathname.startsWith("/postcard/") ||
+    pathname === "/api/postcard-qr" ||
     pathname === "/favicon.ico" ||
     pathname === "/robots.txt" ||
     pathname === "/sitemap.xml"

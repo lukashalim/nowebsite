@@ -30,6 +30,16 @@ import type { SpintaxTemplate } from "@/lib/spintax-templates";
 
 export type OutreachChannel = "call" | "text" | "mail";
 
+export interface PostcardMailGating {
+  hasLobApiKey: boolean;
+  hasReturnAddress: boolean;
+  lobKeyMode: "test" | "live" | null;
+  /** Pro users are not subject to the 1+1 lifetime cap. */
+  lifetimeUnlimited: boolean;
+  testRemaining: number;
+  liveRemaining: number;
+}
+
 interface CrmOutreachPopoverProps {
   phone: string | null;
   country?: PhoneCountry | null;
@@ -52,6 +62,7 @@ interface CrmOutreachPopoverProps {
   outreachRemaining: number | null;
   /** Page-level CRM outreach mode from ?outreachMode= */
   pageOutreachMode?: "all" | "call" | "text" | "mail";
+  postcardMail?: PostcardMailGating;
   onOutreachRecorded?: (
     remaining: number | null,
     action: CrmUsageAction,
@@ -128,6 +139,7 @@ export function CrmOutreachPopover({
   existingNotes,
   outreachRemaining,
   pageOutreachMode = "all",
+  postcardMail,
   onOutreachRecorded,
 }: CrmOutreachPopoverProps) {
   const hasPhone = Boolean(phone?.trim());
@@ -160,6 +172,30 @@ export function CrmOutreachPopover({
   const containerRef = useRef<HTMLDivElement>(null);
 
   const outreachBlocked = outreachRemaining === 0;
+
+  const lobMode = postcardMail?.lobKeyMode ?? null;
+  const hasLobKey = postcardMail?.hasLobApiKey === true;
+  const hasReturnAddress = postcardMail?.hasReturnAddress === true;
+  const lifetimeUnlimited = postcardMail?.lifetimeUnlimited === true;
+  const lifetimeSlotRemaining =
+    lifetimeUnlimited ||
+    (lobMode === "test"
+      ? (postcardMail?.testRemaining ?? 0) > 0
+      : lobMode === "live"
+        ? (postcardMail?.liveRemaining ?? 0) > 0
+        : false);
+  const liveOutreachBlocksMail = lobMode === "live" && outreachBlocked;
+  const mailBlockedReason = !hasLobKey
+    ? ("no_key" as const)
+    : !hasReturnAddress
+      ? ("no_address" as const)
+      : !lifetimeSlotRemaining
+        ? ("lifetime" as const)
+        : liveOutreachBlocksMail
+          ? ("pool" as const)
+          : null;
+  const mailSendDisabled =
+    mailBusy || !mailable || mailBlockedReason != null;
 
   const smsTemplates = useMemo(
     () => filterSpintaxTemplatesForLeadChannel(templates, "sms", leadAudience),
@@ -460,7 +496,7 @@ export function CrmOutreachPopover({
   }
 
   async function sendPostcard() {
-    if (!mailable || outreachBlocked) return;
+    if (!mailable || mailBlockedReason) return;
     setMailBusy(true);
     setMailError(null);
     setMailSuccess(null);
@@ -722,7 +758,41 @@ export function CrmOutreachPopover({
                     <p key={line}>{line}</p>
                   ))}
                 </div>
-                {outreachBlocked ? (
+                {mailBlockedReason === "no_key" ? (
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Add a Lob API key in{" "}
+                    <Link
+                      href="/dashboard/settings"
+                      className="text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      Settings
+                    </Link>{" "}
+                    to send postcards.
+                  </p>
+                ) : mailBlockedReason === "no_address" ? (
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Add your return address in{" "}
+                    <Link
+                      href="/dashboard/settings"
+                      className="text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      Settings
+                    </Link>{" "}
+                    to send postcards.
+                  </p>
+                ) : mailBlockedReason === "lifetime" ? (
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {lobMode === "test"
+                      ? "You've used your test postcard. Swap to a live Lob key in Settings for your one production send."
+                      : "You've used your live postcard."}{" "}
+                    <Link
+                      href="/crm/postcards"
+                      className="text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      View postcards
+                    </Link>
+                  </p>
+                ) : mailBlockedReason === "pool" ? (
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
                     Limit reached ·{" "}
                     <Link
@@ -737,7 +807,10 @@ export function CrmOutreachPopover({
                     <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
                       Sends a 4×6 marketing postcard (HTML front, QR back).
                       Addressed to the owner when Suggest finds one, plus the
-                      business name. Lob must accept the street address.
+                      business name.{" "}
+                      {lobMode === "test"
+                        ? "Test key — proof only, skips USPS verification."
+                        : "Live key — verifies via Lob before send."}
                     </p>
                     {mailError ? (
                       <p
@@ -755,7 +828,7 @@ export function CrmOutreachPopover({
                     <button
                       type="button"
                       onClick={() => void sendPostcard()}
-                      disabled={mailBusy || !mailable}
+                      disabled={mailSendDisabled}
                       className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
                     >
                       <Mail className="size-4" aria-hidden />

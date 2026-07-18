@@ -2,25 +2,37 @@ import { NextResponse } from "next/server";
 import { suggestOwnerNameFromReviews } from "@/app/actions/suggest-owner-name";
 import { demoPathSegment } from "@/lib/demo-slug";
 import { DEMO_DETAIL_COLUMNS } from "@/lib/crm-cohort";
-import { recordCrmUsage } from "@/lib/crm-usage";
+import {
+  canUseCrmOutreach,
+  getCrmUsageSummary,
+  recordCrmUsage,
+} from "@/lib/crm-usage";
+import { logUsageEvent } from "@/lib/log-usage-event";
 import {
   createLobPostcard,
   isAcceptableUsDeliverability,
   isLobTestMode,
   verifyUsAddress,
+  waitForLobPostcardProof,
   type LobAddress,
 } from "@/lib/lob";
 import {
   isMailableLeadAddress,
   leadToLobAddress,
-  parseReturnAddressFromEnv,
 } from "@/lib/postcard/address";
 import { buildPostcardBackHtml } from "@/lib/postcard/back-html";
 import { buildPostcardFrontHtml } from "@/lib/postcard/front-html";
-import { demoUrlToQrDataUri } from "@/lib/postcard/qr";
+import { assertCanSendPostcard } from "@/lib/postcard/limits";
+import { uploadPostcardQrPublicUrl } from "@/lib/postcard/qr";
+import { buildPostcardScanUrl } from "@/lib/postcard/scan-link";
 import { ensureProfileUsername } from "@/lib/profile-username";
 import { ringReadyTenantDemoUrl } from "@/lib/ringready-site";
-import { getUserProfile } from "@/lib/subscription";
+import {
+  getUserLobApiKey,
+  getUserPostcardReturnAddress,
+  getUserProfile,
+  isPro,
+} from "@/lib/subscription";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -70,17 +82,49 @@ export async function POST(request: Request) {
     );
   }
 
-  let from;
-  try {
-    from = parseReturnAddressFromEnv();
-  } catch (err) {
+  const lobApiKey = await getUserLobApiKey(user.id);
+  if (!lobApiKey) {
     return NextResponse.json(
       {
         error:
-          err instanceof Error ? err.message : "RETURN_ADDRESS is misconfigured",
+          "Add your Lob API key in Settings before sending postcards.",
       },
-      { status: 500 },
+      { status: 400 },
     );
+  }
+
+  const from = await getUserPostcardReturnAddress(user.id);
+  if (!from) {
+    return NextResponse.json(
+      {
+        error:
+          "Add your return address in Settings before sending postcards.",
+      },
+      { status: 400 },
+    );
+  }
+
+  const testMode = isLobTestMode(lobApiKey);
+
+  const lifetime = await assertCanSendPostcard(user.id, testMode, {
+    isPro: isPro(profile),
+  });
+  if (!lifetime.ok) {
+    return NextResponse.json({ error: lifetime.error }, { status: 403 });
+  }
+
+  if (!testMode) {
+    const usageSummary = await getCrmUsageSummary(user.id);
+    if (!canUseCrmOutreach(profile, usageSummary.remaining)) {
+      return NextResponse.json(
+        {
+          error:
+            "Monthly outreach limit reached. Upgrade to Pro for unlimited DMs, SMS, demo links, and postcards.",
+          remaining: 0,
+        },
+        { status: 402 },
+      );
+    }
   }
 
   const admin = createSupabaseAdmin();
@@ -133,14 +177,12 @@ export async function POST(request: Request) {
     }
   }
 
-  const slug = demoPathSegment({
+  const slugEncoded = demoPathSegment({
     place_id: placeId,
     demo_slug: typeof row.demo_slug === "string" ? row.demo_slug : null,
   });
-  const liveDemoUrl = ringReadyTenantDemoUrl(
-    username,
-    decodeURIComponent(slug),
-  );
+  const slug = decodeURIComponent(slugEncoded);
+  const liveDemoUrl = ringReadyTenantDemoUrl(username, slug);
 
   const frontHtml = buildPostcardFrontHtml({
     businessName: name?.trim() || "your business",
@@ -153,9 +195,20 @@ export async function POST(request: Request) {
     phone,
   });
 
-  let qrDataUri: string;
+  const scanUrl = buildPostcardScanUrl({
+    userId: user.id,
+    placeId,
+    username,
+    slug,
+    isTest: testMode,
+  });
+
+  let qrImageUrl: string;
   try {
-    qrDataUri = await demoUrlToQrDataUri(liveDemoUrl);
+    qrImageUrl = await uploadPostcardQrPublicUrl({
+      targetUrl: scanUrl,
+      placeId,
+    });
   } catch (err) {
     return NextResponse.json(
       {
@@ -168,11 +221,23 @@ export async function POST(request: Request) {
     );
   }
 
-  const backHtml = buildPostcardBackHtml({
-    businessName: name?.trim() || "your business",
-    qrDataUri,
-    demoUrl: liveDemoUrl,
-  });
+  let backHtml: string;
+  try {
+    backHtml = buildPostcardBackHtml({
+      businessName: name?.trim() || "your business",
+      qrImageUrl,
+    });
+  } catch (err) {
+    return NextResponse.json(
+      {
+        error:
+          err instanceof Error
+            ? err.message
+            : "Failed to build postcard back HTML",
+      },
+      { status: 500 },
+    );
+  }
 
   let to: LobAddress = leadToLobAddress({
     name,
@@ -184,52 +249,56 @@ export async function POST(request: Request) {
     country,
   });
 
-  try {
-    const verified = await verifyUsAddress({
-      primary_line: to.address_line1,
-      secondary_line: to.address_line2,
-      city: to.address_city,
-      state: to.address_state,
-      zip_code: to.address_zip,
-    });
+  // Lob test_ keys do not verify real US addresses (always undeliverable unless
+  // using Lob's fake primary_line/zip fixtures). Skip USAV gate in test mode.
+  if (!testMode) {
+    try {
+      const verified = await verifyUsAddress(lobApiKey, {
+        primary_line: to.address_line1,
+        secondary_line: to.address_line2,
+        city: to.address_city,
+        state: to.address_state,
+        zip_code: to.address_zip,
+      });
 
-    if (!isAcceptableUsDeliverability(verified.deliverability)) {
+      if (!isAcceptableUsDeliverability(verified.deliverability)) {
+        return NextResponse.json(
+          {
+            error: `Address failed Lob deliverability check (${verified.deliverability}). Fix the street/city/state/ZIP, or set Lob account strictness to Normal/Relaxed.`,
+            deliverability: verified.deliverability,
+          },
+          { status: 422 },
+        );
+      }
+
+      to = {
+        name: to.name,
+        ...(to.company ? { company: to.company } : {}),
+        address_line1: verified.primary_line,
+        ...(verified.secondary_line
+          ? { address_line2: verified.secondary_line }
+          : {}),
+        address_city: verified.city,
+        address_state: verified.state.toUpperCase(),
+        address_zip: verified.zip_code,
+        address_country: "US",
+      };
+    } catch (err) {
       return NextResponse.json(
         {
-          error: `Address failed Lob deliverability check (${verified.deliverability}). Fix the street/city/state/ZIP, or set Lob account strictness to Normal/Relaxed for testing.`,
-          deliverability: verified.deliverability,
+          error:
+            err instanceof Error
+              ? `Address verification failed: ${err.message}`
+              : "Address verification failed",
         },
-        { status: 422 },
+        { status: 502 },
       );
     }
-
-    to = {
-      name: to.name,
-      ...(to.company ? { company: to.company } : {}),
-      address_line1: verified.primary_line,
-      ...(verified.secondary_line
-        ? { address_line2: verified.secondary_line }
-        : {}),
-      address_city: verified.city,
-      address_state: verified.state.toUpperCase(),
-      address_zip: verified.zip_code,
-      address_country: "US",
-    };
-  } catch (err) {
-    return NextResponse.json(
-      {
-        error:
-          err instanceof Error
-            ? `Address verification failed: ${err.message}`
-            : "Address verification failed",
-      },
-      { status: 502 },
-    );
   }
 
   let postcard;
   try {
-    postcard = await createLobPostcard({
+    postcard = await createLobPostcard(lobApiKey, {
       description: `CRM postcard for ${name ?? placeId}`,
       to,
       from,
@@ -238,6 +307,12 @@ export async function POST(request: Request) {
       size: "4x6",
       useType: "marketing",
     });
+    const proof = await waitForLobPostcardProof(lobApiKey, postcard.id);
+    postcard = {
+      ...postcard,
+      url: proof.url ?? postcard.url,
+      status: proof.status ?? postcard.status,
+    };
   } catch (err) {
     return NextResponse.json(
       {
@@ -247,18 +322,39 @@ export async function POST(request: Request) {
     );
   }
 
-  const usage = await recordCrmUsage(user.id, profile, "mail", placeId);
-  if (!usage.ok) {
-    return NextResponse.json(
-      {
-        error: usage.error,
-        remaining: usage.remaining,
-        postcardId: postcard.id,
-        url: postcard.url,
-        warning: "Postcard was created but usage was not recorded.",
-      },
-      { status: 402 },
+  let remaining: number | null = null;
+  if (testMode) {
+    const logged = await logUsageEvent(
+      user.id,
+      "postcard_sent_test",
+      placeId,
     );
+    if (!logged.ok) {
+      return NextResponse.json(
+        {
+          error: logged.error,
+          postcardId: postcard.id,
+          url: postcard.url,
+          warning: "Postcard was created but usage was not recorded.",
+        },
+        { status: 502 },
+      );
+    }
+  } else {
+    const usage = await recordCrmUsage(user.id, profile, "mail", placeId);
+    if (!usage.ok) {
+      return NextResponse.json(
+        {
+          error: usage.error,
+          remaining: usage.remaining,
+          postcardId: postcard.id,
+          url: postcard.url,
+          warning: "Postcard was created but usage was not recorded.",
+        },
+        { status: 402 },
+      );
+    }
+    remaining = usage.remaining;
   }
 
   return NextResponse.json({
@@ -266,8 +362,8 @@ export async function POST(request: Request) {
     postcardId: postcard.id,
     url: postcard.url,
     expectedDeliveryDate: postcard.expected_delivery_date,
-    testMode: isLobTestMode(),
-    remaining: usage.remaining,
+    testMode,
+    remaining,
     demoUrl: liveDemoUrl,
     to,
   });
