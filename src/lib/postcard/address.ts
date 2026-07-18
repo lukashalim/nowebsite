@@ -9,7 +9,13 @@ export interface PostcardReturnAddressInput {
   address_state: string;
   address_zip: string;
   address_country?: string;
+  /** Shown on postcard back as "Or call/text …". */
+  contact_phone?: string;
 }
+
+export type PostcardReturnAddressStored = LobAddress & {
+  contact_phone?: string;
+};
 
 /**
  * Normalize form/DB fields into a Lob from-address.
@@ -17,7 +23,7 @@ export interface PostcardReturnAddressInput {
  */
 export function normalizePostcardReturnAddress(
   input: PostcardReturnAddressInput,
-): { ok: true; address: LobAddress } | { ok: false; error: string } {
+): { ok: true; address: PostcardReturnAddressStored } | { ok: false; error: string } {
   const name = input.name.trim();
   const address_line1 = input.address_line1.trim();
   const address_line2 = input.address_line2?.trim() || "";
@@ -26,6 +32,7 @@ export function normalizePostcardReturnAddress(
   const address_state = (stateToAbbr(rawState) ?? rawState).toUpperCase();
   const address_zip = input.address_zip.trim();
   const address_country = (input.address_country?.trim() || "US").toUpperCase();
+  const contact_phone = input.contact_phone?.trim() || "";
 
   if (!name || !address_line1 || !address_city || !address_state || !address_zip) {
     return {
@@ -50,13 +57,14 @@ export function normalizePostcardReturnAddress(
       address_state,
       address_zip,
       address_country,
+      ...(contact_phone ? { contact_phone } : {}),
     },
   };
 }
 
 export function postcardReturnAddressFromUnknown(
   value: unknown,
-): LobAddress | null {
+): PostcardReturnAddressStored | null {
   if (!value || typeof value !== "object") return null;
   const o = value as Record<string, unknown>;
   const parsed = normalizePostcardReturnAddress({
@@ -67,8 +75,24 @@ export function postcardReturnAddressFromUnknown(
     address_state: String(o.address_state ?? o.state ?? ""),
     address_zip: String(o.address_zip ?? o.zip ?? o.postal_code ?? ""),
     address_country: String(o.address_country ?? o.country ?? "US"),
+    contact_phone: String(o.contact_phone ?? o.phone ?? ""),
   });
   return parsed.ok ? parsed.address : null;
+}
+
+/** Lob "from" address without non-Lob fields like contact_phone. */
+export function toLobFromAddress(
+  stored: PostcardReturnAddressStored,
+): LobAddress {
+  return {
+    name: stored.name,
+    address_line1: stored.address_line1,
+    ...(stored.address_line2 ? { address_line2: stored.address_line2 } : {}),
+    address_city: stored.address_city,
+    address_state: stored.address_state,
+    address_zip: stored.address_zip,
+    address_country: stored.address_country ?? "US",
+  };
 }
 
 /**

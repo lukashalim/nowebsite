@@ -22,6 +22,9 @@ export function LobSettingsForm({ initialLob }: LobSettingsFormProps) {
   const [city, setCity] = useState(initialLob.return_address.address_city);
   const [state, setState] = useState(initialLob.return_address.address_state);
   const [zip, setZip] = useState(initialLob.return_address.address_zip);
+  const [contactPhone, setContactPhone] = useState(
+    initialLob.return_address.contact_phone,
+  );
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +49,7 @@ export function LobSettingsForm({ initialLob }: LobSettingsFormProps) {
         address_city: city,
         address_state: state,
         address_zip: zip,
+        contact_phone: contactPhone,
       },
     });
 
@@ -82,6 +86,7 @@ export function LobSettingsForm({ initialLob }: LobSettingsFormProps) {
       setCity("");
       setState("");
       setZip("");
+      setContactPhone("");
       setMessage("Lob API key and return address removed.");
     } else {
       setError(result.error);
@@ -268,6 +273,29 @@ export function LobSettingsForm({ initialLob }: LobSettingsFormProps) {
               required
             />
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <label
+            htmlFor="return_phone"
+            className="block text-sm font-medium text-zinc-900 dark:text-zinc-100"
+          >
+            Contact phone{" "}
+            <span className="font-normal text-zinc-500">(for QR card)</span>
+          </label>
+          <input
+            id="return_phone"
+            type="tel"
+            autoComplete="tel"
+            value={contactPhone}
+            onChange={(event) => setContactPhone(event.target.value)}
+            placeholder="(555) 123-4567"
+            className={inputClass}
+          />
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Printed under the QR as “Or call/text …”. Falls back to your Twilio
+            number if blank.
+          </p>
         </div>
       </div>
 

@@ -30,7 +30,9 @@ import { ringReadyTenantDemoUrl } from "@/lib/ringready-site";
 import {
   getUserLobApiKey,
   getUserPostcardReturnAddress,
+  getUserPostcardReturnStored,
   getUserProfile,
+  getUserTwilioCredentials,
   isPro,
 } from "@/lib/subscription";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
@@ -223,9 +225,17 @@ export async function POST(request: Request) {
 
   let backHtml: string;
   try {
+    const storedReturn = await getUserPostcardReturnStored(user.id);
+    const twilio = await getUserTwilioCredentials(user.id);
+    const contactPhone =
+      storedReturn?.contact_phone ||
+      twilio?.phoneNumber ||
+      twilio?.forwardingNumber ||
+      null;
     backHtml = buildPostcardBackHtml({
       businessName: name?.trim() || "your business",
       qrImageUrl,
+      contactPhone,
     });
   } catch (err) {
     return NextResponse.json(

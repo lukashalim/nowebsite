@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { TwilioUserCredentials } from "@/lib/twilio-credentials";
 import {
   postcardReturnAddressFromUnknown,
+  toLobFromAddress,
 } from "@/lib/postcard/address";
 import type { LobAddress } from "@/lib/lob";
 
@@ -44,6 +45,7 @@ export interface LobProfilePublic {
     address_city: string;
     address_state: string;
     address_zip: string;
+    contact_phone: string;
   };
 }
 
@@ -202,6 +204,11 @@ export async function getUserLobApiKey(userId: string): Promise<string | null> {
 export async function getUserPostcardReturnAddress(
   userId: string,
 ): Promise<LobAddress | null> {
+  const stored = await getUserPostcardReturnStored(userId);
+  return stored ? toLobFromAddress(stored) : null;
+}
+
+export async function getUserPostcardReturnStored(userId: string) {
   const supabase = createSupabaseAdmin();
   const { data, error } = await supabase
     .from("profiles")
@@ -246,6 +253,7 @@ export async function getLobProfilePublic(
       address_city: address?.address_city ?? "",
       address_state: address?.address_state ?? "",
       address_zip: address?.address_zip ?? "",
+      contact_phone: address?.contact_phone ?? "",
     },
   };
 }
