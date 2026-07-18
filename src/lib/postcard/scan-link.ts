@@ -3,7 +3,7 @@ import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 /** Always production — Lob prints and phones must not hit localhost. */
-const POSTCARD_SCAN_ORIGIN = "https://nowebsitebusinessleads.com";
+const POSTCARD_SCAN_ORIGIN = "https://www.nowebsitebusinessleads.com";
 
 export interface PostcardScanPayload {
   userId: string;

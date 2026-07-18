@@ -84,7 +84,7 @@ CRM **Outreach** column: **Call | Text | Mail**. Mail sends a Lob 4×6 postcard:
 
 Lob US address verification runs before create on **live** keys; undeliverable addresses return a clear 422. Lob **`test_` keys do not verify real addresses** (USAV always returns undeliverable), so CRM skips that gate in test mode. For live scraped Google addresses, set Lob account deliverability strictness to **Normal** (or **Relaxed**) at [Account settings](https://dashboard.lob.com/#/settings/account).
 
-Env (`.env.local`): none required for Lob — each user sets their **Lob API key** and **return address** in Settings.
+Env (`.env.local` / Vercel): set the **same** `POSTCARD_SCAN_SECRET` (or shared `LISTING_ACCESS_SECRET`) in local and production — QR codes always hit the live site, so a mismatched secret yields "Invalid scan token".
 
 Lifetime cap (free only): **one test** and **one live** postcard. Pro is unlimited. Live free sends also count toward the free monthly outreach pool.
 
