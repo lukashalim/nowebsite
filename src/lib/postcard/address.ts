@@ -9,7 +9,7 @@ export interface PostcardReturnAddressInput {
   address_state: string;
   address_zip: string;
   address_country?: string;
-  /** Shown on postcard back as "Or call/text …". */
+  /** Shown on postcard back as "Call/text us at …". */
   contact_phone?: string;
 }
 
@@ -201,6 +201,8 @@ export function isMailableLeadAddress(input: {
 
 export function leadToLobAddress(input: {
   name?: string | null;
+  /** Optional Lob-safe shortened company label (maximum 40 chars). */
+  companyName?: string | null;
   ownerName?: string | null;
   address: string;
   city: string;
@@ -210,6 +212,7 @@ export function leadToLobAddress(input: {
   address_line2?: string | null;
 }): LobAddress {
   const business = input.name?.trim() || "";
+  const company = input.companyName?.trim() || business;
   const owner = input.ownerName?.trim() || "";
   const rawState = input.state.trim();
   const abbr = stateToAbbr(rawState);
@@ -225,7 +228,7 @@ export function leadToLobAddress(input: {
   };
 
   if (owner && business) {
-    return { name: owner, company: business, ...base };
+    return { name: owner, company, ...base };
   }
   if (owner) {
     return { name: owner, ...base };

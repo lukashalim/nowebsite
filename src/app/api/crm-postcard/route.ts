@@ -20,11 +20,12 @@ import {
   isMailableLeadAddress,
   leadToLobAddress,
 } from "@/lib/postcard/address";
-import { buildPostcardBackHtml } from "@/lib/postcard/back-html";
+import { buildPostcardBackHtml, LOB_BACK_QR_PLACEMENT } from "@/lib/postcard/back-html";
+import { shortenCompanyNameForLob } from "@/lib/postcard/company-name";
 import { buildPostcardFrontHtml } from "@/lib/postcard/front-html";
 import { assertCanSendPostcard } from "@/lib/postcard/limits";
-import { uploadPostcardQrPublicUrl } from "@/lib/postcard/qr";
 import { buildPostcardScanUrl } from "@/lib/postcard/scan-link";
+import { createPostcardScanLinkUrl } from "@/lib/postcard/scan-links-db";
 import { ensureProfileUsername } from "@/lib/profile-username";
 import { ringReadyTenantDemoUrl } from "@/lib/ringready-site";
 import {
@@ -179,6 +180,11 @@ export async function POST(request: Request) {
     }
   }
 
+  const companyName =
+    ownerName && name?.trim()
+      ? await shortenCompanyNameForLob(name)
+      : null;
+
   const slugEncoded = demoPathSegment({
     place_id: placeId,
     demo_slug: typeof row.demo_slug === "string" ? row.demo_slug : null,
@@ -197,30 +203,26 @@ export async function POST(request: Request) {
     phone,
   });
 
-  const scanUrl = buildPostcardScanUrl({
-    userId: user.id,
-    placeId,
-    username,
-    slug,
-    isTest: testMode,
-  });
-
-  let qrImageUrl: string;
+  let scanUrl: string;
   try {
-    qrImageUrl = await uploadPostcardQrPublicUrl({
-      targetUrl: scanUrl,
+    // Short opaque ?id= URL for Lob QR — long signed ?t= tokens get mangled.
+    scanUrl = await createPostcardScanLinkUrl({
+      userId: user.id,
       placeId,
+      username,
+      slug,
+      isTest: testMode,
     });
   } catch (err) {
-    return NextResponse.json(
-      {
-        error:
-          err instanceof Error
-            ? `QR generation failed: ${err.message}`
-            : "QR generation failed",
-      },
-      { status: 500 },
-    );
+    // Fallback keeps sends working if the links table is missing locally.
+    console.warn("[crm-postcard] scan link insert failed; using signed token", err);
+    scanUrl = buildPostcardScanUrl({
+      userId: user.id,
+      placeId,
+      username,
+      slug,
+      isTest: testMode,
+    });
   }
 
   let backHtml: string;
@@ -234,7 +236,6 @@ export async function POST(request: Request) {
       null;
     backHtml = buildPostcardBackHtml({
       businessName: name?.trim() || "your business",
-      qrImageUrl,
       contactPhone,
     });
   } catch (err) {
@@ -251,6 +252,7 @@ export async function POST(request: Request) {
 
   let to: LobAddress = leadToLobAddress({
     name,
+    companyName,
     ownerName,
     address: address!,
     city: city!,
@@ -316,6 +318,13 @@ export async function POST(request: Request) {
       back: backHtml,
       size: "4x6",
       useType: "marketing",
+      qrCode: {
+        redirectUrl: scanUrl,
+        widthIn: LOB_BACK_QR_PLACEMENT.widthIn,
+        topIn: LOB_BACK_QR_PLACEMENT.topIn,
+        leftIn: LOB_BACK_QR_PLACEMENT.leftIn,
+        pages: LOB_BACK_QR_PLACEMENT.pages,
+      },
     });
     const proof = await waitForLobPostcardProof(lobApiKey, postcard.id);
     postcard = {

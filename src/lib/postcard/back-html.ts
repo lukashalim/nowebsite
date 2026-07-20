@@ -1,10 +1,10 @@
 /**
- * Lob 4×6 postcard back HTML (portrait bleed 4.25″×6.25″).
- * Keep creative in the upper-LEFT safe area; Lob reserves the right side for
- * postage/return/recipient and the lower zone for the address block.
+ * Lob 4×6 postcard back HTML (landscape bleed 6.25″×4.25″).
+ * Creative in the left safe column; Lob address/postage on the right.
+ * SCAN card is absolutely positioned so the QR slot never moves when the
+ * headline wraps — must match {@link LOB_BACK_QR_PLACEMENT} for Lob's
+ * native qr_code overlay.
  * Lob inline HTML must stay under 10,000 characters.
- *
- * QR must be a public HTTPS <img> URL — Lob WebKit drops data-URI QR images.
  */
 
 import {
@@ -16,22 +16,35 @@ import {
 const SCAN_GREEN = "#1a4731";
 const SCAN_GOLD = "#c5a059";
 
+/**
+ * Lob positions native QR codes from the 6×4 trim edge, while the HTML uses
+ * the 6.25×4.25 bleed artboard. Subtract the 0.125in bleed from the slot's
+ * artboard coordinates so the QR overlays `.qr-slot` exactly.
+ */
+export const LOB_BACK_QR_PLACEMENT = {
+  widthIn: "1.25",
+  topIn: "1.545",
+  leftIn: "0.730",
+  pages: "back" as const,
+} as const;
+
+/** Pinned SCAN card — independent of headline line count. */
+const SCAN_CARD = {
+  top: "1.10in",
+  left: "0.28in",
+  width: "2.4in",
+} as const;
+
 export function buildPostcardBackHtml(input: {
   businessName: string;
-  /** Public HTTPS URL to a PNG QR image Lob can fetch. */
-  qrImageUrl: string;
-  /** Sender contact for "Or call/text …" (E.164 or national). */
+  /** Sender contact for "Call/text us at …" (E.164 or national). */
   contactPhone?: string | null;
 }): string {
   const name = escapeHtml(input.businessName || "your business");
-  const qrSrc = input.qrImageUrl.trim();
-  if (!qrSrc || !/^https:\/\//i.test(qrSrc)) {
-    throw new Error("Postcard QR must be a public https:// image URL for Lob.");
-  }
 
   const phoneDisplay = formatUsPhoneDisplay(input.contactPhone);
   const footerHtml = phoneDisplay
-    ? `<p class="scan-footer">Or call/text ${escapeHtml(phoneDisplay)}</p>`
+    ? `<p class="scan-footer">Call/text us at ${escapeHtml(phoneDisplay)}</p>`
     : "";
 
   const html = `<!DOCTYPE html>
@@ -41,32 +54,31 @@ export function buildPostcardBackHtml(input: {
 ${LOB_PRINT_FONT_LINKS}
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{width:4.25in;height:6.25in;font-family:${LOB_PRINT_FONT_FAMILY};color:#18181b;background:#fff;position:relative}
-.safe{position:absolute;top:.28in;left:.28in;width:2.15in}
-h1{font-size:13pt;font-weight:700;line-height:1.2;margin-bottom:.08in}
-.pitch{font-size:9pt;line-height:1.3;color:#3f3f46;margin-bottom:.12in}
-.scan-card{border:2.5px solid ${SCAN_GREEN};border-radius:.1in;overflow:hidden;background:#fff;text-align:center}
-.scan-head{background:${SCAN_GREEN};padding:.1in .08in .09in;line-height:1.15}
-.scan-line1{font-size:11pt;font-weight:700;letter-spacing:.04em;color:#fff}
-.scan-line2{font-size:11pt;font-weight:700;letter-spacing:.04em;color:${SCAN_GOLD};margin-top:.02in}
-.scan-body{padding:.12in .1in .08in}
-.qr{width:1.2in;height:1.2in;margin:0 auto}
-.qr img{width:100%;height:100%;display:block}
-.scan-footer{font-size:7.5pt;line-height:1.25;color:#666;padding:0 .08in .1in}
+body{width:6.25in;height:4.25in;font-family:${LOB_PRINT_FONT_FAMILY};color:#18181b;background:#fff;position:relative}
+.copy{position:absolute;top:.22in;left:.28in;width:2.4in;max-height:.82in;overflow:hidden}
+h1{font-size:13pt;font-weight:700;line-height:1.15;margin-bottom:.06in}
+.pitch{font-size:9pt;line-height:1.25;color:#3f3f46}
+.scan-card{position:absolute;top:${SCAN_CARD.top};left:${SCAN_CARD.left};width:${SCAN_CARD.width};border:2.5px solid ${SCAN_GREEN};border-radius:.1in;overflow:hidden;background:#fff;text-align:center}
+.scan-head{background:${SCAN_GREEN};padding:.08in .08in .07in;line-height:1.15}
+.scan-line1{font-size:10pt;font-weight:700;letter-spacing:.04em;color:#fff}
+.scan-line2{font-size:10pt;font-weight:700;letter-spacing:.04em;color:${SCAN_GOLD};margin-top:.02in}
+.scan-body{padding:.08in .1in .04in}
+.qr-slot{width:1.25in;height:1.25in;margin:0 auto;background:#fff}
+.scan-footer{font-size:7.5pt;line-height:1.25;color:#666;padding:0 .08in .08in}
 </style>
 </head>
 <body>
-<div class="safe">
+<div class="copy">
 <h1>${name} now has a website.</h1>
 <p class="pitch">Built from your Google listing. Live in 24 hours if you want it.</p>
+</div>
 <div class="scan-card">
 <div class="scan-head">
 <p class="scan-line1">SCAN TO SEE</p>
 <p class="scan-line2">YOUR SITE</p>
 </div>
-<div class="scan-body"><div class="qr"><img src="${escapeHtml(qrSrc)}" width="200" height="200" alt="QR"/></div></div>
+<div class="scan-body"><div class="qr-slot"></div></div>
 ${footerHtml}
-</div>
 </div>
 </body>
 </html>`;

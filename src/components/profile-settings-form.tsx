@@ -2,19 +2,15 @@
 
 import { useState } from "react";
 import { updateProfileSettings } from "@/lib/actions/profile";
-import { DEFAULT_PAYMENT_LINK } from "@/lib/tenant-payment-defaults";
 
 interface ProfileSettingsFormProps {
   initialUsername: string;
-  initialPaymentLink: string;
 }
 
 export function ProfileSettingsForm({
   initialUsername,
-  initialPaymentLink,
 }: ProfileSettingsFormProps) {
   const [username, setUsername] = useState(initialUsername);
-  const [userPaymentLink, setUserPaymentLink] = useState(initialPaymentLink);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +23,6 @@ export function ProfileSettingsForm({
 
     const result = await updateProfileSettings({
       username,
-      user_payment_link: userPaymentLink,
     });
 
     setPending(false);
@@ -67,29 +62,6 @@ export function ProfileSettingsForm({
             /{username.trim() || "username"}/{"{slug}"}
           </span>
           . Lowercase letters, numbers, hyphens, and underscores only.
-        </p>
-      </div>
-
-      <div className="space-y-2">
-        <label
-          htmlFor="user_payment_link"
-          className="block text-sm font-medium text-zinc-900 dark:text-zinc-100"
-        >
-          Stripe payment link
-        </label>
-        <input
-          id="user_payment_link"
-          name="user_payment_link"
-          type="url"
-          value={userPaymentLink}
-          onChange={(event) => setUserPaymentLink(event.target.value)}
-          placeholder="https://buy.stripe.com/..."
-          className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-        />
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          Shown on demo pages as the &quot;Activate site — $27/mo&quot; button.
-          Leave blank to use the platform default (
-          <span className="font-mono">{DEFAULT_PAYMENT_LINK}</span>).
         </p>
       </div>
 

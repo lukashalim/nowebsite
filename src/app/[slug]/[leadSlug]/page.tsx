@@ -12,7 +12,7 @@ import {
   Clock3,
 } from "lucide-react";
 import { DemoReviewCarousel } from "@/components/demo-review-carousel";
-import { TenantActivationBanner } from "@/components/tenant-activation-banner";
+import { TenantContactCta } from "@/components/tenant-contact-cta";
 import { buildLocalBusinessJsonLd } from "@/lib/demo-local-business-jsonld";
 import {
   enrichmentSocialLinksForUi,
@@ -28,7 +28,6 @@ import {
 import { absoluteUrl } from "@/lib/site-url";
 import {
   fetchTenantDemoLead,
-  resolveTenantPaymentLink,
   tenantDemoPublicPath,
   type TenantDemoLead,
 } from "@/lib/tenant-demo-lead";
@@ -170,8 +169,7 @@ export default async function TenantDemoLeadPage({
     notFound();
   }
 
-  const { lead: b, userPaymentLink } = result;
-  const paymentLink = resolveTenantPaymentLink(userPaymentLink);
+  const { lead: b, outreachPhone } = result;
   const publicPath = tenantDemoPublicPath(username, leadSlug);
 
   const service = serviceLabel(b);
@@ -549,7 +547,10 @@ export default async function TenantDemoLeadPage({
         ) : null}
       </article>
       {postcardMode ? null : (
-        <TenantActivationBanner paymentLink={paymentLink} />
+        <TenantContactCta
+          businessName={b.name?.trim() || displayName}
+          outreachPhone={outreachPhone}
+        />
       )}
     </>
   );

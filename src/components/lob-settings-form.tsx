@@ -293,7 +293,7 @@ export function LobSettingsForm({ initialLob }: LobSettingsFormProps) {
             className={inputClass}
           />
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Printed under the QR as “Or call/text …”. Falls back to your Twilio
+            Printed under the QR as “Call/text us at …”. Falls back to your Twilio
             number if blank.
           </p>
         </div>

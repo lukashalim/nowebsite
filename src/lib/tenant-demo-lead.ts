@@ -1,18 +1,16 @@
 import { mapRowToDemoBusiness, type DemoBusiness } from "@/lib/crm-cohort";
+import { normalizePhoneE164 } from "@/lib/phone-lookup";
+import { postcardReturnAddressFromUnknown } from "@/lib/postcard/address";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { materializeTenantLeadBySlug } from "@/lib/tenant-lead-sync";
 
-export {
-  DEFAULT_PAYMENT_LINK,
-  resolveTenantPaymentLink,
-} from "@/lib/tenant-payment-defaults";
 export { tenantDemoPublicPath } from "@/lib/demo-slug";
 
 export type TenantDemoLead = DemoBusiness;
 
 export interface TenantDemoLeadResult {
   lead: TenantDemoLead;
-  userPaymentLink: string | null;
+  outreachPhone: string | null;
 }
 
 const LEAD_DETAIL_SELECT = `
@@ -21,7 +19,7 @@ const LEAD_DETAIL_SELECT = `
   google_maps_link, facebook_url, contact_enrichment,
   latitude, longitude, is_spending_on_ads, competitive_weakness,
   review_highlights, services_offered, hours, open_now,
-  profiles!inner(username, user_payment_link)
+  profiles!inner(username, postcard_return_address)
 `;
 
 function mapLeadRowToDemoBusiness(
@@ -74,12 +72,18 @@ export async function fetchTenantDemoLead(
 
   const profile = data.profiles as {
     username?: string;
-    user_payment_link?: string | null;
+    postcard_return_address?: unknown;
   };
+  const postcardAddress = postcardReturnAddressFromUnknown(
+    profile?.postcard_return_address,
+  );
+  const outreachPhone = postcardAddress?.contact_phone
+    ? normalizePhoneE164(postcardAddress.contact_phone, "US")
+    : null;
   const lead = mapLeadRowToDemoBusiness(data as Record<string, unknown>);
 
   return {
     lead,
-    userPaymentLink: profile?.user_payment_link ?? null,
+    outreachPhone,
   };
 }

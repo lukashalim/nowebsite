@@ -81,10 +81,7 @@ export default async function DashboardSettingsPage({
         </p>
       ) : null}
 
-      <ProfileSettingsForm
-        initialUsername={suggestedUsername}
-        initialPaymentLink={profile?.user_payment_link ?? ""}
-      />
+      <ProfileSettingsForm initialUsername={suggestedUsername} />
 
       <LobSettingsForm initialLob={lobProfile} />
 

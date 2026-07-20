@@ -11,7 +11,6 @@ export interface UserProfile {
   id: string;
   email: string | null;
   username: string | null;
-  user_payment_link: string | null;
   is_pro: boolean;
   stripe_customer_id: string | null;
   subscription_price: string | null;
@@ -58,7 +57,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "id, email, username, user_payment_link, is_pro, stripe_customer_id, subscription_price, subscription_started_at, first_login, last_login, marketing_opt_in, sendfox_subscribed_at, sendfox_confirmed_at, twilio_account_sid, twilio_phone_number, forwarding_number",
+      "id, email, username, is_pro, stripe_customer_id, subscription_price, subscription_started_at, first_login, last_login, marketing_opt_in, sendfox_subscribed_at, sendfox_confirmed_at, twilio_account_sid, twilio_phone_number, forwarding_number",
     )
     .eq("id", userId)
     .maybeSingle();
@@ -71,8 +70,6 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
     id: String(data.id),
     email: typeof data.email === "string" ? data.email : null,
     username: typeof data.username === "string" ? data.username : null,
-    user_payment_link:
-      typeof data.user_payment_link === "string" ? data.user_payment_link : null,
     is_pro: data.is_pro === true,
     stripe_customer_id:
       typeof data.stripe_customer_id === "string"

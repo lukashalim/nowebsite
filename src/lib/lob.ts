@@ -197,6 +197,15 @@ export async function verifyUsAddress(
   };
 }
 
+export interface LobPostcardQrCode {
+  /** HTTPS URL opened after Lob's scan redirect (our /api/postcard-scan). */
+  redirectUrl: string;
+  widthIn: string;
+  topIn: string;
+  leftIn: string;
+  pages?: "front" | "back" | "front,back";
+}
+
 export async function createLobPostcard(
   apiKey: string,
   input: {
@@ -207,44 +216,44 @@ export async function createLobPostcard(
     back: string;
     size?: "4x6";
     useType?: "marketing" | "operational";
+    qrCode?: LobPostcardQrCode;
   },
 ): Promise<LobPostcardResult> {
   const key = requireApiKey(apiKey);
 
-  const body = new URLSearchParams();
-  body.set("description", input.description);
-  body.set("size", input.size ?? "4x6");
-  body.set("use_type", input.useType ?? "marketing");
-  body.set("front", input.front);
-  body.set("back", input.back);
-
-  const setAddress = (prefix: "to" | "from", addr: LobAddress) => {
-    body.set(`${prefix}[name]`, addr.name);
-    if (addr.company?.trim()) {
-      body.set(`${prefix}[company]`, addr.company.trim());
-    }
-    body.set(`${prefix}[address_line1]`, addr.address_line1);
-    if (addr.address_line2) {
-      body.set(`${prefix}[address_line2]`, addr.address_line2);
-    }
-    body.set(`${prefix}[address_city]`, addr.address_city);
-    body.set(`${prefix}[address_state]`, addr.address_state);
-    body.set(`${prefix}[address_zip]`, addr.address_zip);
-    body.set(
-      `${prefix}[address_country]`,
-      addr.address_country?.trim() || "US",
-    );
+  // JSON body avoids form-urlencoded mangling of qr_code.redirect_url (?id=…).
+  const payload: Record<string, unknown> = {
+    description: input.description,
+    size: input.size ?? "4x6",
+    use_type: input.useType ?? "marketing",
+    front: input.front,
+    back: input.back,
+    to: lobAddressToApiObject(input.to),
+    from: lobAddressToApiObject(input.from),
   };
-  setAddress("to", input.to);
-  setAddress("from", input.from);
+
+  if (input.qrCode) {
+    const redirect = input.qrCode.redirectUrl.trim();
+    if (!/^https:\/\//i.test(redirect)) {
+      throw new Error("Lob qr_code.redirect_url must be an https:// URL");
+    }
+    payload.qr_code = {
+      position: "relative",
+      redirect_url: redirect,
+      width: input.qrCode.widthIn,
+      top: input.qrCode.topIn,
+      left: input.qrCode.leftIn,
+      pages: input.qrCode.pages ?? "back",
+    };
+  }
 
   const res = await fetch("https://api.lob.com/v1/postcards", {
     method: "POST",
     headers: {
       Authorization: lobAuthHeader(key),
-      "Content-Type": "application/x-www-form-urlencoded",
+      "Content-Type": "application/json",
     },
-    body,
+    body: JSON.stringify(payload),
   });
 
   const json = (await res.json()) as Record<string, unknown>;
@@ -266,6 +275,23 @@ export async function createLobPostcard(
         : null,
     status: typeof json.status === "string" ? json.status : null,
   };
+}
+
+function lobAddressToApiObject(addr: LobAddress): Record<string, string> {
+  const out: Record<string, string> = {
+    name: addr.name,
+    address_line1: addr.address_line1,
+    address_city: addr.address_city,
+    address_state: addr.address_state,
+    address_zip: addr.address_zip,
+    address_country: addr.address_country?.trim() || "US",
+  };
+  if (addr.company?.trim()) {
+    // Lob rejects to.company/from.company above 40 characters.
+    out.company = addr.company.trim().slice(0, 40);
+  }
+  if (addr.address_line2?.trim()) out.address_line2 = addr.address_line2.trim();
+  return out;
 }
 
 function formatLobFailureReason(failure: unknown): string | null {

@@ -13,9 +13,10 @@ export async function demoUrlToQrDataUri(demoUrl: string): Promise<string> {
 export async function qrSvgMarkup(demoUrl: string): Promise<string> {
   return QRCode.toString(demoUrl, {
     type: "svg",
-    errorCorrectionLevel: "M",
-    margin: 1,
-    width: 200,
+    // High ECC — print/postcard scans misread dense QRs (intermittent 404s).
+    errorCorrectionLevel: "H",
+    margin: 2,
+    width: 280,
     color: { dark: "#18181b", light: "#ffffff" },
   });
 }
@@ -23,9 +24,9 @@ export async function qrSvgMarkup(demoUrl: string): Promise<string> {
 export async function qrPngBuffer(demoUrl: string): Promise<Buffer> {
   return QRCode.toBuffer(demoUrl, {
     type: "png",
-    errorCorrectionLevel: "M",
-    margin: 1,
-    width: 400,
+    errorCorrectionLevel: "H",
+    margin: 2,
+    width: 560,
     color: { dark: "#18181b", light: "#ffffff" },
   });
 }
