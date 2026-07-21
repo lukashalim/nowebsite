@@ -9,6 +9,7 @@ import { CrmLoadError } from "@/components/crm-load-error";
 import { CrmLogin } from "@/components/crm-login";
 import { CrmNav } from "@/components/crm-nav";
 import { CrmOutreachModeToggle } from "@/components/crm-outreach-mode-toggle";
+import { CrmShowTestLeadsToggle } from "@/components/crm-show-test-leads-toggle";
 import { fetchCrmBusinessRows, fetchCrmFilterOptions } from "@/lib/crm-cohort";
 import { fetchCategoryGroupTaxonomy } from "@/lib/directory/category-groups";
 import { getCrmUsageSummary } from "@/lib/crm-usage";
@@ -16,12 +17,12 @@ import { CRM_BASE_PATH } from "@/lib/crm-path";
 import { tryParseCrmSearchParams } from "@/lib/crm-params";
 import { getUserPostcardLifetimeSlots } from "@/lib/postcard/limits";
 import {
+  ensureUserProSynced,
   getLobProfilePublic,
   getUserProfile,
   isPro,
 } from "@/lib/subscription";
 import { ensureSendFoxProfileForUser } from "@/lib/sendfox-profile-sync";
-import { syncProForUser } from "@/lib/stripe-subscription";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -91,15 +92,11 @@ export default async function CrmPage({ searchParams }: PageProps) {
   const checkoutSessionId =
     typeof raw.session_id === "string" ? raw.session_id.trim() : undefined;
 
-  if (!isPro(profile) && (checkoutSuccess || profile?.stripe_customer_id)) {
-    await syncProForUser(user.id, {
-      checkoutSessionId:
-        checkoutSuccess && checkoutSessionId ? checkoutSessionId : undefined,
-      stripeCustomerId: profile?.stripe_customer_id,
-      searchRecentCheckout: checkoutSuccess,
-    });
-    profile = await getUserProfile(user.id);
-  }
+  profile = await ensureUserProSynced(user.id, {
+    checkoutSessionId:
+      checkoutSuccess && checkoutSessionId ? checkoutSessionId : undefined,
+    searchRecentCheckout: checkoutSuccess,
+  });
 
   const userIsPro = isPro(profile);
   const usageSummary = userIsPro ? null : await getCrmUsageSummary(user.id);
@@ -109,7 +106,7 @@ export default async function CrmPage({ searchParams }: PageProps) {
 
   const [lobProfile, postcardSlots] = await Promise.all([
     getLobProfilePublic(user.id),
-    getUserPostcardLifetimeSlots(user.id),
+    getUserPostcardLifetimeSlots(user.id, { isPro: userIsPro }),
   ]);
   const postcardMail = {
     hasLobApiKey: lobProfile.has_lob_api_key,
@@ -133,6 +130,7 @@ export default async function CrmPage({ searchParams }: PageProps) {
   const filters = (
     <div className="flex flex-col gap-3">
       <CrmOutreachModeToggle params={p} />
+      <CrmShowTestLeadsToggle params={p} />
       <CrmFilters
         params={p}
         groups={taxonomy.groups}

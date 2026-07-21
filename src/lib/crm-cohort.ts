@@ -44,7 +44,7 @@ import { cache } from "react";
 export type { DemoReviewHighlight } from "@/lib/demo-review-types";
 
 export const CRM_BUSINESS_LIST_COLUMNS =
-  "place_id, demo_slug, name, address, city, state, country, postal_code, business_type, main_category, rating, reviews, phone, phone_line_type, google_maps_link, facebook_url, listing_website, crm_contact_surface, contact_enrichment" as const;
+  "place_id, demo_slug, name, address, city, state, country, postal_code, business_type, main_category, rating, reviews, phone, phone_line_type, google_maps_link, facebook_url, listing_website, crm_contact_surface, contact_enrichment, is_test" as const;
 
 const DEMO_CORE_COLUMNS =
   "place_id, demo_slug, name, address, city, state, postal_code, business_type, main_category, rating, reviews, phone, google_maps_link, facebook_url, listing_website, crm_contact_surface, contact_enrichment" as const;
@@ -426,6 +426,9 @@ export async function fetchCrmBusinessRows(
       .lte("reviews", p.maxReviews)
       .gte("rating", p.minRating);
 
+    // Off: hide QA rows from live outreach. On: show only test leads (not mixed in).
+    q = p.showTestLeads ? q.eq("is_test", true) : q.eq("is_test", false);
+
     q = applyWebPresenceFilter(q, p.webPresence);
 
     const filtered = applyUserContactFilters(q, userContacts, p);
@@ -462,7 +465,10 @@ export async function fetchCrmBusinessRows(
     q = applyPhoneLineTypeFilter(q, p.phoneLineType);
     q = applyOutreachModeFilter(q, p.outreachMode);
 
-    q = applyReviewExcerptsExtractedFilter(q);
+    // Live cohort requires extracted review excerpts; test leads often skip that pipeline.
+    if (!p.showTestLeads) {
+      q = applyReviewExcerptsExtractedFilter(q);
+    }
 
     const from = (p.page - 1) * p.pageSize;
     const to = from + p.pageSize - 1;
@@ -473,10 +479,10 @@ export async function fetchCrmBusinessRows(
 
     if (error) {
       const hint =
-        /crm_contact_surface|listing_website|phone_line_type|crm_timezone|schema cache/i.test(
+        /crm_contact_surface|listing_website|phone_line_type|crm_timezone|is_test|schema cache/i.test(
           error.message,
         )
-          ? " Run scrape/sql migrations in Supabase (e.g. add-listing-website-crm-contact-surface.sql, add-phone-line-type.sql), then refresh."
+          ? " Run scrape/sql migrations in Supabase (e.g. add-listing-website-crm-contact-surface.sql, add-phone-line-type.sql, add-is-test-crm-leads.sql), then refresh."
           : "";
       return { rows: [], total: 0, error: error.message + hint };
     }
@@ -576,7 +582,8 @@ export async function fetchDemoBusinessByUrlSegment(
   let q = supabase
     .from("businesses_nowebsite")
     .select(DEMO_DETAIL_COLUMNS)
-    .eq("is_invalid", false);
+    .eq("is_invalid", false)
+    .eq("is_test", false);
 
   if (isLikelyGooglePlaceId(raw)) {
     q = q.eq("place_id", raw);
@@ -609,6 +616,7 @@ export async function fetchDemoCohortPage(
     .from("businesses_nowebsite")
     .select(DEMO_INDEX_COLUMNS, { count: "exact" })
     .eq("is_invalid", false)
+    .eq("is_test", false)
     .gte("reviews", c.minReviews)
     .lte("reviews", c.maxReviews)
     .gte("rating", c.minRating);

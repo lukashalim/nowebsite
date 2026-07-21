@@ -34,6 +34,7 @@ interface CrmLeadsTableBodyProps {
   userId: string;
   webPresence: CrmWebPresence;
   pageOutreachMode?: CrmOutreachMode;
+  showTestLeads?: boolean;
   spintaxTemplates: SpintaxTemplate[];
   isPro: boolean;
   initialOutreachRemaining: number | null;
@@ -53,6 +54,7 @@ export function CrmLeadsTableBody({
   userId,
   webPresence,
   pageOutreachMode = "all",
+  showTestLeads = false,
   spintaxTemplates,
   isPro,
   initialOutreachRemaining,
@@ -81,16 +83,12 @@ export function CrmLeadsTableBody({
     if (!isPro && remaining !== null) {
       setOutreachRemaining(remaining);
     }
-    if (action === "mail" && !postcardMail.lifetimeUnlimited) {
-      setPostcardMail((prev) => {
-        if (prev.lobKeyMode === "test") {
-          return { ...prev, testRemaining: 0 };
-        }
-        if (prev.lobKeyMode === "live") {
-          return { ...prev, liveRemaining: 0 };
-        }
-        return prev;
-      });
+    if (
+      action === "mail" &&
+      !postcardMail.lifetimeUnlimited &&
+      postcardMail.lobKeyMode === "live"
+    ) {
+      setPostcardMail((prev) => ({ ...prev, liveRemaining: 0 }));
     }
     onOutreachRecorded?.(remaining, action);
   }
@@ -132,8 +130,15 @@ export function CrmLeadsTableBody({
             key={b.place_id}
             className="align-top hover:bg-zinc-50/80 dark:hover:bg-zinc-900/50"
           >
-            <td className="px-3 py-3 font-medium capitalize text-zinc-900 dark:text-zinc-100">
-              {b.name ?? "—"}
+            <td className="px-3 py-3 font-medium text-zinc-900 dark:text-zinc-100">
+              <span className="inline-flex flex-wrap items-center gap-2">
+                <span className="capitalize">{b.name ?? "—"}</span>
+                {b.is_test ? (
+                  <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 dark:bg-amber-950/60 dark:text-amber-200">
+                    TEST
+                  </span>
+                ) : null}
+              </span>
             </td>
             <td className="px-3 py-3 text-zinc-600 dark:text-zinc-300">
               <span className="inline-flex items-start gap-1.5">
@@ -197,7 +202,9 @@ export function CrmLeadsTableBody({
                 templates={spintaxTemplates}
                 existingNotes={b.notes}
                 outreachRemaining={outreachRemaining}
+                isPro={isPro}
                 pageOutreachMode={pageOutreachMode}
+                allowTest={showTestLeads}
                 postcardMail={postcardMail}
                 onOutreachRecorded={handleOutreachRecorded}
               />
@@ -233,7 +240,9 @@ export function CrmLeadsTableBody({
                 </span>
               ) : (
                 <a
-                  href={`/api/crm-demo?placeId=${encodeURIComponent(b.place_id)}`}
+                  href={`/api/crm-demo?placeId=${encodeURIComponent(b.place_id)}${
+                    showTestLeads ? "&allowTest=1" : ""
+                  }`}
                   className="text-blue-600 hover:underline dark:text-blue-400"
                   target="_blank"
                   rel="noopener noreferrer"

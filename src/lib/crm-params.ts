@@ -106,6 +106,15 @@ const timezonesParam = z.preprocess(
   z.array(z.enum(CRM_TIMEZONE_VALUES)).default([]),
 );
 
+/** URL flag: switch CRM list/export to QA/test leads only (`is_test = true`). */
+const showTestLeadsParam = z.preprocess((val) => {
+  if (val === undefined || val === "" || val === false || val === "0")
+    return false;
+  if (val === true) return true;
+  const s = String(val).trim().toLowerCase();
+  return s === "1" || s === "true" || s === "yes";
+}, z.boolean().default(false));
+
 export const crmSearchParamsSchema = z
   .object({
     minReviews: intInRange(25, 0, 1_000_000),
@@ -115,6 +124,8 @@ export const crmSearchParamsSchema = z
     webPresence: z.enum(crmWebPresenceValues).default("all"),
     phoneLineType: z.enum(crmPhoneLineTypeValues).default("all"),
     outreachMode: z.enum(crmOutreachModeValues).default("all"),
+    /** When true, list/export only `is_test` leads; when false, exclude them. */
+    showTestLeads: showTestLeadsParam,
     page: intInRange(1, 1, 1_000_000),
     pageSize: intInRange(50, 1, 100),
     contactMin: optionalInt,
@@ -196,6 +207,7 @@ function rawToFlat(raw: Record<string, string | string[] | undefined>) {
     webPresence: normalizeWebPresence(raw),
     phoneLineType: firstParam(raw.phoneLineType),
     outreachMode: firstParam(raw.outreachMode),
+    showTestLeads: firstParam(raw.showTestLeads),
     page: firstParam(raw.page),
     pageSize: firstParam(raw.pageSize),
     contactMin: firstParam(raw.contactMin),
@@ -234,6 +246,7 @@ function appendCrmFilterParams(sp: URLSearchParams, params: CrmSearchParams): vo
     sp.set("phoneLineType", params.phoneLineType);
   if (params.outreachMode !== "all")
     sp.set("outreachMode", params.outreachMode);
+  if (params.showTestLeads) sp.set("showTestLeads", "1");
   if (params.contactMin !== undefined)
     sp.set("contactMin", String(params.contactMin));
   if (params.contactMax !== undefined)

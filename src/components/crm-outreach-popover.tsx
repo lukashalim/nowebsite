@@ -34,10 +34,12 @@ export interface PostcardMailGating {
   hasLobApiKey: boolean;
   hasReturnAddress: boolean;
   lobKeyMode: "test" | "live" | null;
-  /** Pro users are not subject to the 1+1 lifetime cap. */
+  /** Pro users are not subject to the live lifetime cap. */
   lifetimeUnlimited: boolean;
-  testRemaining: number;
-  liveRemaining: number;
+  /** null = unlimited test proofs. */
+  testRemaining: number | null;
+  /** null = unlimited live sends (Pro). */
+  liveRemaining: number | null;
 }
 
 interface CrmOutreachPopoverProps {
@@ -60,8 +62,11 @@ interface CrmOutreachPopoverProps {
   templates: SpintaxTemplate[];
   existingNotes: string | null;
   outreachRemaining: number | null;
+  isPro?: boolean;
   /** Page-level CRM outreach mode from ?outreachMode= */
   pageOutreachMode?: "all" | "call" | "text" | "mail";
+  /** When true, allow outreach actions against `is_test` leads (CRM Show test leads). */
+  allowTest?: boolean;
   postcardMail?: PostcardMailGating;
   onOutreachRecorded?: (
     remaining: number | null,
@@ -138,7 +143,9 @@ export function CrmOutreachPopover({
   templates,
   existingNotes,
   outreachRemaining,
+  isPro = false,
   pageOutreachMode = "all",
+  allowTest = false,
   postcardMail,
   onOutreachRecorded,
 }: CrmOutreachPopoverProps) {
@@ -176,15 +183,15 @@ export function CrmOutreachPopover({
   const lobMode = postcardMail?.lobKeyMode ?? null;
   const hasLobKey = postcardMail?.hasLobApiKey === true;
   const hasReturnAddress = postcardMail?.hasReturnAddress === true;
-  const lifetimeUnlimited = postcardMail?.lifetimeUnlimited === true;
+  const lifetimeUnlimited =
+    isPro || postcardMail?.lifetimeUnlimited === true;
+  const liveRemaining = postcardMail?.liveRemaining;
   const lifetimeSlotRemaining =
     lifetimeUnlimited ||
-    (lobMode === "test"
-      ? (postcardMail?.testRemaining ?? 0) > 0
-      : lobMode === "live"
-        ? (postcardMail?.liveRemaining ?? 0) > 0
-        : false);
-  const liveOutreachBlocksMail = lobMode === "live" && outreachBlocked;
+    lobMode === "test" ||
+    (lobMode === "live" && (liveRemaining == null || liveRemaining > 0));
+  const liveOutreachBlocksMail =
+    !isPro && lobMode === "live" && outreachBlocked;
   const mailBlockedReason = !hasLobKey
     ? ("no_key" as const)
     : !hasReturnAddress
@@ -409,7 +416,9 @@ export function CrmOutreachPopover({
       const callTemplateId = selectedCallId;
       if (!callTemplateId) return;
 
-      const demoResult = await resolveTenantDemoUrl(userId, placeId);
+      const demoResult = await resolveTenantDemoUrl(userId, placeId, {
+        allowTest,
+      });
       if (!demoResult.ok) {
         window.alert(demoResult.error);
         return;
@@ -507,6 +516,7 @@ export function CrmOutreachPopover({
         body: JSON.stringify({
           placeId,
           ownerName,
+          allowTest: allowTest || undefined,
         }),
       });
       const data = (await res.json()) as {
@@ -782,15 +792,21 @@ export function CrmOutreachPopover({
                   </p>
                 ) : mailBlockedReason === "lifetime" ? (
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    {lobMode === "test"
-                      ? "You've used your test postcard. Swap to a live Lob key in Settings for your one production send."
-                      : "You've used your live postcard."}{" "}
+                    You&apos;ve used your one live postcard.{" "}
+                    <Link
+                      href="/pro"
+                      className="text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      Upgrade to Pro
+                    </Link>{" "}
+                    for unlimited sends, or{" "}
                     <Link
                       href="/crm/postcards"
                       className="text-blue-600 hover:underline dark:text-blue-400"
                     >
-                      View postcards
+                      view postcards
                     </Link>
+                    .
                   </p>
                 ) : mailBlockedReason === "pool" ? (
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">

@@ -128,8 +128,8 @@ export function LobSettingsForm({ initialLob }: LobSettingsFormProps) {
           Add your Lob secret API key and the return address printed on
           postcards. Use a <code className="text-xs">test_</code> key for proofs
           only, or a <code className="text-xs">live_</code> key for real mail.
-          Free accounts may send one test and one live postcard ever; Pro is
-          unlimited.
+          Free accounts get unlimited test proofs and one live postcard ever; Pro
+          is unlimited.
         </p>
       </div>
 

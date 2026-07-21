@@ -12,8 +12,8 @@ import {
 import { CRM_BASE_PATH } from "@/lib/crm-path";
 import { getUserPostcardLifetimeSlots } from "@/lib/postcard/limits";
 import {
+  ensureUserProSynced,
   getLobProfilePublic,
-  getUserProfile,
   isPro,
 } from "@/lib/subscription";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -97,10 +97,10 @@ export default async function CrmPostcardsPage({ searchParams }: PageProps) {
     return <CrmLogin />;
   }
 
-  const profile = await getUserProfile(user.id);
+  const profile = await ensureUserProSynced(user.id);
   const userIsPro = isPro(profile);
   const lob = await getLobProfilePublic(user.id);
-  const slots = await getUserPostcardLifetimeSlots(user.id);
+  const slots = await getUserPostcardLifetimeSlots(user.id, { isPro: userIsPro });
 
   const raw = await searchParams;
   const mode = modeSchema.safeParse(firstParam(raw.mode)).success
@@ -132,7 +132,7 @@ export default async function CrmPostcardsPage({ searchParams }: PageProps) {
           who has scanned.
           {userIsPro
             ? " Pro: unlimited postcards."
-            : " Free: one test and one live postcard lifetime."}
+            : " Free: unlimited test proofs and one live postcard lifetime."}
         </p>
       </header>
 
@@ -143,9 +143,7 @@ export default async function CrmPostcardsPage({ searchParams }: PageProps) {
           ) : (
             <>
               Slots remaining:{" "}
-              <span className="font-medium">
-                {slots.testRemaining}/1 test
-              </span>
+              <span className="font-medium">Unlimited test</span>
               {" · "}
               <span className="font-medium">
                 {slots.liveRemaining}/1 live

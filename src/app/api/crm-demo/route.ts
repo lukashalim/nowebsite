@@ -9,6 +9,10 @@ import { getUserProfile, isPro } from "@/lib/subscription";
 import { materializeTenantLeadByPlaceId } from "@/lib/tenant-lead-sync";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  TEST_LEAD_BLOCKED_MESSAGE,
+  shouldBlockTestLead,
+} from "@/lib/crm-test-lead";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +29,9 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const placeId = searchParams.get("placeId")?.trim() ?? "";
+  const allowTest =
+    searchParams.get("allowTest") === "1" ||
+    searchParams.get("allowTest") === "true";
 
   if (!placeId) {
     return NextResponse.json({ error: "placeId is required" }, { status: 400 });
@@ -46,7 +53,7 @@ export async function GET(request: Request) {
   const admin = createSupabaseAdmin();
   const { data: row, error } = await admin
     .from("businesses_nowebsite")
-    .select(DEMO_DETAIL_COLUMNS)
+    .select(`${DEMO_DETAIL_COLUMNS}, is_test`)
     .eq("place_id", placeId)
     .maybeSingle();
 
@@ -56,6 +63,13 @@ export async function GET(request: Request) {
 
   if (!row) {
     return NextResponse.json({ error: "Business not found" }, { status: 404 });
+  }
+
+  if (shouldBlockTestLead(row.is_test, allowTest)) {
+    return NextResponse.json(
+      { error: TEST_LEAD_BLOCKED_MESSAGE },
+      { status: 403 },
+    );
   }
 
   await materializeTenantLeadByPlaceId(user.id, placeId).catch(() => {});

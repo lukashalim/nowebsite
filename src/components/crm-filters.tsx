@@ -93,6 +93,9 @@ export function CrmFilters({
         {params.outreachMode !== "all" ? (
           <input type="hidden" name="outreachMode" value={params.outreachMode} />
         ) : null}
+        {params.showTestLeads ? (
+          <input type="hidden" name="showTestLeads" value="1" />
+        ) : null}
         <label className={labelClass}>
           Reviews
           <span className="flex items-center gap-1.5">

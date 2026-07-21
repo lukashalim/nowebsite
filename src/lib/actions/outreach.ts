@@ -13,6 +13,10 @@ import {
   buildVoiceHandlerUrl,
   createTwilioClient,
 } from "@/lib/twilio-credentials";
+import {
+  TEST_LEAD_BLOCKED_MESSAGE,
+  shouldBlockTestLead,
+} from "@/lib/crm-test-lead";
 
 export type OutboundSmsResult =
   | { type: "TWILIO"; ok: true; remaining: number | null }
@@ -44,6 +48,7 @@ async function requireSessionUser(userId: string): Promise<
 export async function resolveTenantDemoUrl(
   userId: string,
   placeId: string,
+  options?: { allowTest?: boolean },
 ): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   const auth = await requireSessionUser(userId);
   if (!auth.ok) {
@@ -69,7 +74,7 @@ export async function resolveTenantDemoUrl(
   const admin = createSupabaseAdmin();
   const { data: row, error } = await admin
     .from("businesses_nowebsite")
-    .select(DEMO_DETAIL_COLUMNS)
+    .select(`${DEMO_DETAIL_COLUMNS}, is_test`)
     .eq("place_id", trimmedPlaceId)
     .maybeSingle();
 
@@ -78,6 +83,10 @@ export async function resolveTenantDemoUrl(
   }
   if (!row) {
     return { ok: false, error: "Business not found" };
+  }
+
+  if (shouldBlockTestLead(row.is_test, options?.allowTest === true)) {
+    return { ok: false, error: TEST_LEAD_BLOCKED_MESSAGE };
   }
 
   const slug = demoPathSegment({

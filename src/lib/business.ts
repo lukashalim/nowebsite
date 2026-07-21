@@ -29,4 +29,6 @@ export interface BusinessLead {
   notes: string | null;
   contact_email: string | null;
   enrichment_email: string | null;
+  /** Internal QA/test lead; shown only when CRM `showTestLeads` is on. */
+  is_test?: boolean;
 }

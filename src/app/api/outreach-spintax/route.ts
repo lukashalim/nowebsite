@@ -16,6 +16,10 @@ import {
 } from "@/lib/spintax-audience";
 import { getUserProfile, isPro } from "@/lib/subscription";
 import { fetchSpintaxTemplatesForUser } from "@/lib/spintax-templates";
+import {
+  TEST_LEAD_BLOCKED_MESSAGE,
+  shouldBlockTestLead,
+} from "@/lib/crm-test-lead";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,6 +62,7 @@ export async function POST(req: Request) {
     ).includes(webPresenceRaw as CrmWebPresence)
       ? (webPresenceRaw as CrmWebPresence)
       : "all";
+    const allowTest = record.allowTest === true;
 
     if (!placeId) {
       return NextResponse.json({ error: "placeId is required" }, { status: 400 });
@@ -79,7 +84,7 @@ export async function POST(req: Request) {
     const { data: row, error } = await supabase
       .from("businesses_nowebsite")
       .select(
-        "place_id, name, facebook_url, crm_contact_surface, listing_website, main_category, business_type, has_website",
+        "place_id, name, facebook_url, crm_contact_surface, listing_website, main_category, business_type, has_website, is_test",
       )
       .eq("place_id", placeId)
       .maybeSingle();
@@ -89,6 +94,13 @@ export async function POST(req: Request) {
     }
     if (!row) {
       return NextResponse.json({ error: "Business not found" }, { status: 404 });
+    }
+
+    if (shouldBlockTestLead(row.is_test, allowTest)) {
+      return NextResponse.json(
+        { error: TEST_LEAD_BLOCKED_MESSAGE },
+        { status: 403 },
+      );
     }
 
     const outreachRow = row as OutreachDbRow;

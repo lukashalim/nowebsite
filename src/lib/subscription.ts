@@ -52,6 +52,43 @@ export function isPro(profile: UserProfile | null | undefined): boolean {
   return profile?.is_pro === true;
 }
 
+/** Reconcile Stripe subscription state when profiles.is_pro is stale. */
+export async function ensureUserProSynced(
+  userId: string,
+  options?: {
+    checkoutSessionId?: string;
+    searchRecentCheckout?: boolean;
+  },
+): Promise<UserProfile | null> {
+  let profile = await getUserProfile(userId);
+  if (!profile || isPro(profile)) {
+    return profile;
+  }
+
+  const { syncProForUser } = await import("@/lib/stripe-subscription");
+  let synced = false;
+
+  if (options?.checkoutSessionId) {
+    synced = await syncProForUser(userId, {
+      checkoutSessionId: options.checkoutSessionId,
+    });
+  } else if (profile.stripe_customer_id) {
+    synced = await syncProForUser(userId, {
+      stripeCustomerId: profile.stripe_customer_id,
+    });
+  } else if (options?.searchRecentCheckout) {
+    synced = await syncProForUser(userId, {
+      searchRecentCheckout: true,
+    });
+  }
+
+  if (synced) {
+    profile = await getUserProfile(userId);
+  }
+
+  return profile;
+}
+
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
   const supabase = createSupabaseAdmin();
   const { data, error } = await supabase

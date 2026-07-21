@@ -57,6 +57,7 @@ export function CrmLeadsTableShell({
               userId={userId}
               webPresence={params.webPresence}
               pageOutreachMode={params.outreachMode}
+              showTestLeads={params.showTestLeads}
               spintaxTemplates={spintaxTemplates}
               isPro={isPro}
               initialOutreachRemaining={initialOutreachRemaining}

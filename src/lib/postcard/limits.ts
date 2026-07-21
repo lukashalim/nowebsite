@@ -39,12 +39,26 @@ export async function countUserPostcardSends(
   return count ?? 0;
 }
 
-export async function getUserPostcardLifetimeSlots(userId: string): Promise<{
+export async function getUserPostcardLifetimeSlots(
+  userId: string,
+  opts?: { isPro?: boolean },
+): Promise<{
   testUsed: number;
   liveUsed: number;
-  testRemaining: number;
-  liveRemaining: number;
+  /** null = unlimited (test Lob proofs never mail physically). */
+  testRemaining: number | null;
+  /** null = unlimited (Pro accounts). */
+  liveRemaining: number | null;
 }> {
+  if (opts?.isPro) {
+    return {
+      testUsed: 0,
+      liveUsed: 0,
+      testRemaining: null,
+      liveRemaining: null,
+    };
+  }
+
   const [testUsed, liveUsed] = await Promise.all([
     countUserPostcardSends(userId, "test"),
     countUserPostcardSends(userId, "live"),
@@ -52,7 +66,7 @@ export async function getUserPostcardLifetimeSlots(userId: string): Promise<{
   return {
     testUsed,
     liveUsed,
-    testRemaining: Math.max(0, LIFETIME_LIMIT - testUsed),
+    testRemaining: null,
     liveRemaining: Math.max(0, LIFETIME_LIMIT - liveUsed),
   };
 }
@@ -66,14 +80,15 @@ export async function assertCanSendPostcard(
   if (opts?.isPro) {
     return { ok: true };
   }
-  const mode: PostcardSendMode = isTest ? "test" : "live";
-  const used = await countUserPostcardSends(userId, mode);
+  // Test Lob keys only generate proofs — no physical mail — so free users can iterate.
+  if (isTest) {
+    return { ok: true };
+  }
+  const used = await countUserPostcardSends(userId, "live");
   if (used >= LIFETIME_LIMIT) {
     return {
       ok: false,
-      error: isTest
-        ? "You've already used your one test postcard. Switch to a live Lob key in Settings to send a production postcard."
-        : "You've already used your one live postcard.",
+      error: "You've already used your one live postcard.",
     };
   }
   return { ok: true };

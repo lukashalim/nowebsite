@@ -29,15 +29,19 @@ import { createPostcardScanLinkUrl } from "@/lib/postcard/scan-links-db";
 import { ensureProfileUsername } from "@/lib/profile-username";
 import { ringReadyTenantDemoUrl } from "@/lib/ringready-site";
 import {
+  ensureUserProSynced,
   getUserLobApiKey,
   getUserPostcardReturnAddress,
   getUserPostcardReturnStored,
-  getUserProfile,
   getUserTwilioCredentials,
   isPro,
 } from "@/lib/subscription";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  TEST_LEAD_BLOCKED_MESSAGE,
+  shouldBlockTestLead,
+} from "@/lib/crm-test-lead";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,11 +60,13 @@ export async function POST(request: Request) {
   let body: {
     placeId?: string;
     ownerName?: string | null;
+    allowTest?: boolean;
   };
   try {
     body = (await request.json()) as {
       placeId?: string;
       ownerName?: string | null;
+      allowTest?: boolean;
     };
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
@@ -71,7 +77,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "placeId is required" }, { status: 400 });
   }
 
-  const profile = await getUserProfile(user.id);
+  const profile = await ensureUserProSynced(user.id);
   const username =
     profile?.username?.trim() ||
     (await ensureProfileUsername(
@@ -133,7 +139,7 @@ export async function POST(request: Request) {
   const admin = createSupabaseAdmin();
   const { data: row, error } = await admin
     .from("businesses_nowebsite")
-    .select(`${DEMO_DETAIL_COLUMNS}, country`)
+    .select(`${DEMO_DETAIL_COLUMNS}, country, is_test`)
     .eq("place_id", placeId)
     .maybeSingle();
 
@@ -142,6 +148,13 @@ export async function POST(request: Request) {
   }
   if (!row) {
     return NextResponse.json({ error: "Business not found" }, { status: 404 });
+  }
+
+  if (shouldBlockTestLead(row.is_test, body.allowTest === true)) {
+    return NextResponse.json(
+      { error: TEST_LEAD_BLOCKED_MESSAGE },
+      { status: 403 },
+    );
   }
 
   const address = typeof row.address === "string" ? row.address : null;

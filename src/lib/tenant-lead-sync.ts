@@ -84,7 +84,8 @@ export async function materializeTenantLeadBySlug(
   let businessQuery = supabase
     .from("businesses_nowebsite")
     .select(DEMO_DETAIL_COLUMNS)
-    .eq("is_invalid", false);
+    .eq("is_invalid", false)
+    .eq("is_test", false);
 
   if (isLikelyGooglePlaceId(normalizedSlug)) {
     businessQuery = businessQuery.eq("place_id", normalizedSlug);
@@ -114,6 +115,7 @@ export async function materializeTenantLeadByPlaceId(
     .from("businesses_nowebsite")
     .select(DEMO_DETAIL_COLUMNS)
     .eq("is_invalid", false)
+    .eq("is_test", false)
     .eq("place_id", placeId)
     .maybeSingle();
 
