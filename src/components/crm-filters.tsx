@@ -93,6 +93,18 @@ export function CrmFilters({
         {params.outreachMode !== "all" ? (
           <input type="hidden" name="outreachMode" value={params.outreachMode} />
         ) : null}
+        {params.outreachMode === "mail" &&
+        params.postcardMode !== "production" ? (
+          <input type="hidden" name="postcardMode" value={params.postcardMode} />
+        ) : null}
+        {params.outreachMode === "mail" &&
+        params.postcardStatus !== "all" ? (
+          <input
+            type="hidden"
+            name="postcardStatus"
+            value={params.postcardStatus}
+          />
+        ) : null}
         {params.showTestLeads ? (
           <input type="hidden" name="showTestLeads" value="1" />
         ) : null}

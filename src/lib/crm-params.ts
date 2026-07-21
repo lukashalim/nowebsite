@@ -84,6 +84,20 @@ export type CrmPhoneLineType = (typeof crmPhoneLineTypeValues)[number];
 export const crmOutreachModeValues = ["all", "call", "text", "mail"] as const;
 export type CrmOutreachMode = (typeof crmOutreachModeValues)[number];
 
+/** Lob postcard stream when Mail mode is active (maps to usage_events test vs live). */
+export const crmPostcardModeValues = ["test", "production"] as const;
+export type CrmPostcardMode = (typeof crmPostcardModeValues)[number];
+
+/** Postcard send/scan status filter when Mail mode is active. */
+export const crmPostcardStatusValues = [
+  "all",
+  "sent",
+  "scanned",
+  "not_scanned",
+  "not_sent",
+] as const;
+export type CrmPostcardStatus = (typeof crmPostcardStatusValues)[number];
+
 export { CRM_TIMEZONE_VALUES, type CrmTimezone };
 
 function parseTimezonesParam(
@@ -124,6 +138,10 @@ export const crmSearchParamsSchema = z
     webPresence: z.enum(crmWebPresenceValues).default("all"),
     phoneLineType: z.enum(crmPhoneLineTypeValues).default("all"),
     outreachMode: z.enum(crmOutreachModeValues).default("all"),
+    /** Lob test vs production postcard events; only applied when outreachMode is mail. */
+    postcardMode: z.enum(crmPostcardModeValues).default("production"),
+    /** Send/scan status within postcardMode; only applied when outreachMode is mail. */
+    postcardStatus: z.enum(crmPostcardStatusValues).default("all"),
     /** When true, list/export only `is_test` leads; when false, exclude them. */
     showTestLeads: showTestLeadsParam,
     page: intInRange(1, 1, 1_000_000),
@@ -207,6 +225,8 @@ function rawToFlat(raw: Record<string, string | string[] | undefined>) {
     webPresence: normalizeWebPresence(raw),
     phoneLineType: firstParam(raw.phoneLineType),
     outreachMode: firstParam(raw.outreachMode),
+    postcardMode: firstParam(raw.postcardMode),
+    postcardStatus: firstParam(raw.postcardStatus),
     showTestLeads: firstParam(raw.showTestLeads),
     page: firstParam(raw.page),
     pageSize: firstParam(raw.pageSize),
@@ -246,6 +266,13 @@ function appendCrmFilterParams(sp: URLSearchParams, params: CrmSearchParams): vo
     sp.set("phoneLineType", params.phoneLineType);
   if (params.outreachMode !== "all")
     sp.set("outreachMode", params.outreachMode);
+  // Postcard filters only matter in Mail mode; omit when leaving Mail.
+  if (params.outreachMode === "mail") {
+    if (params.postcardMode !== "production")
+      sp.set("postcardMode", params.postcardMode);
+    if (params.postcardStatus !== "all")
+      sp.set("postcardStatus", params.postcardStatus);
+  }
   if (params.showTestLeads) sp.set("showTestLeads", "1");
   if (params.contactMin !== undefined)
     sp.set("contactMin", String(params.contactMin));

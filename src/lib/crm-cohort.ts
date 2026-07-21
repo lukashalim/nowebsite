@@ -7,9 +7,14 @@ import { extractDemoPublicEmail, toFiniteNumber } from "@/lib/demo-enrichment";
 import { isCrmStage, type CrmStage } from "@/lib/crm-stage";
 import {
   defaultCrmDemoCohortFilters,
+  type CrmPostcardStatus,
   type CrmSearchParams,
   type CrmWebPresence,
 } from "@/lib/crm-params";
+import {
+  fetchUserPostcardPlaceIdSets,
+  postcardTrackingModeFromCrm,
+} from "@/lib/admin/postcard-tracking";
 import { formatCategoryDisplayName } from "@/lib/directory/labels";
 import {
   allNamedCategoryGroupSlugs,
@@ -375,6 +380,62 @@ function applyUserContactFilters<
   return q;
 }
 
+async function applyPostcardStatusFilter<
+  T extends {
+    in: (column: string, values: string[]) => T;
+    not: (column: string, operator: string, value: string) => T;
+  },
+>(
+  q: T,
+  userId: string,
+  p: CrmSearchParams,
+): Promise<{ q: T; empty: boolean; error: string | null }> {
+  if (p.outreachMode !== "mail" || p.postcardStatus === "all") {
+    return { q, empty: false, error: null };
+  }
+
+  const { sentPlaceIds, scannedPlaceIds, notScannedPlaceIds, error } =
+    await fetchUserPostcardPlaceIdSets({
+      userId,
+      mode: postcardTrackingModeFromCrm(p.postcardMode),
+    });
+
+  if (error) {
+    return { q, empty: true, error };
+  }
+
+  const status: CrmPostcardStatus = p.postcardStatus;
+
+  if (status === "sent") {
+    if (sentPlaceIds.length === 0) return { q, empty: true, error: null };
+    return { q: q.in("place_id", sentPlaceIds), empty: false, error: null };
+  }
+
+  if (status === "scanned") {
+    if (scannedPlaceIds.length === 0) return { q, empty: true, error: null };
+    return {
+      q: q.in("place_id", scannedPlaceIds),
+      empty: false,
+      error: null,
+    };
+  }
+
+  if (status === "not_scanned") {
+    if (notScannedPlaceIds.length === 0) return { q, empty: true, error: null };
+    return {
+      q: q.in("place_id", notScannedPlaceIds),
+      empty: false,
+      error: null,
+    };
+  }
+
+  // not_sent: mailable cohort minus sent place_ids
+  if (sentPlaceIds.length > 0) {
+    q = q.not("place_id", "in", `(${sentPlaceIds.join(",")})`);
+  }
+  return { q, empty: false, error: null };
+}
+
 export async function fetchCrmBusinessRows(
   p: CrmSearchParams,
   userId: string,
@@ -464,6 +525,15 @@ export async function fetchCrmBusinessRows(
 
     q = applyPhoneLineTypeFilter(q, p.phoneLineType);
     q = applyOutreachModeFilter(q, p.outreachMode);
+
+    const postcardFiltered = await applyPostcardStatusFilter(q, userId, p);
+    if (postcardFiltered.error) {
+      return { rows: [], total: 0, error: postcardFiltered.error };
+    }
+    if (postcardFiltered.empty) {
+      return { rows: [], total: 0, error: null };
+    }
+    q = postcardFiltered.q;
 
     // Live cohort requires extracted review excerpts; test leads often skip that pipeline.
     if (!p.showTestLeads) {

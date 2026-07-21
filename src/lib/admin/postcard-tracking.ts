@@ -26,7 +26,7 @@ export interface AdminPostcardRow {
 
 const ROW_CAP = 200;
 
-function eventTypesForMode(mode: PostcardTrackingMode): {
+export function eventTypesForMode(mode: PostcardTrackingMode): {
   sent: UsageEventType;
   scanned: UsageEventType;
 } {
@@ -39,6 +39,121 @@ function eventTypesForMode(mode: PostcardTrackingMode): {
   return {
     sent: "postcard_sent",
     scanned: "postcard_scanned",
+  };
+}
+
+/** CRM Mail filter: map UI production/test onto tracking live/test event types. */
+export function postcardTrackingModeFromCrm(
+  mode: "test" | "production",
+): PostcardTrackingMode {
+  return mode === "test" ? "test" : "live";
+}
+
+/**
+ * Distinct place_ids the user has mailed (and which of those were scanned)
+ * for a Lob test or live stream. Used by CRM Mail status filters.
+ */
+export async function fetchUserPostcardPlaceIdSets(input: {
+  userId: string;
+  mode: PostcardTrackingMode;
+}): Promise<{
+  sentPlaceIds: string[];
+  scannedPlaceIds: string[];
+  notScannedPlaceIds: string[];
+  error: string | null;
+}> {
+  const { sent: sentType, scanned: scannedType } = eventTypesForMode(
+    input.mode,
+  );
+  const admin = createSupabaseAdmin();
+
+  // Higher cap than the tracker table UI — list filters need complete membership.
+  const PLACE_SET_CAP = 10_000;
+
+  const { data: sentRows, error: sentError } = await admin
+    .from(USAGE_EVENTS_TABLE)
+    .select("lead_id, created_at")
+    .eq(USAGE_EVENT_COLUMNS.eventType, sentType)
+    .eq(USAGE_EVENT_COLUMNS.userId, input.userId)
+    .not(USAGE_EVENT_COLUMNS.leadId, "is", null)
+    .order(USAGE_EVENT_COLUMNS.createdAt, { ascending: false })
+    .limit(PLACE_SET_CAP);
+
+  if (sentError) {
+    return {
+      sentPlaceIds: [],
+      scannedPlaceIds: [],
+      notScannedPlaceIds: [],
+      error: sentError.message,
+    };
+  }
+
+  /** Latest send time per place (scan must be on/after that send). */
+  const latestSendByPlace = new Map<string, string>();
+  for (const row of sentRows ?? []) {
+    const placeId =
+      typeof row.lead_id === "string" ? row.lead_id.trim() : "";
+    const sentAt =
+      typeof row.created_at === "string" ? row.created_at : "";
+    if (!placeId || !sentAt) continue;
+    // Rows are newest-first; first write wins as latest.
+    if (!latestSendByPlace.has(placeId)) {
+      latestSendByPlace.set(placeId, sentAt);
+    }
+  }
+
+  const sentPlaceIds = [...latestSendByPlace.keys()];
+  if (sentPlaceIds.length === 0) {
+    return {
+      sentPlaceIds: [],
+      scannedPlaceIds: [],
+      notScannedPlaceIds: [],
+      error: null,
+    };
+  }
+
+  const scannedPlaceIds = new Set<string>();
+  for (const placeChunk of chunk(sentPlaceIds, 80)) {
+    const { data: scanRows, error: scanError } = await admin
+      .from(USAGE_EVENTS_TABLE)
+      .select("lead_id, created_at")
+      .eq(USAGE_EVENT_COLUMNS.eventType, scannedType)
+      .eq(USAGE_EVENT_COLUMNS.userId, input.userId)
+      .in(USAGE_EVENT_COLUMNS.leadId, placeChunk)
+      .order(USAGE_EVENT_COLUMNS.createdAt, { ascending: true });
+
+    if (scanError) {
+      return {
+        sentPlaceIds: [],
+        scannedPlaceIds: [],
+        notScannedPlaceIds: [],
+        error: scanError.message,
+      };
+    }
+
+    for (const row of scanRows ?? []) {
+      const placeId =
+        typeof row.lead_id === "string" ? row.lead_id.trim() : "";
+      const createdAt =
+        typeof row.created_at === "string" ? row.created_at : "";
+      if (!placeId || !createdAt) continue;
+      const latestSend = latestSendByPlace.get(placeId);
+      if (latestSend && createdAt >= latestSend) {
+        scannedPlaceIds.add(placeId);
+      }
+    }
+  }
+
+  const scannedList = [...scannedPlaceIds];
+  const notScannedPlaceIds = sentPlaceIds.filter(
+    (id) => !scannedPlaceIds.has(id),
+  );
+
+  return {
+    sentPlaceIds,
+    scannedPlaceIds: scannedList,
+    notScannedPlaceIds,
+    error: null,
   };
 }
 
