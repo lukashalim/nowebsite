@@ -93,8 +93,8 @@ export async function GET(request: Request) {
     },
   );
 
-  after(() => {
-    void notifyPostcardScan(payload);
+  after(async () => {
+    await notifyPostcardScan(payload);
   });
 
   const demoUrl = new URL(

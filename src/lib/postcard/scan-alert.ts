@@ -34,7 +34,14 @@ export async function notifyPostcardScan(
       return;
     }
     // logUsageEvent already inserted this scan — alert only on the first hit.
-    if ((count ?? 0) !== 1) return;
+    if ((count ?? 0) !== 1) {
+      console.info("[postcard-scan-alert] skip non-first scan", {
+        eventType,
+        placeId: payload.placeId,
+        count,
+      });
+      return;
+    }
 
     const { data: profile, error: profileError } = await admin
       .from("profiles")
@@ -51,7 +58,12 @@ export async function notifyPostcardScan(
       typeof profile?.telegram_chat_id === "string"
         ? profile.telegram_chat_id.trim()
         : "";
-    if (!chatId) return;
+    if (!chatId) {
+      console.info("[postcard-scan-alert] skip — no telegram_chat_id", {
+        userId: payload.userId,
+      });
+      return;
+    }
 
     const { data: business } = await admin
       .from("businesses_nowebsite")
