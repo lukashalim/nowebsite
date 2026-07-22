@@ -10,7 +10,7 @@ import {
 import type { PostcardScanPayload } from "@/lib/postcard/scan-link";
 
 /**
- * Best-effort Telegram alert on first postcard QR scan (live or test).
+ * Best-effort Telegram alert on postcard QR scan (live or test).
  * Never throws — scan redirect must stay fast and reliable.
  */
 export async function notifyPostcardScan(
@@ -18,30 +18,6 @@ export async function notifyPostcardScan(
 ): Promise<void> {
   try {
     const admin = createSupabaseAdmin();
-    const eventType = payload.isTest
-      ? "postcard_scanned_test"
-      : "postcard_scanned";
-
-    const { count, error: countError } = await admin
-      .from(USAGE_EVENTS_TABLE)
-      .select("id", { count: "exact", head: true })
-      .eq(USAGE_EVENT_COLUMNS.userId, payload.userId)
-      .eq(USAGE_EVENT_COLUMNS.eventType, eventType)
-      .eq(USAGE_EVENT_COLUMNS.leadId, payload.placeId);
-
-    if (countError) {
-      console.warn("[postcard-scan-alert] count failed", countError.message);
-      return;
-    }
-    // logUsageEvent already inserted this scan — alert only on the first hit.
-    if ((count ?? 0) !== 1) {
-      console.info("[postcard-scan-alert] skip non-first scan", {
-        eventType,
-        placeId: payload.placeId,
-        count,
-      });
-      return;
-    }
 
     const { data: profile, error: profileError } = await admin
       .from("profiles")
@@ -65,6 +41,17 @@ export async function notifyPostcardScan(
       return;
     }
 
+    const eventType = payload.isTest
+      ? "postcard_scanned_test"
+      : "postcard_scanned";
+    const { count } = await admin
+      .from(USAGE_EVENTS_TABLE)
+      .select("id", { count: "exact", head: true })
+      .eq(USAGE_EVENT_COLUMNS.userId, payload.userId)
+      .eq(USAGE_EVENT_COLUMNS.eventType, eventType)
+      .eq(USAGE_EVENT_COLUMNS.leadId, payload.placeId);
+    const isFirstScan = (count ?? 0) <= 1;
+
     const { data: business } = await admin
       .from("businesses_nowebsite")
       .select("name, phone, city, state")
@@ -85,10 +72,16 @@ export async function notifyPostcardScan(
       typeof business?.state === "string" ? business.state.trim() : "";
     const location = [city, state].filter(Boolean).join(", ");
 
-    const lines = [
-      payload.isTest
+    const headline = payload.isTest
+      ? isFirstScan
         ? "Postcard scanned (TEST — Lob test key, not a live mailpiece)"
-        : "Postcard scanned",
+        : "Postcard scanned again (TEST)"
+      : isFirstScan
+        ? "Postcard scanned"
+        : "Postcard scanned again";
+
+    const lines = [
+      headline,
       "",
       name,
       ...(phone ? [`Phone: ${phone}`] : []),
@@ -104,6 +97,12 @@ export async function notifyPostcardScan(
     const result = await sendTelegramMessage(chatId, lines.join("\n"));
     if (!result.ok) {
       console.warn("[postcard-scan-alert] send failed", result.error);
+    } else {
+      console.info("[postcard-scan-alert] sent", {
+        placeId: payload.placeId,
+        isTest: payload.isTest,
+        isFirstScan,
+      });
     }
   } catch (error) {
     console.warn(
