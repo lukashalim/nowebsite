@@ -34,8 +34,10 @@ export interface TwilioProfilePublic {
 }
 
 export interface LobProfilePublic {
+  /** True when either test or live Lob key is saved. */
   has_lob_api_key: boolean;
-  lob_key_mode: "test" | "live" | null;
+  has_lob_test_api_key: boolean;
+  has_lob_live_api_key: boolean;
   has_return_address: boolean;
   return_address: {
     name: string;
@@ -219,7 +221,12 @@ export async function getTwilioProfilePublic(
   };
 }
 
-export async function getUserLobApiKey(userId: string): Promise<string | null> {
+export type LobKeyMode = "test" | "live";
+
+/** Live/production Lob key (`lob_api_key`). */
+export async function getUserLobLiveApiKey(
+  userId: string,
+): Promise<string | null> {
   const supabase = createSupabaseAdmin();
   const { data, error } = await supabase
     .from("profiles")
@@ -233,6 +240,37 @@ export async function getUserLobApiKey(userId: string): Promise<string | null> {
   const key =
     typeof data.lob_api_key === "string" ? data.lob_api_key.trim() : "";
   return key.length > 0 ? key : null;
+}
+
+/** Test Lob key (`lob_test_api_key`). */
+export async function getUserLobTestApiKey(
+  userId: string,
+): Promise<string | null> {
+  const supabase = createSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("lob_test_api_key")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+  const key =
+    typeof data.lob_test_api_key === "string"
+      ? data.lob_test_api_key.trim()
+      : "";
+  return key.length > 0 ? key : null;
+}
+
+/** Lob key for the requested send mode. */
+export async function getUserLobApiKey(
+  userId: string,
+  mode: LobKeyMode = "live",
+): Promise<string | null> {
+  return mode === "test"
+    ? getUserLobTestApiKey(userId)
+    : getUserLobLiveApiKey(userId);
 }
 
 export async function getUserPostcardReturnAddress(
@@ -262,23 +300,27 @@ export async function getLobProfilePublic(
   const supabase = createSupabaseAdmin();
   const { data } = await supabase
     .from("profiles")
-    .select("lob_api_key, postcard_return_address")
+    .select("lob_api_key, lob_test_api_key, postcard_return_address")
     .eq("id", userId)
     .maybeSingle();
 
-  const key =
+  const liveKey =
     typeof data?.lob_api_key === "string" ? data.lob_api_key.trim() : "";
+  const testKey =
+    typeof data?.lob_test_api_key === "string"
+      ? data.lob_test_api_key.trim()
+      : "";
   const address = postcardReturnAddressFromUnknown(
     data?.postcard_return_address,
   );
 
+  const hasTest = testKey.length > 0;
+  const hasLive = liveKey.length > 0;
+
   return {
-    has_lob_api_key: key.length > 0,
-    lob_key_mode: key
-      ? key.startsWith("test_")
-        ? "test"
-        : "live"
-      : null,
+    has_lob_api_key: hasTest || hasLive,
+    has_lob_test_api_key: hasTest,
+    has_lob_live_api_key: hasLive,
     has_return_address: address != null,
     return_address: {
       name: address?.name ?? "",

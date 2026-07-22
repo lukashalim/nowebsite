@@ -105,7 +105,7 @@ export default async function CrmPostcardsPage({ searchParams }: PageProps) {
   const raw = await searchParams;
   const mode = modeSchema.safeParse(firstParam(raw.mode)).success
     ? (firstParam(raw.mode) as PostcardTrackingMode)
-    : lob.lob_key_mode === "live"
+    : lob.has_lob_live_api_key
       ? "live"
       : "test";
   const status = statusSchema.safeParse(firstParam(raw.status)).success
@@ -158,18 +158,23 @@ export default async function CrmPostcardsPage({ searchParams }: PageProps) {
                 className="text-blue-600 hover:underline dark:text-blue-400"
               >
                 {!lob.has_lob_api_key && !lob.has_return_address
-                  ? "Add Lob key and return address in Settings"
+                  ? "Add Lob keys and return address in Settings"
                   : !lob.has_lob_api_key
-                    ? "Add Lob API key in Settings"
+                    ? "Add Lob API keys in Settings"
                     : "Add return address in Settings"}
               </Link>
             </>
           ) : (
             <>
               {" · "}
-              Current key:{" "}
+              Keys:{" "}
               <span className="font-medium">
-                {lob.lob_key_mode === "test" ? "test" : "live"}
+                {[
+                  lob.has_lob_test_api_key ? "test" : null,
+                  lob.has_lob_live_api_key ? "live" : null,
+                ]
+                  .filter(Boolean)
+                  .join(" + ")}
               </span>
             </>
           )}

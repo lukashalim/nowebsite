@@ -109,9 +109,9 @@ export default async function CrmPage({ searchParams }: PageProps) {
     getUserPostcardLifetimeSlots(user.id, { isPro: userIsPro }),
   ]);
   const postcardMail = {
-    hasLobApiKey: lobProfile.has_lob_api_key,
+    hasLobTestApiKey: lobProfile.has_lob_test_api_key,
+    hasLobLiveApiKey: lobProfile.has_lob_live_api_key,
     hasReturnAddress: lobProfile.has_return_address,
-    lobKeyMode: lobProfile.lob_key_mode,
     lifetimeUnlimited: userIsPro,
     testRemaining: postcardSlots.testRemaining,
     liveRemaining: postcardSlots.liveRemaining,

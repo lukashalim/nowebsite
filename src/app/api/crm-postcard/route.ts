@@ -11,6 +11,7 @@ import { logUsageEvent } from "@/lib/log-usage-event";
 import {
   createLobPostcard,
   isAcceptableUsDeliverability,
+  isLobLiveMode,
   isLobTestMode,
   verifyUsAddress,
   waitForLobPostcardProof,
@@ -61,12 +62,15 @@ export async function POST(request: Request) {
     placeId?: string;
     ownerName?: string | null;
     allowTest?: boolean;
+    /** CRM Mail Test vs Production — selects which stored Lob key to use. */
+    mode?: "test" | "live" | "production";
   };
   try {
     body = (await request.json()) as {
       placeId?: string;
       ownerName?: string | null;
       allowTest?: boolean;
+      mode?: "test" | "live" | "production";
     };
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
@@ -91,12 +95,64 @@ export async function POST(request: Request) {
     );
   }
 
-  const lobApiKey = await getUserLobApiKey(user.id);
+  const requestedMode =
+    body.mode === "test"
+      ? ("test" as const)
+      : body.mode === "live" || body.mode === "production"
+        ? ("live" as const)
+        : null;
+
+  // Prefer explicit mode from CRM; fall back to whichever key exists.
+  let lobApiKey: string | null = null;
+  let testMode = false;
+  if (requestedMode === "test") {
+    lobApiKey = await getUserLobApiKey(user.id, "test");
+    testMode = true;
+  } else if (requestedMode === "live") {
+    lobApiKey = await getUserLobApiKey(user.id, "live");
+    testMode = false;
+  } else {
+    const liveKey = await getUserLobApiKey(user.id, "live");
+    const testKey = await getUserLobApiKey(user.id, "test");
+    if (liveKey) {
+      lobApiKey = liveKey;
+      testMode = false;
+    } else if (testKey) {
+      lobApiKey = testKey;
+      testMode = true;
+    }
+  }
+
   if (!lobApiKey) {
     return NextResponse.json(
       {
         error:
-          "Add your Lob API key in Settings before sending postcards.",
+          requestedMode === "test"
+            ? "Add your Lob test API key in Settings before sending test postcards."
+            : requestedMode === "live"
+              ? "Add your Lob production API key in Settings before sending live postcards."
+              : "Add your Lob API key in Settings before sending postcards.",
+      },
+      { status: 400 },
+    );
+  }
+
+  // Guard against a mis-filed key in the wrong column.
+  if (testMode) {
+    if (!isLobTestMode(lobApiKey)) {
+      return NextResponse.json(
+        {
+          error:
+            "Stored test key is invalid (must start with test_). Re-save in Settings.",
+        },
+        { status: 400 },
+      );
+    }
+  } else if (!isLobLiveMode(lobApiKey)) {
+    return NextResponse.json(
+      {
+        error:
+          "Stored production key is invalid (must start with live_). Re-save in Settings.",
       },
       { status: 400 },
     );
@@ -112,8 +168,6 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-
-  const testMode = isLobTestMode(lobApiKey);
 
   const lifetime = await assertCanSendPostcard(user.id, testMode, {
     isPro: isPro(profile),

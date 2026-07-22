@@ -21,7 +21,11 @@ import type {
 } from "@/components/crm-outreach-popover";
 import type { BusinessLead } from "@/lib/business";
 import type { CrmUsageAction } from "@/lib/crm-limits";
-import type { CrmOutreachMode, CrmWebPresence } from "@/lib/crm-params";
+import type {
+  CrmOutreachMode,
+  CrmPostcardMode,
+  CrmWebPresence,
+} from "@/lib/crm-params";
 import {
   isEligibleForCrmSpintax,
   resolveFacebookPageUrl,
@@ -34,6 +38,7 @@ interface CrmLeadsTableBodyProps {
   userId: string;
   webPresence: CrmWebPresence;
   pageOutreachMode?: CrmOutreachMode;
+  postcardMode?: CrmPostcardMode;
   showTestLeads?: boolean;
   spintaxTemplates: SpintaxTemplate[];
   isPro: boolean;
@@ -54,6 +59,7 @@ export function CrmLeadsTableBody({
   userId,
   webPresence,
   pageOutreachMode = "all",
+  postcardMode = "production",
   showTestLeads = false,
   spintaxTemplates,
   isPro,
@@ -86,7 +92,7 @@ export function CrmLeadsTableBody({
     if (
       action === "mail" &&
       !postcardMail.lifetimeUnlimited &&
-      postcardMail.lobKeyMode === "live"
+      postcardMode === "production"
     ) {
       setPostcardMail((prev) => ({ ...prev, liveRemaining: 0 }));
     }
@@ -204,6 +210,7 @@ export function CrmLeadsTableBody({
                 outreachRemaining={outreachRemaining}
                 isPro={isPro}
                 pageOutreachMode={pageOutreachMode}
+                postcardMode={postcardMode}
                 allowTest={showTestLeads}
                 postcardMail={postcardMail}
                 onOutreachRecorded={handleOutreachRecorded}

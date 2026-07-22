@@ -1,5 +1,6 @@
 /**
- * Lob API helpers. Callers pass the user's API key from profiles.lob_api_key.
+ * Lob API helpers. Callers pass the user's API key from profiles
+ * (`lob_api_key` live / `lob_test_api_key` test).
  */
 
 export interface LobAddress {
@@ -63,8 +64,15 @@ export function isLobTestMode(apiKey: string): boolean {
   return apiKey.trim().startsWith("test_");
 }
 
-export function lobKeyMode(apiKey: string): "test" | "live" {
-  return isLobTestMode(apiKey) ? "test" : "live";
+export function isLobLiveMode(apiKey: string): boolean {
+  return apiKey.trim().startsWith("live_");
+}
+
+export function lobKeyMode(apiKey: string): "test" | "live" | null {
+  const key = apiKey.trim();
+  if (key.startsWith("test_")) return "test";
+  if (key.startsWith("live_")) return "live";
+  return null;
 }
 
 export function isAcceptableUsDeliverability(
@@ -76,6 +84,7 @@ export function isAcceptableUsDeliverability(
 
 /**
  * Cheap auth check before saving a Lob key (GET /v1/addresses?limit=1).
+ * Secret keys only — must start with test_ or live_ (not *_pub).
  */
 export async function validateLobApiKey(
   apiKey: string,
@@ -84,10 +93,21 @@ export async function validateLobApiKey(
   if (!key) {
     return { ok: false, error: "Lob API key is required" };
   }
-  if (!key.startsWith("test_") && !key.startsWith("live_")) {
+
+  const mode = lobKeyMode(key);
+  if (!mode) {
     return {
       ok: false,
-      error: "Lob API key should start with test_ or live_",
+      error: "Lob secret API key must start with test_ or live_",
+    };
+  }
+
+  // Publishable keys look like test_pub_… / live_pub_… and cannot create postcards.
+  if (key.startsWith("test_pub") || key.startsWith("live_pub")) {
+    return {
+      ok: false,
+      error:
+        "Use the Lob secret key (test_… or live_…), not the publishable *_pub key",
     };
   }
 
@@ -112,7 +132,7 @@ export async function validateLobApiKey(
           `Lob validation failed (HTTP ${res.status})`,
       };
     }
-    return { ok: true, mode: lobKeyMode(key) };
+    return { ok: true, mode };
   } catch (err) {
     return {
       ok: false,

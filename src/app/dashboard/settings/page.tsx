@@ -3,7 +3,9 @@ import { CrmLogin } from "@/components/crm-login";
 import { CrmNav } from "@/components/crm-nav";
 import { LobSettingsForm } from "@/components/lob-settings-form";
 import { ProfileSettingsForm } from "@/components/profile-settings-form";
+import { TelegramSettingsForm } from "@/components/telegram-settings-form";
 import { TwilioSettingsForm } from "@/components/twilio-settings-form";
+import { getTelegramProfilePublic } from "@/lib/actions/telegram-settings";
 import { suggestUsernameFromEmail } from "@/lib/profile-username";
 import { ensureSendFoxProfileForUser } from "@/lib/sendfox-profile-sync";
 import {
@@ -20,7 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: "Settings | Outreach Engine",
     description:
-      "Configure demo site settings, Lob postcards, and optional Pro communications via your Twilio account.",
+      "Configure demo site settings, Lob postcards, Telegram scan alerts, and optional Pro communications via your Twilio account.",
   };
 }
 
@@ -53,6 +55,7 @@ export default async function DashboardSettingsPage({
   }
   const twilioProfile = await getTwilioProfilePublic(user.id);
   const lobProfile = await getLobProfilePublic(user.id);
+  const telegramProfile = await getTelegramProfilePublic(user.id);
   const userIsPro = isPro(profile);
   const suggestedUsername =
     profile?.username?.trim() ||
@@ -66,9 +69,9 @@ export default async function DashboardSettingsPage({
           Settings
         </h1>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Configure your demo site, Lob API key for postcards, and optional Pro
-          communications. Save Twilio credentials to send SMS and place calls from
-          your business line in the CRM.
+          Configure your demo site, Lob API key for postcards, Telegram scan
+          alerts, and optional Pro communications. Save Twilio credentials to send
+          SMS and place calls from your business line in the CRM.
         </p>
       </header>
 
@@ -84,6 +87,11 @@ export default async function DashboardSettingsPage({
       <ProfileSettingsForm initialUsername={suggestedUsername} />
 
       <LobSettingsForm initialLob={lobProfile} />
+
+      <TelegramSettingsForm
+        initialChatId={telegramProfile.telegram_chat_id}
+        botConfigured={telegramProfile.bot_configured}
+      />
 
       <TwilioSettingsForm initialTwilio={twilioProfile} />
     </div>

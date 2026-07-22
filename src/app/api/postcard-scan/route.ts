@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { logUsageEvent } from "@/lib/log-usage-event";
+import { notifyPostcardScan } from "@/lib/postcard/scan-alert";
 import { resolvePostcardScanLink } from "@/lib/postcard/scan-links-db";
 import {
   normalizeScanToken,
@@ -79,6 +80,10 @@ export async function GET(request: Request) {
     payload.isTest ? "postcard_scanned_test" : "postcard_scanned",
     payload.placeId,
   );
+
+  after(() => {
+    void notifyPostcardScan(payload);
+  });
 
   const demoUrl = new URL(
     ringReadyTenantDemoUrl(payload.username, payload.slug),

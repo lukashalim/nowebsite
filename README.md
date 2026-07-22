@@ -86,9 +86,11 @@ Lob US address verification runs before create on **live** keys; undeliverable a
 
 Env (`.env.local` / Vercel): set the **same** `POSTCARD_SCAN_SECRET` (or shared `LISTING_ACCESS_SECRET`) in local and production — QR codes always hit the live site, so a mismatched secret yields "Invalid scan token".
 
+Optional Telegram alerts on first QR scan (live or test; test messages are labeled): set `TELEGRAM_BOT_TOKEN` (from [@BotFather](https://t.me/BotFather)), then save your chat id under **Settings → Telegram scan alerts**. Run [`scrape/sql/add-profiles-telegram-chat-id.sql`](scrape/sql/add-profiles-telegram-chat-id.sql) if that column is missing.
+
 Lifetime cap (free only): **one test** and **one live** postcard. Pro is unlimited. Live free sends also count toward the free monthly outreach pool.
 
-Also run [`scrape/sql/add-postcard-sent-usage.sql`](scrape/sql/add-postcard-sent-usage.sql), [`scrape/sql/add-profiles-lob-api-key.sql`](scrape/sql/add-profiles-lob-api-key.sql), and [`scrape/sql/add-profiles-postcard-return-address.sql`](scrape/sql/add-profiles-postcard-return-address.sql) if not already applied.
+Also run [`scrape/sql/add-postcard-sent-usage.sql`](scrape/sql/add-postcard-sent-usage.sql), [`scrape/sql/add-profiles-lob-api-key.sql`](scrape/sql/add-profiles-lob-api-key.sql), [`scrape/sql/add-profiles-lob-test-api-key.sql`](scrape/sql/add-profiles-lob-test-api-key.sql), and [`scrape/sql/add-profiles-postcard-return-address.sql`](scrape/sql/add-profiles-postcard-return-address.sql) if not already applied.
 
 ### Postcard demo screenshots (optional)
 

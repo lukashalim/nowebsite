@@ -31,9 +31,9 @@ import type { SpintaxTemplate } from "@/lib/spintax-templates";
 export type OutreachChannel = "call" | "text" | "mail";
 
 export interface PostcardMailGating {
-  hasLobApiKey: boolean;
+  hasLobTestApiKey: boolean;
+  hasLobLiveApiKey: boolean;
   hasReturnAddress: boolean;
-  lobKeyMode: "test" | "live" | null;
   /** Pro users are not subject to the live lifetime cap. */
   lifetimeUnlimited: boolean;
   /** null = unlimited test proofs. */
@@ -65,6 +65,8 @@ interface CrmOutreachPopoverProps {
   isPro?: boolean;
   /** Page-level CRM outreach mode from ?outreachMode= */
   pageOutreachMode?: "all" | "call" | "text" | "mail";
+  /** CRM Mail Test vs Production (?postcardMode=) — selects Lob key. */
+  postcardMode?: "test" | "production";
   /** When true, allow outreach actions against `is_test` leads (CRM Show test leads). */
   allowTest?: boolean;
   postcardMail?: PostcardMailGating;
@@ -145,6 +147,7 @@ export function CrmOutreachPopover({
   outreachRemaining,
   isPro = false,
   pageOutreachMode = "all",
+  postcardMode = "production",
   allowTest = false,
   postcardMail,
   onOutreachRecorded,
@@ -180,19 +183,22 @@ export function CrmOutreachPopover({
 
   const outreachBlocked = outreachRemaining === 0;
 
-  const lobMode = postcardMail?.lobKeyMode ?? null;
-  const hasLobKey = postcardMail?.hasLobApiKey === true;
+  const sendTestMode = postcardMode === "test";
+  const hasLobKeyForMode = sendTestMode
+    ? postcardMail?.hasLobTestApiKey === true
+    : postcardMail?.hasLobLiveApiKey === true;
   const hasReturnAddress = postcardMail?.hasReturnAddress === true;
   const lifetimeUnlimited =
     isPro || postcardMail?.lifetimeUnlimited === true;
   const liveRemaining = postcardMail?.liveRemaining;
   const lifetimeSlotRemaining =
     lifetimeUnlimited ||
-    lobMode === "test" ||
-    (lobMode === "live" && (liveRemaining == null || liveRemaining > 0));
+    sendTestMode ||
+    liveRemaining == null ||
+    liveRemaining > 0;
   const liveOutreachBlocksMail =
-    !isPro && lobMode === "live" && outreachBlocked;
-  const mailBlockedReason = !hasLobKey
+    !isPro && !sendTestMode && outreachBlocked;
+  const mailBlockedReason = !hasLobKeyForMode
     ? ("no_key" as const)
     : !hasReturnAddress
       ? ("no_address" as const)
@@ -517,6 +523,7 @@ export function CrmOutreachPopover({
           placeId,
           ownerName,
           allowTest: allowTest || undefined,
+          mode: sendTestMode ? "test" : "live",
         }),
       });
       const data = (await res.json()) as {
@@ -770,14 +777,15 @@ export function CrmOutreachPopover({
                 </div>
                 {mailBlockedReason === "no_key" ? (
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    Add a Lob API key in{" "}
+                    Add your Lob {sendTestMode ? "test" : "production"} API key
+                    in{" "}
                     <Link
                       href="/dashboard/settings"
                       className="text-blue-600 hover:underline dark:text-blue-400"
                     >
                       Settings
                     </Link>{" "}
-                    to send postcards.
+                    to send {sendTestMode ? "test" : "live"} postcards.
                   </p>
                 ) : mailBlockedReason === "no_address" ? (
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
@@ -824,9 +832,9 @@ export function CrmOutreachPopover({
                       Sends a 4×6 marketing postcard (HTML front, QR back).
                       Addressed to the owner when Suggest finds one, plus the
                       business name.{" "}
-                      {lobMode === "test"
-                        ? "Test key — proof only, skips USPS verification."
-                        : "Live key — verifies via Lob before send."}
+                      {sendTestMode
+                        ? "Test mode — proof only, skips USPS verification."
+                        : "Production mode — verifies via Lob before send."}
                     </p>
                     {mailError ? (
                       <p

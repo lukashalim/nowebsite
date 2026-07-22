@@ -15,7 +15,8 @@ const inputClass =
   "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100";
 
 export function LobSettingsForm({ initialLob }: LobSettingsFormProps) {
-  const [apiKey, setApiKey] = useState("");
+  const [testApiKey, setTestApiKey] = useState("");
+  const [liveApiKey, setLiveApiKey] = useState("");
   const [name, setName] = useState(initialLob.return_address.name);
   const [line1, setLine1] = useState(initialLob.return_address.address_line1);
   const [line2, setLine2] = useState(initialLob.return_address.address_line2);
@@ -28,11 +29,9 @@ export function LobSettingsForm({ initialLob }: LobSettingsFormProps) {
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [hasKey, setHasKey] = useState(initialLob.has_lob_api_key);
+  const [hasTestKey, setHasTestKey] = useState(initialLob.has_lob_test_api_key);
+  const [hasLiveKey, setHasLiveKey] = useState(initialLob.has_lob_live_api_key);
   const [hasAddress, setHasAddress] = useState(initialLob.has_return_address);
-  const [mode, setMode] = useState<"test" | "live" | null>(
-    initialLob.lob_key_mode,
-  );
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -41,7 +40,8 @@ export function LobSettingsForm({ initialLob }: LobSettingsFormProps) {
     setError(null);
 
     const result = await updateLobSettings({
-      lob_api_key: apiKey,
+      lob_test_api_key: testApiKey,
+      lob_live_api_key: liveApiKey,
       return_address: {
         name,
         address_line1: line1,
@@ -55,14 +55,16 @@ export function LobSettingsForm({ initialLob }: LobSettingsFormProps) {
 
     setPending(false);
     if (result.ok) {
-      setHasKey(true);
+      setHasTestKey(result.has_lob_test_api_key);
+      setHasLiveKey(result.has_lob_live_api_key);
       setHasAddress(result.has_return_address);
-      setMode(result.mode);
-      setApiKey("");
+      setTestApiKey("");
+      setLiveApiKey("");
+      const parts: string[] = [];
+      if (result.has_lob_test_api_key) parts.push("test");
+      if (result.has_lob_live_api_key) parts.push("production");
       setMessage(
-        result.mode === "test"
-          ? "Lob settings saved (test key). Test postcards never mail physically."
-          : "Lob settings saved (live key). Production postcards will be mailed.",
+        `Lob settings saved (${parts.join(" + ")} key${parts.length === 1 ? "" : "s"}).`,
       );
     } else {
       setError(result.error);
@@ -76,10 +78,11 @@ export function LobSettingsForm({ initialLob }: LobSettingsFormProps) {
     const result = await clearLobSettings();
     setPending(false);
     if (result.ok) {
-      setHasKey(false);
+      setHasTestKey(false);
+      setHasLiveKey(false);
       setHasAddress(false);
-      setMode(null);
-      setApiKey("");
+      setTestApiKey("");
+      setLiveApiKey("");
       setName("");
       setLine1("");
       setLine2("");
@@ -87,11 +90,13 @@ export function LobSettingsForm({ initialLob }: LobSettingsFormProps) {
       setState("");
       setZip("");
       setContactPhone("");
-      setMessage("Lob API key and return address removed.");
+      setMessage("Lob API keys and return address removed.");
     } else {
       setError(result.error);
     }
   }
+
+  const hasAnyKey = hasTestKey || hasLiveKey;
 
   return (
     <form
@@ -103,12 +108,12 @@ export function LobSettingsForm({ initialLob }: LobSettingsFormProps) {
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
             Lob postcards
           </h2>
-          {hasKey && mode === "test" ? (
+          {hasTestKey ? (
             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950/60 dark:text-amber-200">
               Test key
             </span>
           ) : null}
-          {hasKey && mode === "live" ? (
+          {hasLiveKey ? (
             <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200">
               Live key
             </span>
@@ -118,40 +123,72 @@ export function LobSettingsForm({ initialLob }: LobSettingsFormProps) {
               Address set
             </span>
           ) : null}
-          {!hasKey ? (
+          {!hasAnyKey ? (
             <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
               Not connected
             </span>
           ) : null}
         </div>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Add your Lob secret API key and the return address printed on
-          postcards. Use a <code className="text-xs">test_</code> key for proofs
-          only, or a <code className="text-xs">live_</code> key for real mail.
-          Free accounts get unlimited test proofs and one live postcard ever; Pro
-          is unlimited.
+          Save both Lob <span className="font-medium">secret</span> API keys
+          (must start with <code className="text-xs">test_</code> or{" "}
+          <code className="text-xs">live_</code> — not{" "}
+          <code className="text-xs">*_pub</code>) and your return address. CRM
+          Mail <span className="font-medium">Test</span> uses the test key;{" "}
+          <span className="font-medium">Production</span> uses the live key.
+          Free accounts get unlimited test proofs and one live postcard ever;
+          Pro is unlimited.
         </p>
       </div>
 
       <div className="space-y-2">
         <label
-          htmlFor="lob_api_key"
+          htmlFor="lob_test_api_key"
           className="block text-sm font-medium text-zinc-900 dark:text-zinc-100"
         >
-          Lob API key
+          Test API key
         </label>
         <input
-          id="lob_api_key"
-          name="lob_api_key"
+          id="lob_test_api_key"
+          name="lob_test_api_key"
           type="password"
           autoComplete="off"
-          value={apiKey}
-          onChange={(event) => setApiKey(event.target.value)}
+          value={testApiKey}
+          onChange={(event) => setTestApiKey(event.target.value)}
           placeholder={
-            hasKey ? "Leave blank to keep existing key" : "test_… or live_…"
+            hasTestKey ? "Leave blank to keep existing test key" : "test_…"
           }
           className={`${inputClass} font-mono`}
         />
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          Must start with <code className="font-mono">test_</code> (Lob secret
+          key).
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <label
+          htmlFor="lob_live_api_key"
+          className="block text-sm font-medium text-zinc-900 dark:text-zinc-100"
+        >
+          Production API key
+        </label>
+        <input
+          id="lob_live_api_key"
+          name="lob_live_api_key"
+          type="password"
+          autoComplete="off"
+          value={liveApiKey}
+          onChange={(event) => setLiveApiKey(event.target.value)}
+          placeholder={
+            hasLiveKey ? "Leave blank to keep existing live key" : "live_…"
+          }
+          className={`${inputClass} font-mono`}
+        />
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          Must start with <code className="font-mono">live_</code> (Lob secret
+          key).
+        </p>
       </div>
 
       <div className="space-y-3 border-t border-zinc-200 pt-4 dark:border-zinc-800">
@@ -325,7 +362,7 @@ export function LobSettingsForm({ initialLob }: LobSettingsFormProps) {
         >
           {pending ? "Saving…" : "Save Lob settings"}
         </button>
-        {hasKey || hasAddress ? (
+        {hasAnyKey || hasAddress ? (
           <button
             type="button"
             disabled={pending}
