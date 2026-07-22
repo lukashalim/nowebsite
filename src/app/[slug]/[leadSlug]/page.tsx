@@ -32,7 +32,8 @@ import {
   type TenantDemoLead,
 } from "@/lib/tenant-demo-lead";
 
-export const revalidate = 3600;
+export const revalidate = 0;
+export const dynamic = "force-dynamic";
 export const dynamicParams = true;
 
 interface PageProps {

@@ -8,6 +8,7 @@ import {
   type PostcardScanPayload,
 } from "@/lib/postcard/scan-link";
 import { ringReadyTenantDemoUrl } from "@/lib/ringready-site";
+import { materializeTenantLeadByPlaceId } from "@/lib/tenant-lead-sync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -79,6 +80,17 @@ export async function GET(request: Request) {
     payload.userId,
     payload.isTest ? "postcard_scanned_test" : "postcard_scanned",
     payload.placeId,
+  );
+
+  // Provision the tenant demo lead before redirect so RingReady does not
+  // hit create-on-read (which used to 404 on the first visit).
+  await materializeTenantLeadByPlaceId(payload.userId, payload.placeId).catch(
+    (err) => {
+      console.warn(
+        "[postcard-scan] materialize failed",
+        err instanceof Error ? err.message : err,
+      );
+    },
   );
 
   after(() => {

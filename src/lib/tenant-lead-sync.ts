@@ -62,24 +62,29 @@ export async function upsertTenantLeadFromBusiness(
   }
 }
 
+export interface MaterializedTenantLead {
+  business: Record<string, unknown>;
+  postcardReturnAddress: unknown;
+}
+
 /** Copy a global CRM business into tenant leads on first demo view or CRM click. */
 export async function materializeTenantLeadBySlug(
   username: string,
   leadSlug: string,
-): Promise<boolean> {
+): Promise<MaterializedTenantLead | null> {
   const normalizedUsername = username.trim().toLowerCase();
   const normalizedSlug = leadSlug.trim().toLowerCase();
-  if (!normalizedUsername || !normalizedSlug) return false;
+  if (!normalizedUsername || !normalizedSlug) return null;
 
   const supabase = createSupabaseAdmin();
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("id")
+    .select("id, username, postcard_return_address")
     .eq("username", normalizedUsername)
     .maybeSingle();
 
   if (profileError) throw new Error(profileError.message);
-  if (!profile) return false;
+  if (!profile) return null;
 
   let businessQuery = supabase
     .from("businesses_nowebsite")
@@ -97,13 +102,17 @@ export async function materializeTenantLeadBySlug(
     await businessQuery.maybeSingle();
 
   if (businessError) throw new Error(businessError.message);
-  if (!business) return false;
+  if (!business) return null;
 
   await upsertTenantLeadFromBusiness(
     String(profile.id),
     business as Record<string, unknown>,
   );
-  return true;
+
+  return {
+    business: business as Record<string, unknown>,
+    postcardReturnAddress: profile.postcard_return_address,
+  };
 }
 
 export async function materializeTenantLeadByPlaceId(
@@ -115,7 +124,6 @@ export async function materializeTenantLeadByPlaceId(
     .from("businesses_nowebsite")
     .select(DEMO_DETAIL_COLUMNS)
     .eq("is_invalid", false)
-    .eq("is_test", false)
     .eq("place_id", placeId)
     .maybeSingle();
 

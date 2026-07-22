@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { mapRowToDemoBusiness, type DemoBusiness } from "@/lib/crm-cohort";
 import { normalizePhoneE164 } from "@/lib/phone-lookup";
 import { postcardReturnAddressFromUnknown } from "@/lib/postcard/address";
@@ -33,43 +34,9 @@ function mapLeadRowToDemoBusiness(
   return mapRowToDemoBusiness({ ...data, demo_slug }, true);
 }
 
-export async function fetchTenantDemoLead(
-  username: string,
-  slug: string,
-): Promise<TenantDemoLeadResult | null> {
-  const normalizedUsername = username.trim().toLowerCase();
-  const normalizedSlug = slug.trim().toLowerCase();
-  if (!normalizedUsername || !normalizedSlug) return null;
-
-  const supabase = createSupabaseAdmin();
-  let { data, error } = await supabase
-    .from("leads")
-    .select(LEAD_DETAIL_SELECT)
-    .eq("slug", normalizedSlug)
-    .eq("profiles.username", normalizedUsername)
-    .maybeSingle();
-
-  if (error) throw new Error(error.message);
-  if (!data) {
-    const materialized = await materializeTenantLeadBySlug(
-      normalizedUsername,
-      normalizedSlug,
-    );
-    if (materialized) {
-      const retry = await supabase
-        .from("leads")
-        .select(LEAD_DETAIL_SELECT)
-        .eq("slug", normalizedSlug)
-        .eq("profiles.username", normalizedUsername)
-        .maybeSingle();
-      data = retry.data;
-      error = retry.error;
-    }
-  }
-
-  if (error) throw new Error(error.message);
-  if (!data) return null;
-
+function resultFromLeadRow(
+  data: Record<string, unknown>,
+): TenantDemoLeadResult {
   const profile = data.profiles as {
     username?: string;
     postcard_return_address?: unknown;
@@ -80,10 +47,62 @@ export async function fetchTenantDemoLead(
   const outreachPhone = postcardAddress?.contact_phone
     ? normalizePhoneE164(postcardAddress.contact_phone, "US")
     : null;
-  const lead = mapLeadRowToDemoBusiness(data as Record<string, unknown>);
-
   return {
-    lead,
+    lead: mapLeadRowToDemoBusiness(data),
     outreachPhone,
   };
 }
+
+function resultFromMaterialized(input: {
+  business: Record<string, unknown>;
+  postcardReturnAddress: unknown;
+}): TenantDemoLeadResult {
+  const postcardAddress = postcardReturnAddressFromUnknown(
+    input.postcardReturnAddress,
+  );
+  const outreachPhone = postcardAddress?.contact_phone
+    ? normalizePhoneE164(postcardAddress.contact_phone, "US")
+    : null;
+  return {
+    lead: mapRowToDemoBusiness(input.business, true),
+    outreachPhone,
+  };
+}
+
+/**
+ * Resolve a tenant demo lead. Create-on-read materializes from the CRM cohort
+ * when missing. Wrapped in React cache() so metadata + page share one load.
+ */
+export const fetchTenantDemoLead = cache(
+  async (
+    username: string,
+    slug: string,
+  ): Promise<TenantDemoLeadResult | null> => {
+    const normalizedUsername = username.trim().toLowerCase();
+    const normalizedSlug = slug.trim().toLowerCase();
+    if (!normalizedUsername || !normalizedSlug) return null;
+
+    const supabase = createSupabaseAdmin();
+    const { data, error } = await supabase
+      .from("leads")
+      .select(LEAD_DETAIL_SELECT)
+      .eq("slug", normalizedSlug)
+      .eq("profiles.username", normalizedUsername)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    if (data) {
+      return resultFromLeadRow(data as Record<string, unknown>);
+    }
+
+    // Do not re-SELECT with the same filters after upsert — Next.js request
+    // memoization can reuse the empty GET and 404 even though the row exists.
+    const materialized = await materializeTenantLeadBySlug(
+      normalizedUsername,
+      normalizedSlug,
+    );
+    if (!materialized) return null;
+
+    return resultFromMaterialized(materialized);
+  },
+);
