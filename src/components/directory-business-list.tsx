@@ -11,7 +11,7 @@ interface DirectoryBusinessListProps {
   businesses: DirectoryBusiness[];
   /** On nationwide category pages, show city/state instead of neighborhood-only area. */
   showCityState?: boolean;
-  contactAccess: DirectoryContactAccess;
+  contactAccess: DirectoryContactAccess | null;
   variant?: DirectoryBusinessListVariant;
   publishedCitySlugs?: Set<string>;
   publishedCategorySlugs?: Set<string>;

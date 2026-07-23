@@ -5,6 +5,7 @@ import { shouldBypassRateLimit } from "@/lib/bot-detection";
 export type RateLimitKind =
   | "directoryPage"
   | "directoryContacts"
+  | "buyFullList"
   | "ringreadySmsOptIn";
 
 interface RateLimitResult {
@@ -24,6 +25,7 @@ const memoryStore = new Map<string, MemoryEntry>();
 const LIMITS: Record<RateLimitKind, { requests: number; windowMs: number }> = {
   directoryPage: { requests: 300, windowMs: 60 * 60 * 1000 },
   directoryContacts: { requests: 60, windowMs: 60 * 60 * 1000 },
+  buyFullList: { requests: 20, windowMs: 60 * 60 * 1000 },
   ringreadySmsOptIn: { requests: 5, windowMs: 60 * 60 * 1000 },
 };
 

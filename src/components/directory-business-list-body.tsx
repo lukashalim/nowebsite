@@ -6,7 +6,7 @@ import type { DirectoryBusinessListVariant } from "@/components/directory-busine
 interface DirectoryBusinessListBodyProps {
   businesses: DirectoryBusinessPublic[];
   showCityState?: boolean;
-  contactAccess: DirectoryContactAccess;
+  contactAccess: DirectoryContactAccess | null;
   variant?: DirectoryBusinessListVariant;
   publishedCitySlugs?: Set<string>;
   publishedCategorySlugs?: Set<string>;

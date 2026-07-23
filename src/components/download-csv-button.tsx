@@ -4,9 +4,9 @@ import { ChevronDown, Download } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { DirectoryContactAccess } from "@/lib/directory/contact-fields";
 import { buildDirectoryCsvDownloadUrl } from "@/lib/directory/csv-download-url";
-import { BUY_FULL_LIST_STRIPE_URL } from "@/lib/directory/buy-full-list";
+import { LIST_PURCHASE_FREE_ROWS_CLIENT } from "@/lib/directory/buy-full-list";
+import { BuyFullListCheckoutModal } from "@/components/buy-full-list-checkout-modal";
 import { directoryOutlineButtonClass } from "@/lib/directory/ui-classes";
-import { trackCsvPurchaseClick } from "@/lib/analytics";
 
 interface DownloadCsvButtonProps {
   exportAccess: DirectoryContactAccess;
@@ -33,6 +33,7 @@ export function DownloadCsvButton({
   className,
 }: DownloadCsvButtonProps) {
   const [open, setOpen] = useState(false);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
   const buttonClass = className ?? `${directoryOutlineButtonClass} gap-2`;
@@ -42,7 +43,12 @@ export function DownloadCsvButton({
       ? "Current page — Free (100 max)"
       : "Current page — Free";
 
-  const paidLabel = `Full list (${totalCount.toLocaleString()} results) — $9`;
+  const remainingRows = Math.max(0, totalCount - LIST_PURCHASE_FREE_ROWS_CLIENT);
+  const canBuyFullList =
+    remainingRows > 0 &&
+    (exportAccess.scope.startsWith("category:") ||
+      exportAccess.scope.startsWith("city:"));
+  const paidLabel = `Remaining ${remainingRows.toLocaleString()} records — $9`;
 
   const downloadUrl = buildDirectoryCsvDownloadUrl({
     exportAccess,
@@ -79,6 +85,11 @@ export function DownloadCsvButton({
   function handleFreeDownload() {
     closeMenu();
     window.location.href = downloadUrl;
+  }
+
+  function handlePaidClick() {
+    closeMenu();
+    setCheckoutOpen(true);
   }
 
   if (isPro) {
@@ -133,22 +144,29 @@ export function DownloadCsvButton({
           >
             {freeLabel}
           </button>
-          <a
-            href={BUY_FULL_LIST_STRIPE_URL}
-            role="menuitem"
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => {
-              if (categoryOrCity) {
-                trackCsvPurchaseClick(categoryOrCity, "bottom");
-              }
-              closeMenu();
-            }}
-            className="flex w-full border-t border-zinc-100 px-4 py-3 text-left text-sm text-zinc-800 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-900"
-          >
-            {paidLabel}
-          </a>
+          {canBuyFullList ? (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={handlePaidClick}
+              className="flex w-full border-t border-zinc-100 px-4 py-3 text-left text-sm text-zinc-800 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-900"
+            >
+              {paidLabel}
+            </button>
+          ) : null}
         </div>
+      ) : null}
+
+      {canBuyFullList ? (
+        <BuyFullListCheckoutModal
+          open={checkoutOpen}
+          onClose={() => setCheckoutOpen(false)}
+          exportAccess={exportAccess}
+          pagePath={pagePath}
+          remainingRows={remainingRows}
+          categoryOrCity={categoryOrCity}
+          placement="bottom"
+        />
       ) : null}
     </div>
   );

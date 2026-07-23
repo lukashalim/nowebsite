@@ -13,6 +13,8 @@ import {
   getClientIp,
   rateLimitHeaders,
 } from "@/lib/rate-limit";
+import { getAuthenticatedUserProfile, isPro } from "@/lib/subscription";
+import { canRevealDirectoryPageContacts } from "@/lib/directory/free-browse-limits";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -61,6 +63,11 @@ export async function GET(request: Request) {
   }
 
   const page = parsed.data.page ?? 1;
+  const auth = await getAuthenticatedUserProfile();
+  if (!canRevealDirectoryPageContacts(scope.kind, page, isPro(auth?.profile))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const filters = parseDirectoryListingFilters({
     state: parsed.data.state,
     city: parsed.data.city,

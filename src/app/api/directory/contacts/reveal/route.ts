@@ -15,7 +15,8 @@ import {
   getClientIp,
   rateLimitHeaders,
 } from "@/lib/rate-limit";
-import { getAuthenticatedUserProfile } from "@/lib/subscription";
+import { getAuthenticatedUserProfile, isPro } from "@/lib/subscription";
+import { canRevealDirectoryPageContacts } from "@/lib/directory/free-browse-limits";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -67,6 +68,12 @@ export async function POST(request: Request) {
   }
 
   const page = parsed.data.page ?? 1;
+  const auth = await getAuthenticatedUserProfile();
+  const userIsPro = isPro(auth?.profile);
+  if (!canRevealDirectoryPageContacts(scope.kind, page, userIsPro)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const filters = parsed.data.filters
     ? parseDirectoryListingFilters({
         state: parsed.data.filters.stateSlug ?? undefined,
@@ -94,7 +101,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const auth = await getAuthenticatedUserProfile();
     if (auth) {
       void logUsageEvent(
         auth.userId,

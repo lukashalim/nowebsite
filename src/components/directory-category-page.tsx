@@ -62,7 +62,7 @@ interface DirectoryCategoryPageProps {
   content?: CategoryContent | null;
   filters: DirectoryListingFiltersState;
   filterOptions: DirectoryFilterOptions;
-  contactAccess: DirectoryContactAccess;
+  contactAccess: DirectoryContactAccess | null;
   exportAccess: DirectoryContactAccess;
   isPro?: boolean;
 }
@@ -205,7 +205,12 @@ export async function DirectoryCategoryPage({
         )}
 
         {!isPro && totalCount > 0 ? (
-          <BuyFullListCta categoryOrCity={categorySlug} />
+          <BuyFullListCta
+            categoryOrCity={categorySlug}
+            exportAccess={exportAccess}
+            pagePath={`/${categorySlug}`}
+            totalCount={totalCount}
+          />
         ) : null}
 
         {content && page === 1 && content.websiteAdoptionPct != null ? (

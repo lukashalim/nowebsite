@@ -17,11 +17,12 @@ import {
 } from "@/lib/directory/labels";
 import { categoryLabelToFlatSlug, cityStateToSlug } from "@/lib/directory/slugs";
 import type { DirectoryBusinessListVariant } from "@/components/directory-business-list";
+import { ProFeatureLock } from "@/components/pro-gate-overlay";
 
 interface DirectoryBusinessListRowProps {
   business: DirectoryBusinessPublic;
   rowIndex: number;
-  contactAccess: DirectoryContactAccess;
+  contactAccess: DirectoryContactAccess | null;
   showCityState?: boolean;
   variant?: DirectoryBusinessListVariant;
   publishedCitySlugs?: Set<string>;
@@ -92,8 +93,10 @@ export function DirectoryBusinessListRow({
   const checkedLabel = formatListingCheckedAt(b.checkedAt);
   const checkedTitle = formatListingCheckedAtTitle(b.checkedAt);
 
+  const contactsLocked = contactAccess == null;
+
   async function handleReveal() {
-    if (contact || loading) return;
+    if (!contactAccess || contact || loading) return;
     setLoading(true);
     setError(false);
     try {
@@ -165,7 +168,11 @@ export function DirectoryBusinessListRow({
         {b.reviews ?? "—"}
       </td>
       <td className="px-4 py-3">
-        {phone ? (
+        {contactsLocked ? (
+          <a href="/api/stripe/checkout" className="inline-flex">
+            <ProFeatureLock label="Pro" />
+          </a>
+        ) : phone ? (
           <a
             href={`tel:${phone.replace(/\s/g, "")}`}
             className="inline-flex items-center gap-1 text-blue-600 hover:underline dark:text-blue-400"
@@ -188,7 +195,7 @@ export function DirectoryBusinessListRow({
         )}
       </td>
       <td className="max-w-[200px] px-4 py-3 text-zinc-600 dark:text-zinc-300">
-        {address ?? "—"}
+        {contactsLocked ? "—" : (address ?? "—")}
       </td>
       <td
         className="px-4 py-3 tabular-nums text-zinc-600 dark:text-zinc-400"
@@ -197,7 +204,9 @@ export function DirectoryBusinessListRow({
         {checkedLabel ?? "—"}
       </td>
       <td className="px-4 py-3">
-        {loading ? (
+        {contactsLocked ? (
+          "—"
+        ) : loading ? (
           <span className="inline-block h-4 w-12 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
         ) : mapsLink ? (
           <a

@@ -23,3 +23,13 @@ export function getStripePriceId(): string {
   }
   return priceId;
 }
+
+/** One-time $9 full directory list export. */
+export function getBuyFullListPriceId(): string {
+  loadSharedEnvLocal();
+  const priceId = process.env.STRIPE_BUY_FULL_LIST_PRICE_ID?.trim();
+  if (!priceId) {
+    throw new Error("Missing STRIPE_BUY_FULL_LIST_PRICE_ID");
+  }
+  return priceId;
+}

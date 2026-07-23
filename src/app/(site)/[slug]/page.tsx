@@ -59,6 +59,7 @@ import { absoluteUrl } from "@/lib/site-url";
 import { directoryOpenGraph } from "@/lib/site-metadata";
 import { getAuthenticatedUserProfile, isPro } from "@/lib/subscription";
 import { createDirectoryContactAccess } from "@/lib/directory/contact-access";
+import { canRevealDirectoryPageContacts } from "@/lib/directory/free-browse-limits";
 import { DirectoryPagination } from "@/components/directory-pagination";
 import {
   listingScopeForCategory,
@@ -200,11 +201,17 @@ export default async function SlugDirectoryPage({
 
   if (resolved.kind === "category") {
     const { data } = resolved;
-    const contactAccess = createDirectoryContactAccess(
-      listingScopeForCategory(lower),
+    const contactAccess = canRevealDirectoryPageContacts(
+      "category",
       data.page,
-      data.filters,
-    );
+      userIsPro,
+    )
+      ? createDirectoryContactAccess(
+          listingScopeForCategory(lower),
+          data.page,
+          data.filters,
+        )
+      : null;
     const exportAccess = createDirectoryContactAccess(
       listingScopeForCategory(lower),
       1,
@@ -271,11 +278,17 @@ export default async function SlugDirectoryPage({
 
   if (resolved.kind === "city") {
     const { hub, businesses, cityData } = resolved;
-    const contactAccess = createDirectoryContactAccess(
-      listingScopeForCity(lower),
+    const contactAccess = canRevealDirectoryPageContacts(
+      "city",
       cityData.page,
-      cityData.filters,
-    );
+      userIsPro,
+    )
+      ? createDirectoryContactAccess(
+          listingScopeForCity(lower),
+          cityData.page,
+          cityData.filters,
+        )
+      : null;
     const exportAccess = createDirectoryContactAccess(
       listingScopeForCity(lower),
       1,
@@ -430,7 +443,12 @@ export default async function SlugDirectoryPage({
             )}
           </p>
           {!userIsPro && cityData.unfilteredCount > 0 ? (
-            <BuyFullListCta categoryOrCity={lower} />
+            <BuyFullListCta
+              categoryOrCity={lower}
+              exportAccess={exportAccess}
+              pagePath={`/${lower}`}
+              totalCount={cityData.totalCount}
+            />
           ) : null}
         </header>
 
