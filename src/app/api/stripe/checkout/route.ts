@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSiteOrigin } from "@/lib/site-url";
-import { getStripe, getStripePriceId } from "@/lib/stripe";
+import { getStripe, getCrmProPriceId } from "@/lib/stripe";
 import { getUserProfile, isPro } from "@/lib/subscription";
 import { CRM_BASE_PATH } from "@/lib/crm-path";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -29,7 +29,7 @@ export async function GET() {
 
     const sessionParams: Parameters<typeof stripe.checkout.sessions.create>[0] = {
       mode: "subscription",
-      line_items: [{ price: getStripePriceId(), quantity: 1 }],
+      line_items: [{ price: getCrmProPriceId(), quantity: 1 }],
       client_reference_id: user.id,
       metadata: { supabase_user_id: user.id },
       success_url: `${origin}${CRM_BASE_PATH}?checkout=success&session_id={CHECKOUT_SESSION_ID}`,

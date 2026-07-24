@@ -15,7 +15,7 @@ import {
   getClientIp,
   rateLimitHeaders,
 } from "@/lib/rate-limit";
-import { getBuyFullListPriceId, getStripe } from "@/lib/stripe";
+import { getCsvPriceId, getStripe } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
       mode: "payment",
       ui_mode: "embedded_page",
       redirect_on_completion: "never",
-      line_items: [{ price: getBuyFullListPriceId(), quantity: 1 }],
+      line_items: [{ price: getCsvPriceId(), quantity: 1 }],
       metadata: { ...metadata },
       // Checkout collects a required email (fallback delivery recipient).
       customer_creation: "if_required",

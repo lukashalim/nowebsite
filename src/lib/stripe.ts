@@ -15,21 +15,22 @@ export function getStripe(): Stripe {
   return stripeClient;
 }
 
-export function getStripePriceId(): string {
+/** Pro CRM subscription price ($27/month). */
+export function getCrmProPriceId(): string {
   loadSharedEnvLocal();
-  const priceId = process.env.STRIPE_PRICE_ID?.trim();
+  const priceId = process.env.STRIPE_CRM_PRO_PRICE_ID?.trim();
   if (!priceId) {
-    throw new Error("Missing STRIPE_PRICE_ID");
+    throw new Error("Missing STRIPE_CRM_PRO_PRICE_ID");
   }
   return priceId;
 }
 
-/** One-time $9 full directory list export. */
-export function getBuyFullListPriceId(): string {
+/** One-time $9 full directory CSV export. */
+export function getCsvPriceId(): string {
   loadSharedEnvLocal();
-  const priceId = process.env.STRIPE_BUY_FULL_LIST_PRICE_ID?.trim();
+  const priceId = process.env.STRIPE_CSV_PRICE_ID?.trim();
   if (!priceId) {
-    throw new Error("Missing STRIPE_BUY_FULL_LIST_PRICE_ID");
+    throw new Error("Missing STRIPE_CSV_PRICE_ID");
   }
   return priceId;
 }
