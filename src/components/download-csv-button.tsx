@@ -14,6 +14,8 @@ interface DownloadCsvButtonProps {
   pageSize: number;
   totalPages: number;
   totalCount: number;
+  /** Current listing page (1-based). Free CSV only on page 1. */
+  page?: number;
   /** Slug for GA4 csv_purchase_click (category/city pages). */
   categoryOrCity?: string;
   isPro?: boolean;
@@ -27,6 +29,7 @@ export function DownloadCsvButton({
   pageSize,
   totalPages,
   totalCount,
+  page = 1,
   categoryOrCity,
   isPro = false,
   label = "Download CSV",
@@ -34,13 +37,16 @@ export function DownloadCsvButton({
 }: DownloadCsvButtonProps) {
   const [open, setOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [checkoutStep, setCheckoutStep] = useState<"offer" | "checkout">(
+    "checkout",
+  );
   const rootRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
   const buttonClass = className ?? `${directoryOutlineButtonClass} gap-2`;
 
   const freeLabel =
     totalCount > pageSize
-      ? "Current page — Free (100 max)"
+      ? "First 100 records — Free"
       : "Current page — Free";
 
   const remainingRows = Math.max(0, totalCount - LIST_PURCHASE_FREE_ROWS_CLIENT);
@@ -48,6 +54,7 @@ export function DownloadCsvButton({
     remainingRows > 0 &&
     (exportAccess.scope.startsWith("category:") ||
       exportAccess.scope.startsWith("city:"));
+  const onFirstPage = page <= 1;
   const paidLabel = `Remaining ${remainingRows.toLocaleString()} records — $9`;
 
   const downloadUrl = buildDirectoryCsvDownloadUrl({
@@ -84,11 +91,18 @@ export function DownloadCsvButton({
 
   function handleFreeDownload() {
     closeMenu();
+    // Page 2+ free click → explain limit, then $9 checkout (no free CSV).
+    if (!onFirstPage && canBuyFullList) {
+      setCheckoutStep("offer");
+      setCheckoutOpen(true);
+      return;
+    }
     window.location.href = downloadUrl;
   }
 
   function handlePaidClick() {
     closeMenu();
+    setCheckoutStep("checkout");
     setCheckoutOpen(true);
   }
 
@@ -97,7 +111,9 @@ export function DownloadCsvButton({
       <div className="flex flex-col items-center sm:items-start">
         <button
           type="button"
-          onClick={handleFreeDownload}
+          onClick={() => {
+            window.location.href = downloadUrl;
+          }}
           className={buttonClass}
         >
           <Download className="size-4" aria-hidden />
@@ -159,6 +175,7 @@ export function DownloadCsvButton({
 
       {canBuyFullList ? (
         <BuyFullListCheckoutModal
+          key={checkoutStep}
           open={checkoutOpen}
           onClose={() => setCheckoutOpen(false)}
           exportAccess={exportAccess}
@@ -166,6 +183,7 @@ export function DownloadCsvButton({
           remainingRows={remainingRows}
           categoryOrCity={categoryOrCity}
           placement="bottom"
+          initialStep={checkoutStep}
         />
       ) : null}
     </div>

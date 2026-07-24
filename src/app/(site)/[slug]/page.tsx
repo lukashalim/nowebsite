@@ -548,6 +548,7 @@ export default async function SlugDirectoryPage({
             pageSize={cityData.pageSize}
             totalPages={cityData.totalPages}
             totalCount={cityData.totalCount}
+            page={cityData.page}
             categoryOrCity={lower}
             isPro={userIsPro}
           />

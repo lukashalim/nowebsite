@@ -18,9 +18,20 @@ interface BuyFullListCheckoutModalProps {
   categoryOrCity?: string;
   /** GA placement: top CTA vs download menu */
   placement?: "top" | "bottom";
+  /**
+   * `offer` — explain free 100-row cap first, then payment.
+   * `checkout` — go straight to Embedded Checkout.
+   */
+  initialStep?: "offer" | "checkout";
 }
 
-type Phase = "loading" | "checkout" | "fulfilling" | "ready" | "error";
+type Phase =
+  | "offer"
+  | "loading"
+  | "checkout"
+  | "fulfilling"
+  | "ready"
+  | "error";
 
 async function pollForDownload(sessionId: string): Promise<string> {
   const deadline = Date.now() + POLL_TIMEOUT_MS;
@@ -64,11 +75,14 @@ export function BuyFullListCheckoutModal({
   remainingRows,
   categoryOrCity,
   placement = "bottom",
+  initialStep = "checkout",
 }: BuyFullListCheckoutModalProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const checkoutRef = useRef<StripeEmbeddedCheckout | null>(null);
   const startedRef = useRef(false);
-  const [phase, setPhase] = useState<Phase>("loading");
+  const [phase, setPhase] = useState<Phase>(
+    initialStep === "offer" ? "offer" : "loading",
+  );
   const [error, setError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
@@ -80,11 +94,11 @@ export function BuyFullListCheckoutModal({
   const handleClose = useCallback(() => {
     cleanupCheckout();
     startedRef.current = false;
-    setPhase("loading");
+    setPhase(initialStep === "offer" ? "offer" : "loading");
     setError(null);
     setSessionId(null);
     onClose();
-  }, [cleanupCheckout, onClose]);
+  }, [cleanupCheckout, onClose, initialStep]);
 
   const startFulfillment = useCallback(async (id: string) => {
     setPhase("fulfilling");
@@ -154,8 +168,30 @@ export function BuyFullListCheckoutModal({
     }
   }, [cleanupCheckout, exportAccess, pagePath, startFulfillment]);
 
+  const beginCheckoutFromOffer = useCallback(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    if (categoryOrCity) {
+      trackCsvPurchaseClick(categoryOrCity, placement);
+    }
+    void (async () => {
+      try {
+        await startCheckout();
+      } catch (err) {
+        setPhase("error");
+        setError(err instanceof Error ? err.message : "Checkout failed");
+        startedRef.current = false;
+      }
+    })();
+  }, [categoryOrCity, placement, startCheckout]);
+
   useEffect(() => {
     if (!open) return;
+    if (initialStep === "offer") {
+      setPhase("offer");
+      startedRef.current = false;
+      return;
+    }
 
     let cancelled = false;
 
@@ -185,6 +221,7 @@ export function BuyFullListCheckoutModal({
     };
   }, [
     open,
+    initialStep,
     categoryOrCity,
     placement,
     startCheckout,
@@ -202,6 +239,31 @@ export function BuyFullListCheckoutModal({
 
   if (!open) return null;
 
+  const title =
+    phase === "offer" ? "Free download limit" : "Get the remaining list";
+  const subtitle =
+    phase === "offer" ? (
+      <>
+        Free CSV downloads only include the first{" "}
+        <span className="font-medium tabular-nums text-zinc-900 dark:text-zinc-100">
+          100
+        </span>{" "}
+        records. Get the remaining{" "}
+        <span className="font-medium tabular-nums text-zinc-900 dark:text-zinc-100">
+          {remainingRows.toLocaleString()}
+        </span>{" "}
+        for $9.
+      </>
+    ) : (
+      <>
+        You&apos;ve used your free download. Get the remaining{" "}
+        <span className="font-medium tabular-nums text-zinc-900 dark:text-zinc-100">
+          {remainingRows.toLocaleString()}
+        </span>{" "}
+        records for $9.
+      </>
+    );
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/50 p-4"
@@ -216,14 +278,10 @@ export function BuyFullListCheckoutModal({
               id="buy-full-list-title"
               className="text-lg font-semibold text-zinc-900 dark:text-zinc-50"
             >
-              Get the remaining list
+              {title}
             </h2>
             <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              You&apos;ve used your free download. Get the remaining{" "}
-              <span className="font-medium tabular-nums text-zinc-900 dark:text-zinc-100">
-                {remainingRows.toLocaleString()}
-              </span>{" "}
-              records for $9.
+              {subtitle}
             </p>
           </div>
           <button
@@ -236,7 +294,18 @@ export function BuyFullListCheckoutModal({
           </button>
         </div>
 
-        <div className="min-h-[320px] flex-1 overflow-y-auto px-5 py-4">
+        <div className="min-h-[200px] flex-1 overflow-y-auto px-5 py-4">
+          {phase === "offer" ? (
+            <div className="flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={beginCheckoutFromOffer}
+                className="rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:bg-accent-hover"
+              >
+                Get remaining {remainingRows.toLocaleString()} — $9
+              </button>
+            </div>
+          ) : null}
           {phase === "loading" ? (
             <p className="text-sm text-zinc-600 dark:text-zinc-400">
               Preparing secure checkout…

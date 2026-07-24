@@ -305,6 +305,7 @@ export async function DirectoryCategoryPage({
           pageSize={pageSize}
           totalPages={totalPages}
           totalCount={totalCount}
+          page={page}
           categoryOrCity={categorySlug}
           isPro={isPro}
         />
