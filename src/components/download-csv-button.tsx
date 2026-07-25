@@ -44,18 +44,17 @@ export function DownloadCsvButton({
   const menuId = useId();
   const buttonClass = className ?? `${directoryOutlineButtonClass} gap-2`;
 
-  const freeLabel =
-    totalCount > pageSize
-      ? "First 100 records — Free"
-      : "Current page — Free";
-
+  const freeLabel = "Single page — Free";
   const remainingRows = Math.max(0, totalCount - LIST_PURCHASE_FREE_ROWS_CLIENT);
   const canBuyFullList =
     remainingRows > 0 &&
     (exportAccess.scope.startsWith("category:") ||
       exportAccess.scope.startsWith("city:"));
   const onFirstPage = page <= 1;
-  const paidLabel = `Remaining ${remainingRows.toLocaleString()} records — $9`;
+  const paidLabel =
+    remainingRows > 0
+      ? `Full list (${remainingRows.toLocaleString()} remaining) — $9`
+      : "Full list — $9";
 
   const downloadUrl = buildDirectoryCsvDownloadUrl({
     exportAccess,
