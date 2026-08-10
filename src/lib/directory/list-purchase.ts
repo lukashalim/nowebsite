@@ -295,7 +295,8 @@ export async function fulfillListPurchaseFromSession(
     const { error: uploadError } = await supabase.storage
       .from(LIST_PURCHASE_BUCKET)
       .upload(storagePath, Buffer.from(csv, "utf8"), {
-        contentType: "text/csv; charset=utf-8",
+        // Bucket allow-list is exact (`text/csv`); charset suffixes are rejected.
+        contentType: "text/csv",
         upsert: true,
       });
     if (uploadError) throw new Error(uploadError.message);
