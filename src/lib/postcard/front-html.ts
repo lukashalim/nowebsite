@@ -3,8 +3,14 @@
  * Compact phone-frame mockup centered on Lob's full landscape artboard.
  */
 
+import "server-only";
+
 import { parseReviewHighlights } from "@/lib/demo-review-types";
 import { formatUsPhoneDisplay } from "@/lib/postcard/back-html";
+import {
+  formatPostcardCallHeadlineHtml,
+  headlineTrackingStyle,
+} from "@/lib/postcard/call-headline";
 import {
   LOB_PRINT_FONT_FAMILY,
   LOB_PRINT_FONT_LINKS,
@@ -30,7 +36,10 @@ export function buildPostcardFrontHtml(input: {
   phone?: string | null;
 }): string {
   const name = escapeHtml(input.businessName.trim() || "Your business");
-  const headline = escapeHtml(input.headline.trim() || "Get more local customer calls");
+  const headlineText =
+    input.headline.trim() || "Get more local customer calls";
+  const headlineHtml = formatPostcardCallHeadlineHtml(headlineText);
+  const headlineStyle = headlineTrackingStyle(headlineText.length);
   const category = escapeHtml(
     (input.category?.trim() || "Local business").toUpperCase(),
   );
@@ -119,6 +128,10 @@ export function buildPostcardFrontHtml(input: {
       text-align: center;
       margin: 0 0 0.14in;
       width: 100%;
+      white-space: nowrap;
+    }
+    .headline-emphasis {
+      color: #d97706;
     }
     .phone {
       width: 100%;
@@ -232,7 +245,7 @@ export function buildPostcardFrontHtml(input: {
 </head>
 <body>
   <div class="block">
-    <p class="headline">${headline}</p>
+    <p class="headline"${headlineStyle}>${headlineHtml}</p>
     <div class="phone">
       <div class="notch"></div>
       <div class="screen">

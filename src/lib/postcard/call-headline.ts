@@ -4,7 +4,46 @@ import { z } from "zod";
 import { parseReviewHighlights } from "@/lib/demo-review-types";
 import { deepseekChat } from "@/lib/deepseek";
 
-export const POSTCARD_CALL_HEADLINE_MAX_LENGTH = 52;
+export const POSTCARD_CALL_HEADLINE_MAX_LENGTH = 44;
+
+export interface ParsedPostcardCallHeadline {
+  prefix: string;
+  emphasis: string;
+  suffix: string;
+}
+
+const CALL_HEADLINE_PATTERN = /^Get more (.+) calls$/i;
+
+/** Split a validated headline into prefix, service phrase, and suffix. */
+export function parsePostcardCallHeadline(
+  headline: string,
+): ParsedPostcardCallHeadline | null {
+  const normalized = normalizeWhitespace(headline);
+  const match = CALL_HEADLINE_PATTERN.exec(normalized);
+  if (!match?.[1]?.trim()) return null;
+
+  return {
+    prefix: "Get more ",
+    emphasis: match[1].trim(),
+    suffix: " calls",
+  };
+}
+
+/** Render headline HTML with the service phrase emphasized. */
+export function formatPostcardCallHeadlineHtml(headline: string): string {
+  const normalized = normalizeWhitespace(headline) || "Get more local customer calls";
+  const parsed = parsePostcardCallHeadline(normalized);
+  if (!parsed) return escapeHeadlineHtml(normalized);
+
+  return `${escapeHeadlineHtml(parsed.prefix)}<span class="headline-emphasis">${escapeHeadlineHtml(parsed.emphasis)}</span>${escapeHeadlineHtml(parsed.suffix)}`;
+}
+
+/** Adaptive letter-spacing to keep 14pt headlines on one line in 2.7in. */
+export function headlineTrackingStyle(length: number): string {
+  if (length <= 32) return "";
+  if (length <= 40) return ' style="letter-spacing:-0.015em"';
+  return ' style="letter-spacing:-0.025em"';
+}
 
 const responseSchema = z.object({
   headline: z.string(),
@@ -125,4 +164,12 @@ function normalizeWhitespace(value: string): string {
 
 function isSafeHeadline(value: string): boolean {
   return !/[\r\n<>]/.test(value);
+}
+
+function escapeHeadlineHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }

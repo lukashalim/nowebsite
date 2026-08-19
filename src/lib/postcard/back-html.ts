@@ -23,14 +23,14 @@ const SCAN_GOLD = "#c5a059";
  */
 export const LOB_BACK_QR_PLACEMENT = {
   widthIn: "1.25",
-  topIn: "1.545",
+  topIn: "1.695",
   leftIn: "0.730",
   pages: "back" as const,
 } as const;
 
 /** Pinned SCAN card — independent of headline line count. */
 const SCAN_CARD = {
-  top: "1.10in",
+  top: "1.25in",
   left: "0.28in",
   width: "2.4in",
 } as const;
@@ -53,7 +53,7 @@ ${LOB_PRINT_FONT_LINKS}
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{width:6.25in;height:4.25in;font-family:${LOB_PRINT_FONT_FAMILY};color:#18181b;background:#fff;position:relative}
-.copy{position:absolute;top:.22in;left:.28in;width:2.4in;max-height:.82in;overflow:hidden}
+.copy{position:absolute;top:.22in;left:.28in;width:2.4in;max-height:.98in;overflow:hidden}
 h1{font-size:13pt;font-weight:700;line-height:1.15;margin-bottom:.06in}
 .pitch{font-size:9pt;line-height:1.25;color:#3f3f46}
 .scan-card{position:absolute;top:${SCAN_CARD.top};left:${SCAN_CARD.left};width:${SCAN_CARD.width};border:2.5px solid ${SCAN_GREEN};border-radius:.1in;overflow:hidden;background:#fff;text-align:center}
