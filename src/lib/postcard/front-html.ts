@@ -18,6 +18,8 @@ const BLOCK_WIDTH = "2.7in";
 const BLOCK_LEFT = "1.775in";
 
 export function buildPostcardFrontHtml(input: {
+  /** e.g. "Get more water heater replacement calls" */
+  headline: string;
   businessName: string;
   category?: string | null;
   city?: string | null;
@@ -28,6 +30,7 @@ export function buildPostcardFrontHtml(input: {
   phone?: string | null;
 }): string {
   const name = escapeHtml(input.businessName.trim() || "Your business");
+  const headline = escapeHtml(input.headline.trim() || "Get more local customer calls");
   const category = escapeHtml(
     (input.category?.trim() || "Local business").toUpperCase(),
   );
@@ -116,9 +119,6 @@ export function buildPostcardFrontHtml(input: {
       text-align: center;
       margin: 0 0 0.14in;
       width: 100%;
-    }
-    .headline .brand {
-      color: #d97706;
     }
     .phone {
       width: 100%;
@@ -232,7 +232,7 @@ export function buildPostcardFrontHtml(input: {
 </head>
 <body>
   <div class="block">
-    <p class="headline">Get a <span class="brand">Ring Ready</span> website.</p>
+    <p class="headline">${headline}</p>
     <div class="phone">
       <div class="notch"></div>
       <div class="screen">

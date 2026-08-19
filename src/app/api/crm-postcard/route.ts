@@ -22,6 +22,7 @@ import {
   leadToLobAddress,
 } from "@/lib/postcard/address";
 import { buildPostcardBackHtml, LOB_BACK_QR_PLACEMENT } from "@/lib/postcard/back-html";
+import { generatePostcardCallHeadline } from "@/lib/postcard/call-headline";
 import { shortenCompanyNameForLob } from "@/lib/postcard/company-name";
 import { buildPostcardFrontHtml } from "@/lib/postcard/front-html";
 import { assertCanSendPostcard } from "@/lib/postcard/limits";
@@ -218,13 +219,14 @@ export async function POST(request: Request) {
     typeof row.postal_code === "string" ? row.postal_code : null;
   const country = typeof row.country === "string" ? row.country : null;
   const name = typeof row.name === "string" ? row.name : null;
+  const business_type =
+    typeof row.business_type === "string" && row.business_type.trim()
+      ? row.business_type
+      : null;
   const category =
     (typeof row.main_category === "string" && row.main_category.trim()
       ? row.main_category
-      : null) ||
-    (typeof row.business_type === "string" && row.business_type.trim()
-      ? row.business_type
-      : null);
+      : null) || business_type;
   const rating = row.rating != null ? Number(row.rating) : null;
   const reviewCount = row.reviews != null ? Number(row.reviews) : null;
   const phone = typeof row.phone === "string" ? row.phone : null;
@@ -259,7 +261,17 @@ export async function POST(request: Request) {
   const slug = decodeURIComponent(slugEncoded);
   const liveDemoUrl = ringReadyTenantDemoUrl(username, slug);
 
+  const headline = await generatePostcardCallHeadline({
+    businessName: name,
+    category,
+    businessType: business_type,
+    city,
+    state,
+    reviewHighlights: row.review_highlights,
+  });
+
   const frontHtml = buildPostcardFrontHtml({
+    headline,
     businessName: name?.trim() || "your business",
     category,
     city,

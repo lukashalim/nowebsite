@@ -40,8 +40,6 @@ export function buildPostcardBackHtml(input: {
   /** Sender contact for "Call/text us at …" (E.164 or national). */
   contactPhone?: string | null;
 }): string {
-  const name = escapeHtml(input.businessName || "your business");
-
   const phoneDisplay = formatUsPhoneDisplay(input.contactPhone);
   const footerHtml = phoneDisplay
     ? `<p class="scan-footer">Call/text us at ${escapeHtml(phoneDisplay)}</p>`
@@ -69,8 +67,8 @@ h1{font-size:13pt;font-weight:700;line-height:1.15;margin-bottom:.06in}
 </head>
 <body>
 <div class="copy">
-<h1>${name} now has a website.</h1>
-<p class="pitch">Built from your Google listing. Live in 24 hours if you want it.</p>
+<h1>Calls going to your competitors?</h1>
+<p class="pitch">Your mobile site is already built.<br/>Scan to test-drive it live.<br/>First month completely free.</p>
 </div>
 <div class="scan-card">
 <div class="scan-head">
