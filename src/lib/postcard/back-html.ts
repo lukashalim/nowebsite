@@ -16,6 +16,9 @@ import {
 const SCAN_GREEN = "#1a4731";
 const SCAN_GOLD = "#c5a059";
 
+/** Accent red for "competitors" in the back headline. */
+const HEADLINE_ACCENT_RED = "#B91C1C";
+
 /**
  * Lob positions native QR codes from the 6×4 trim edge, while the HTML uses
  * the 6.25×4.25 bleed artboard. Subtract the 0.125in bleed from the slot's
@@ -23,14 +26,22 @@ const SCAN_GOLD = "#c5a059";
  */
 export const LOB_BACK_QR_PLACEMENT = {
   widthIn: "1.25",
-  topIn: "1.695",
+  topIn: "1.895",
   leftIn: "0.730",
   pages: "back" as const,
 } as const;
 
+/** Left creative column — widened slightly so the h1 fits on one line. */
+const COPY = {
+  top: "0.22in",
+  left: "0.28in",
+  width: "2.65in",
+  maxHeight: "1.12in",
+} as const;
+
 /** Pinned SCAN card — independent of headline line count. */
 const SCAN_CARD = {
-  top: "1.25in",
+  top: "1.45in",
   left: "0.28in",
   width: "2.4in",
 } as const;
@@ -53,9 +64,10 @@ ${LOB_PRINT_FONT_LINKS}
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{width:6.25in;height:4.25in;font-family:${LOB_PRINT_FONT_FAMILY};color:#18181b;background:#fff;position:relative}
-.copy{position:absolute;top:.22in;left:.28in;width:2.4in;max-height:.98in;overflow:hidden}
-h1{font-size:13pt;font-weight:700;line-height:1.15;margin-bottom:.06in}
-.pitch{font-size:9pt;line-height:1.25;color:#3f3f46}
+.copy{position:absolute;top:${COPY.top};left:${COPY.left};width:${COPY.width};max-height:${COPY.maxHeight};overflow:hidden}
+h1{font-size:13pt;font-weight:700;line-height:1.15;margin-bottom:.08in;white-space:nowrap;letter-spacing:-0.018em}
+h1 .headline-accent{color:${HEADLINE_ACCENT_RED}}
+.pitch{font-size:9pt;line-height:1.45;color:#3f3f46}
 .scan-card{position:absolute;top:${SCAN_CARD.top};left:${SCAN_CARD.left};width:${SCAN_CARD.width};border:2.5px solid ${SCAN_GREEN};border-radius:.1in;overflow:hidden;background:#fff;text-align:center}
 .scan-head{background:${SCAN_GREEN};padding:.08in .08in .07in;line-height:1.15}
 .scan-line1{font-size:10pt;font-weight:700;letter-spacing:.04em;color:#fff}
@@ -67,7 +79,7 @@ h1{font-size:13pt;font-weight:700;line-height:1.15;margin-bottom:.06in}
 </head>
 <body>
 <div class="copy">
-<h1>Calls going to your competitors?</h1>
+<h1>Calls going to your <span class="headline-accent">competitors</span>?</h1>
 <p class="pitch">Your mobile site is already built.<br/>Scan to test-drive it live.<br/>First month completely free.</p>
 </div>
 <div class="scan-card">
