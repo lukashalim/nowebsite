@@ -11,6 +11,7 @@ import {
   formatPostcardCallHeadlineHtml,
   headlineTrackingStyle,
 } from "@/lib/postcard/call-headline";
+import { pickPostcardReviewExcerpt } from "@/lib/postcard/review-excerpt";
 import {
   LOB_PRINT_FONT_FAMILY,
   LOB_PRINT_FONT_LINKS,
@@ -56,14 +57,12 @@ export function buildPostcardFrontHtml(input: {
       : null;
 
   const highlights = parseReviewHighlights(input.reviewHighlights) ?? [];
-  // Postcard review card: only 5★ excerpts; star label is always 5/5.
-  const fiveStarReview = highlights.find(
-    (r) => r.rating != null && Math.round(r.rating) === 5,
-  );
-  const quote = fiveStarReview?.excerpt?.trim() ?? "";
-  const quoteHtml = quote ? escapeHtml(quote) : "";
-  const reviewerHtml = fiveStarReview?.reviewer_name?.trim()
-    ? escapeHtml(formatReviewerDisplayName(fiveStarReview.reviewer_name))
+  const pickedReview = pickPostcardReviewExcerpt(highlights);
+  const quoteHtml = pickedReview?.excerpt
+    ? escapeHtml(pickedReview.excerpt)
+    : "";
+  const reviewerHtml = pickedReview?.reviewer_name
+    ? escapeHtml(formatReviewerDisplayName(pickedReview.reviewer_name))
     : "";
 
   const phoneDisplay =
@@ -88,7 +87,7 @@ export function buildPostcardFrontHtml(input: {
 
   const reviewBody = quoteHtml
     ? `&ldquo;${quoteHtml}&rdquo;`
-    : `&ldquo;Your services, reviews, and a clear call button — ready for local customers.&rdquo;`;
+    : `&ldquo;Incredible service! Fast and professional.&rdquo;`;
   const reviewerLine = reviewerHtml
     ? `<p class="review-name">— ${reviewerHtml}</p>`
     : "";
@@ -119,6 +118,9 @@ export function buildPostcardFrontHtml(input: {
       top: 0.28in;
       left: ${BLOCK_LEFT};
       width: ${BLOCK_WIDTH};
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
     .headline {
       font-size: 14pt;
@@ -127,7 +129,9 @@ export function buildPostcardFrontHtml(input: {
       color: #064e3b;
       text-align: center;
       margin: 0 0 0.14in;
-      width: 100%;
+      width: auto;
+      max-width: 100%;
+      display: inline-block;
       white-space: nowrap;
     }
     .headline-emphasis {
@@ -135,6 +139,7 @@ export function buildPostcardFrontHtml(input: {
     }
     .phone {
       width: 100%;
+      align-self: stretch;
       height: 4.75in;
       background: #111827;
       border-radius: 0.22in;

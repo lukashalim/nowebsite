@@ -9,6 +9,9 @@ import {
 
 export type PostcardSendMode = "test" | "live";
 
+export const LIVE_POSTCARD_ALREADY_SENT_TODAY =
+  "You already sent a live postcard to this lead today. Try again tomorrow or send a test proof.";
+
 const LIFETIME_LIMIT = 1;
 
 /**
@@ -90,6 +93,45 @@ export async function assertCanSendPostcard(
       ok: false,
       error: "You've already used your one live postcard.",
     };
+  }
+  return { ok: true };
+}
+
+function startOfUtcDayIso(now = new Date()): string {
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  ).toISOString();
+}
+
+export async function hasLivePostcardToLeadToday(
+  userId: string,
+  placeId: string,
+): Promise<boolean> {
+  const leadId = placeId.trim();
+  if (!leadId) return false;
+
+  const admin = createSupabaseAdmin();
+  const { count, error } = await admin
+    .from(USAGE_EVENTS_TABLE)
+    .select("id", { count: "exact", head: true })
+    .eq(USAGE_EVENT_COLUMNS.userId, userId)
+    .eq(USAGE_EVENT_COLUMNS.eventType, "postcard_sent")
+    .eq(USAGE_EVENT_COLUMNS.leadId, leadId)
+    .gte(USAGE_EVENT_COLUMNS.createdAt, startOfUtcDayIso());
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  return (count ?? 0) > 0;
+}
+
+export async function assertCanSendLivePostcardToLeadToday(
+  userId: string,
+  placeId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const alreadySent = await hasLivePostcardToLeadToday(userId, placeId);
+  if (alreadySent) {
+    return { ok: false, error: LIVE_POSTCARD_ALREADY_SENT_TODAY };
   }
   return { ok: true };
 }

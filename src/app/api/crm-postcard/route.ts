@@ -7,7 +7,7 @@ import {
   getCrmUsageSummary,
   recordCrmUsage,
 } from "@/lib/crm-usage";
-import { logUsageEvent } from "@/lib/log-usage-event";
+import { logUsageEvent, deleteUsageEventById } from "@/lib/log-usage-event";
 import {
   createLobPostcard,
   isAcceptableUsDeliverability,
@@ -25,7 +25,7 @@ import { buildPostcardBackHtml, LOB_BACK_QR_PLACEMENT } from "@/lib/postcard/bac
 import { generatePostcardCallHeadline } from "@/lib/postcard/call-headline";
 import { shortenCompanyNameForLob } from "@/lib/postcard/company-name";
 import { buildPostcardFrontHtml } from "@/lib/postcard/front-html";
-import { assertCanSendPostcard } from "@/lib/postcard/limits";
+import { assertCanSendPostcard, assertCanSendLivePostcardToLeadToday } from "@/lib/postcard/limits";
 import { buildPostcardScanUrl } from "@/lib/postcard/scan-link";
 import { createPostcardScanLinkUrl } from "@/lib/postcard/scan-links-db";
 import { ensureProfileUsername } from "@/lib/profile-username";
@@ -188,6 +188,11 @@ export async function POST(request: Request) {
         },
         { status: 402 },
       );
+    }
+
+    const daily = await assertCanSendLivePostcardToLeadToday(user.id, placeId);
+    if (!daily.ok) {
+      return NextResponse.json({ error: daily.error }, { status: 409 });
     }
   }
 
@@ -387,6 +392,23 @@ export async function POST(request: Request) {
     }
   }
 
+  let remaining: number | null = null;
+  let liveUsageEventId: number | null = null;
+  if (!testMode) {
+    const usage = await recordCrmUsage(user.id, profile, "mail", placeId);
+    if (!usage.ok) {
+      return NextResponse.json(
+        {
+          error: usage.error,
+          remaining: usage.remaining,
+        },
+        { status: usage.uniqueViolation ? 409 : 402 },
+      );
+    }
+    remaining = usage.remaining;
+    liveUsageEventId = usage.eventId;
+  }
+
   let postcard;
   try {
     postcard = await createLobPostcard(lobApiKey, {
@@ -412,6 +434,15 @@ export async function POST(request: Request) {
       status: proof.status ?? postcard.status,
     };
   } catch (err) {
+    if (liveUsageEventId != null) {
+      const rolledBack = await deleteUsageEventById(liveUsageEventId);
+      if (!rolledBack.ok) {
+        console.warn(
+          "[crm-postcard] failed to roll back live usage after Lob error",
+          rolledBack.error,
+        );
+      }
+    }
     return NextResponse.json(
       {
         error: err instanceof Error ? err.message : "Lob create failed",
@@ -420,7 +451,6 @@ export async function POST(request: Request) {
     );
   }
 
-  let remaining: number | null = null;
   if (testMode) {
     const logged = await logUsageEvent(
       user.id,
@@ -438,21 +468,6 @@ export async function POST(request: Request) {
         { status: 502 },
       );
     }
-  } else {
-    const usage = await recordCrmUsage(user.id, profile, "mail", placeId);
-    if (!usage.ok) {
-      return NextResponse.json(
-        {
-          error: usage.error,
-          remaining: usage.remaining,
-          postcardId: postcard.id,
-          url: postcard.url,
-          warning: "Postcard was created but usage was not recorded.",
-        },
-        { status: 402 },
-      );
-    }
-    remaining = usage.remaining;
   }
 
   return NextResponse.json({

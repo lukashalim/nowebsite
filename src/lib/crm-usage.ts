@@ -53,8 +53,13 @@ export async function recordCrmUsage(
   action: CrmUsageAction,
   placeId?: string,
 ): Promise<
-  | { ok: true; remaining: number | null }
-  | { ok: false; error: string; remaining: number }
+  | { ok: true; remaining: number | null; eventId: number | null }
+  | {
+      ok: false;
+      error: string;
+      remaining: number;
+      uniqueViolation?: boolean;
+    }
 > {
   const pro = isPro(profile);
 
@@ -74,21 +79,27 @@ export async function recordCrmUsage(
 
   if (!logged.ok) {
     if (pro) {
-      return { ok: false, error: logged.error, remaining: 0 };
+      return {
+        ok: false,
+        error: logged.error,
+        remaining: 0,
+        uniqueViolation: logged.uniqueViolation,
+      };
     }
     const used = await getMonthlyUsageCount(userId);
     return {
       ok: false,
       error: logged.error,
       remaining: Math.max(0, FREE_MONTHLY_OUTREACH_LIMIT - used),
+      uniqueViolation: logged.uniqueViolation,
     };
   }
 
   if (pro) {
-    return { ok: true, remaining: null };
+    return { ok: true, remaining: null, eventId: logged.eventId };
   }
 
   const used = await getMonthlyUsageCount(userId);
   const remaining = FREE_MONTHLY_OUTREACH_LIMIT - used;
-  return { ok: true, remaining };
+  return { ok: true, remaining, eventId: logged.eventId };
 }
