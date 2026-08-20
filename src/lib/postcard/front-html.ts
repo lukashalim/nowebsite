@@ -25,7 +25,7 @@ const BLOCK_WIDTH = "2.7in";
 const BLOCK_LEFT = "1.775in";
 
 export function buildPostcardFrontHtml(input: {
-  /** e.g. "Get more water heater replacement calls" */
+  /** e.g. "Get more roof repair calls" */
   headline: string;
   businessName: string;
   category?: string | null;

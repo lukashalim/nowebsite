@@ -51,6 +51,7 @@ const responseSchema = z.object({
 
 /**
  * Postcard front headline tailored to the calls a business wants.
+ * Specificity is grounded in listed services and review excerpts.
  * DeepSeek is best-effort; callers always receive a Lob-safe fallback.
  */
 export async function generatePostcardCallHeadline(input: {
@@ -59,6 +60,7 @@ export async function generatePostcardCallHeadline(input: {
   businessType?: string | null;
   city?: string | null;
   state?: string | null;
+  servicesOffered?: unknown;
   reviewHighlights?: unknown;
 }): Promise<string> {
   const businessName = normalizeWhitespace(input.businessName ?? "");
@@ -66,6 +68,7 @@ export async function generatePostcardCallHeadline(input: {
   const businessType = normalizeWhitespace(input.businessType ?? "");
   const location = [input.city?.trim(), input.state?.trim()].filter(Boolean).join(", ");
 
+  const services = parseServicesOfferedInput(input.servicesOffered).slice(0, 12);
   const reviewExcerpts =
     parseReviewHighlights(input.reviewHighlights)
       ?.map((review) => review.excerpt.trim())
@@ -80,6 +83,11 @@ export async function generatePostcardCallHeadline(input: {
       location ? `Location: ${JSON.stringify(location)}` : null,
     ].filter(Boolean);
 
+    const servicesBlock =
+      services.length > 0
+        ? `\nServices offered:\n${services.map((service) => `- ${JSON.stringify(service)}`).join("\n")}`
+        : "";
+
     const reviewsBlock =
       reviewExcerpts.length > 0
         ? `\nCustomer review excerpts:\n${reviewExcerpts.map((excerpt) => `- ${JSON.stringify(excerpt)}`).join("\n")}`
@@ -91,17 +99,22 @@ export async function generatePostcardCallHeadline(input: {
           role: "system",
           content: `Write a short postcard headline for a local service business.
 Rules:
-- Format must be exactly: Get more [specific service or job type] calls
-- Infer the highest-value phone-call job type this business likely wants from category, business type, name, and reviews.
-- Be specific when possible (e.g. plumber → "Get more water heater replacement calls", not "Get more plumbing calls").
+- Format must be exactly: Get more [service or job type] calls
+- Be as specific as the listed services and review excerpts support — never more specific.
+- Prefer phrases drawn directly from services offered when they imply phone-call intent.
+- Reviews may narrow the phrase only if they mention a service or job plausible from services or category.
+- Do NOT invent materials, brands, or sub-jobs (e.g. "metal", "tankless") unless services or reviews explicitly mention them.
+- If services are broad (e.g. "Roofing") and reviews mention a sub-task, prefer the sub-task only if it fits under listed services; otherwise stay at the listed service level.
+- If data is thin, fall back to category or business type at a similar specificity level.
 - Use natural lowercase for the service phrase inside the headline.
+- Aim for 2–4 words in the service phrase when possible.
 - Maximum ${POSTCARD_CALL_HEADLINE_MAX_LENGTH} characters total.
 - No trailing period. Do not include the business name.
 - Respond with JSON only: { "headline": "Get more … calls" }.`,
         },
         {
           role: "user",
-          content: `${contextLines.join("\n")}${reviewsBlock}`,
+          content: `${contextLines.join("\n")}${servicesBlock}${reviewsBlock}`,
         },
       ],
       { maxTokens: 96, temperature: 0.2, jsonObject: true },
@@ -145,6 +158,25 @@ function inferFallbackServicePhrase(
     return normalized.replace(/ service$/, "");
   }
   return normalized;
+}
+
+function parseServicesOfferedInput(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .filter((item) => !isPlaceholderServicesOfferedLabel(item));
+}
+
+function isPlaceholderServicesOfferedLabel(label: string): boolean {
+  const normalized = label
+    .trim()
+    .toLowerCase()
+    .replace(/_+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return normalized === "local cache";
 }
 
 function normalizeHeadline(value: string): string | null {

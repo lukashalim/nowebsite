@@ -272,6 +272,7 @@ export async function POST(request: Request) {
     businessType: business_type,
     city,
     state,
+    servicesOffered: row.services_offered,
     reviewHighlights: row.review_highlights,
   });
 
