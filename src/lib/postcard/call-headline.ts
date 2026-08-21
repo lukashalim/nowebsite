@@ -4,38 +4,77 @@ import { z } from "zod";
 import { parseReviewHighlights } from "@/lib/demo-review-types";
 import { deepseekChat } from "@/lib/deepseek";
 
-export const POSTCARD_CALL_HEADLINE_MAX_LENGTH = 44;
+/** Max length for the base "More … calls" headline (no owner prefix). */
+export const POSTCARD_CALL_HEADLINE_MAX_LENGTH = 40;
+
+/** Full display line budget including optional "Name - " prefix (~2.7in at 14pt). */
+export const POSTCARD_CALL_HEADLINE_DISPLAY_MAX_LENGTH = 48;
 
 export interface ParsedPostcardCallHeadline {
+  ownerPrefix: string | null;
   prefix: string;
   emphasis: string;
   suffix: string;
 }
 
-const CALL_HEADLINE_PATTERN = /^Get more (.+) calls$/i;
+const CALL_HEADLINE_PATTERN = /^(?:(.+?) - )?More (.+) calls$/i;
 
-/** Split a validated headline into prefix, service phrase, and suffix. */
+/** First name for postcard personalization, or null if unavailable. */
+export function postcardOwnerFirstName(
+  ownerName?: string | null,
+): string | null {
+  const trimmed = ownerName?.trim();
+  if (!trimmed) return null;
+  const first = trimmed.split(/\s+/)[0] ?? trimmed;
+  if (!first || /[\r\n<>]/.test(first)) return null;
+  return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+}
+
+/** "Phil - " when a first name is known; empty string otherwise. */
+export function postcardOwnerHeadlinePrefix(
+  ownerName?: string | null,
+): string {
+  const first = postcardOwnerFirstName(ownerName);
+  return first ? `${first} - ` : "";
+}
+
+/** Split a validated headline into optional owner, prefix, service phrase, and suffix. */
 export function parsePostcardCallHeadline(
   headline: string,
 ): ParsedPostcardCallHeadline | null {
   const normalized = normalizeWhitespace(headline);
   const match = CALL_HEADLINE_PATTERN.exec(normalized);
-  if (!match?.[1]?.trim()) return null;
+  if (!match?.[2]?.trim()) return null;
 
+  const ownerRaw = match[1]?.trim() || null;
   return {
-    prefix: "Get more ",
-    emphasis: match[1].trim(),
+    ownerPrefix: ownerRaw,
+    prefix: "More ",
+    emphasis: match[2].trim(),
     suffix: " calls",
   };
 }
 
 /** Render headline HTML with the service phrase emphasized. */
-export function formatPostcardCallHeadlineHtml(headline: string): string {
-  const normalized = normalizeWhitespace(headline) || "Get more local customer calls";
+export function formatPostcardCallHeadlineHtml(
+  headline: string,
+  ownerName?: string | null,
+): string {
+  const base =
+    normalizeWhitespace(headline) || "More local customer calls";
+  const ownerPrefix = postcardOwnerHeadlinePrefix(ownerName);
+  const display = ownerPrefix
+    ? `${ownerPrefix}${stripOwnerPrefix(base)}`
+    : stripOwnerPrefix(base);
+  const normalized = normalizeWhitespace(display) || "More local customer calls";
   const parsed = parsePostcardCallHeadline(normalized);
   if (!parsed) return escapeHeadlineHtml(normalized);
 
-  return `${escapeHeadlineHtml(parsed.prefix)}<span class="headline-emphasis">${escapeHeadlineHtml(parsed.emphasis)}</span>${escapeHeadlineHtml(parsed.suffix)}`;
+  const ownerHtml = parsed.ownerPrefix
+    ? `${escapeHeadlineHtml(parsed.ownerPrefix)} - `
+    : "";
+
+  return `${ownerHtml}${escapeHeadlineHtml(parsed.prefix)}<span class="headline-emphasis">${escapeHeadlineHtml(parsed.emphasis)}</span>${escapeHeadlineHtml(parsed.suffix)}`;
 }
 
 /** Adaptive letter-spacing to keep 14pt headlines on one line in 2.7in. */
@@ -53,6 +92,7 @@ const responseSchema = z.object({
  * Postcard front headline tailored to the calls a business wants.
  * Specificity is grounded in listed services and review excerpts.
  * DeepSeek is best-effort; callers always receive a Lob-safe fallback.
+ * Returns the base "More … calls" string (no owner prefix).
  */
 export async function generatePostcardCallHeadline(input: {
   businessName?: string | null;
@@ -62,11 +102,18 @@ export async function generatePostcardCallHeadline(input: {
   state?: string | null;
   servicesOffered?: unknown;
   reviewHighlights?: unknown;
+  /** When set, shortens the base headline budget so "Name - …" still fits. */
+  ownerName?: string | null;
 }): Promise<string> {
   const businessName = normalizeWhitespace(input.businessName ?? "");
   const category = normalizeWhitespace(input.category ?? "");
   const businessType = normalizeWhitespace(input.businessType ?? "");
   const location = [input.city?.trim(), input.state?.trim()].filter(Boolean).join(", ");
+  const ownerPrefix = postcardOwnerHeadlinePrefix(input.ownerName);
+  const maxBaseLength = Math.max(
+    24,
+    POSTCARD_CALL_HEADLINE_DISPLAY_MAX_LENGTH - ownerPrefix.length,
+  );
 
   const services = parseServicesOfferedInput(input.servicesOffered).slice(0, 12);
   const reviewExcerpts =
@@ -99,7 +146,7 @@ export async function generatePostcardCallHeadline(input: {
           role: "system",
           content: `Write a short postcard headline for a local service business.
 Rules:
-- Format must be exactly: Get more [service or job type] calls
+- Format must be exactly: More [service or job type] calls
 - Be as specific as the listed services and review excerpts support — never more specific.
 - Prefer phrases drawn directly from services offered when they imply phone-call intent.
 - Reviews may narrow the phrase only if they mention a service or job plausible from services or category.
@@ -108,9 +155,9 @@ Rules:
 - If data is thin, fall back to category or business type at a similar specificity level.
 - Use natural lowercase for the service phrase inside the headline.
 - Aim for 2–4 words in the service phrase when possible.
-- Maximum ${POSTCARD_CALL_HEADLINE_MAX_LENGTH} characters total.
-- No trailing period. Do not include the business name.
-- Respond with JSON only: { "headline": "Get more … calls" }.`,
+- Maximum ${maxBaseLength} characters total.
+- No trailing period. Do not include the business name or an owner name.
+- Respond with JSON only: { "headline": "More … calls" }.`,
         },
         {
           role: "user",
@@ -122,25 +169,31 @@ Rules:
 
     const parsed = responseSchema.safeParse(JSON.parse(content));
     if (parsed.success) {
-      const candidate = normalizeHeadline(parsed.data.headline);
+      const candidate = normalizeHeadline(parsed.data.headline, maxBaseLength);
       if (candidate) return candidate;
     }
   } catch (error) {
     console.warn("[postcard] DeepSeek call headline failed", error);
   }
 
-  return fallbackPostcardCallHeadline({ category, businessType });
+  return fallbackPostcardCallHeadline({ category, businessType, maxBaseLength });
 }
 
 export function fallbackPostcardCallHeadline(input: {
   category?: string | null;
   businessType?: string | null;
+  maxBaseLength?: number;
 }): string {
+  const maxBaseLength =
+    input.maxBaseLength ?? POSTCARD_CALL_HEADLINE_MAX_LENGTH;
   const servicePhrase = inferFallbackServicePhrase(
     input.category,
     input.businessType,
   );
-  return normalizeHeadline(`Get more ${servicePhrase} calls`) ?? "Get more local customer calls";
+  return (
+    normalizeHeadline(`More ${servicePhrase} calls`, maxBaseLength) ??
+    "More local customer calls"
+  );
 }
 
 function inferFallbackServicePhrase(
@@ -179,13 +232,22 @@ function isPlaceholderServicesOfferedLabel(label: string): boolean {
   return normalized === "local cache";
 }
 
-function normalizeHeadline(value: string): string | null {
-  const headline = normalizeWhitespace(value);
+/** Strip a leading "Name - " if the model or caller included one. */
+function stripOwnerPrefix(headline: string): string {
+  const match = /^.+? - (More .+ calls)$/i.exec(normalizeWhitespace(headline));
+  return match?.[1] ?? normalizeWhitespace(headline);
+}
+
+function normalizeHeadline(
+  value: string,
+  maxLength: number = POSTCARD_CALL_HEADLINE_MAX_LENGTH,
+): string | null {
+  const headline = stripOwnerPrefix(value);
   if (!headline || !isSafeHeadline(headline)) return null;
-  if (headline.length > POSTCARD_CALL_HEADLINE_MAX_LENGTH) return null;
+  if (headline.length > maxLength) return null;
 
   const lower = headline.toLowerCase();
-  if (!lower.startsWith("get more ") || !lower.endsWith(" calls")) return null;
+  if (!lower.startsWith("more ") || !lower.endsWith(" calls")) return null;
 
   return headline;
 }

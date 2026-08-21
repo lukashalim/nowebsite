@@ -16,6 +16,8 @@
 
 
 
+import { postcardOwnerFirstName } from "@/lib/postcard/call-headline";
+
 import {
 
   LOB_PRINT_FONT_FAMILY,
@@ -100,6 +102,10 @@ export function buildPostcardBackHtml(input: {
 
   contactPhone?: string | null;
 
+  /** Owner first name when known — bold-prefixed on the mobile-site pitch line. */
+
+  ownerName?: string | null;
+
 }): string {
 
   const phoneDisplay = formatUsPhoneDisplay(input.contactPhone);
@@ -127,6 +133,12 @@ export function buildPostcardBackHtml(input: {
     ? `<p class="scan-footer">Call/text us at ${escapeHtml(phoneDisplay)}</p>`
 
     : "";
+
+  const ownerFirst = postcardOwnerFirstName(input.ownerName);
+
+  const mobileSitePitchHtml = ownerFirst
+    ? `<strong>${escapeHtml(ownerFirst)} - </strong>Your mobile site is already built.`
+    : "Your mobile site is already built.";
 
 
 
@@ -184,7 +196,7 @@ h1 .headline-accent{color:${HEADLINE_ACCENT_RED}}
 
 <h1>Calls going to your <span class="headline-accent">competitors</span>?</h1>
 
-<p class="pitch-line">Your mobile site is already built.</p>
+<p class="pitch-line">${mobileSitePitchHtml}</p>
 
 <p class="pitch-line">${valuePropHtml}</p>
 

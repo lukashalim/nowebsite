@@ -10,6 +10,7 @@ import { formatUsPhoneDisplay } from "@/lib/postcard/back-html";
 import {
   formatPostcardCallHeadlineHtml,
   headlineTrackingStyle,
+  postcardOwnerHeadlinePrefix,
 } from "@/lib/postcard/call-headline";
 import { pickPostcardReviewExcerpt } from "@/lib/postcard/review-excerpt";
 import {
@@ -25,7 +26,7 @@ const BLOCK_WIDTH = "2.7in";
 const BLOCK_LEFT = "1.775in";
 
 export function buildPostcardFrontHtml(input: {
-  /** e.g. "Get more roof repair calls" */
+  /** e.g. "More roof repair calls" (owner prefix applied separately) */
   headline: string;
   businessName: string;
   category?: string | null;
@@ -35,11 +36,17 @@ export function buildPostcardFrontHtml(input: {
   reviewCount?: number | null;
   reviewHighlights?: unknown;
   phone?: string | null;
+  ownerName?: string | null;
 }): string {
   const name = escapeHtml(input.businessName.trim() || "Your business");
-  const headlineText =
-    input.headline.trim() || "Get more local customer calls";
-  const headlineHtml = formatPostcardCallHeadlineHtml(headlineText);
+  const baseHeadline =
+    input.headline.trim() || "More local customer calls";
+  const ownerPrefix = postcardOwnerHeadlinePrefix(input.ownerName);
+  const headlineText = `${ownerPrefix}${baseHeadline}`;
+  const headlineHtml = formatPostcardCallHeadlineHtml(
+    baseHeadline,
+    input.ownerName,
+  );
   const headlineStyle = headlineTrackingStyle(headlineText.length);
   const category = escapeHtml(
     (input.category?.trim() || "Local business").toUpperCase(),

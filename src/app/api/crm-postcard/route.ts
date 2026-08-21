@@ -274,6 +274,7 @@ export async function POST(request: Request) {
     state,
     servicesOffered: row.services_offered,
     reviewHighlights: row.review_highlights,
+    ownerName,
   });
 
   const frontHtml = buildPostcardFrontHtml({
@@ -286,6 +287,7 @@ export async function POST(request: Request) {
     reviewCount: Number.isFinite(reviewCount) ? reviewCount : null,
     reviewHighlights: row.review_highlights,
     phone,
+    ownerName,
   });
 
   let scanUrl: string;
@@ -322,6 +324,7 @@ export async function POST(request: Request) {
     backHtml = buildPostcardBackHtml({
       businessName: name?.trim() || "your business",
       contactPhone,
+      ownerName,
     });
   } catch (err) {
     return NextResponse.json(
