@@ -71,7 +71,7 @@ export function formatPostcardCallHeadlineHtml(
   if (!parsed) return escapeHeadlineHtml(normalized);
 
   const ownerHtml = parsed.ownerPrefix
-    ? `${escapeHeadlineHtml(parsed.ownerPrefix)} - `
+    ? `<span class="headline-emphasis">${escapeHeadlineHtml(parsed.ownerPrefix)}</span> - `
     : "";
 
   return `${ownerHtml}${escapeHeadlineHtml(parsed.prefix)}<span class="headline-emphasis">${escapeHeadlineHtml(parsed.emphasis)}</span>${escapeHeadlineHtml(parsed.suffix)}`;
