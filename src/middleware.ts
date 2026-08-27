@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import {
+  ADMIN_COOKIE_NAME,
+  canAccessAdmin,
+  safeAdminNextPath,
+} from "@/lib/admin/auth";
 import { parseCitySlug } from "@/lib/directory/slugs";
 import {
   getRingReadyRobotsHeader,
@@ -82,6 +87,41 @@ export async function middleware(request: NextRequest) {
 
   if (isRingReady && !isRingReadyAllowedPath(pathname)) {
     return new NextResponse(null, { status: 404 });
+  }
+
+  if (pathname.startsWith("/admin")) {
+    const access = await canAccessAdmin({
+      host,
+      token: request.cookies.get(ADMIN_COOKIE_NAME)?.value,
+    });
+    const isLogin = pathname === "/admin/login";
+
+    if (access === "not_found") {
+      return new NextResponse(null, { status: 404 });
+    }
+
+    if (isLogin && access === "allow") {
+      const nextPath = safeAdminNextPath(
+        request.nextUrl.searchParams.get("next"),
+      );
+      const url = request.nextUrl.clone();
+      const parsedNext = new URL(nextPath, request.nextUrl.origin);
+      url.pathname = parsedNext.pathname;
+      url.search = parsedNext.search;
+      return NextResponse.redirect(url);
+    }
+
+    if (!isLogin && access === "login") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/admin/login";
+      const nextValue = `${pathname}${request.nextUrl.search}`;
+      url.search = `?next=${encodeURIComponent(nextValue)}`;
+      return NextResponse.redirect(url);
+    }
+
+    const response = NextResponse.next();
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+    return response;
   }
 
   if (

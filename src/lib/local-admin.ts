@@ -22,11 +22,11 @@ export function isLocalAdminEnabled(host?: string | null): boolean {
   if (process.env.ENABLE_LOCAL_ADMIN === "0") {
     return false;
   }
-  if (process.env.VERCEL === "1") {
-    return false;
-  }
   if (host && isPrivateLocalHost(host)) {
     return true;
+  }
+  if (process.env.VERCEL === "1") {
+    return false;
   }
   if (process.env.ENABLE_LOCAL_ADMIN === "1") {
     return true;

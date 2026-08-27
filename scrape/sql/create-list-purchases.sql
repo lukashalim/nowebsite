@@ -12,11 +12,22 @@ create table if not exists public.list_purchases (
   storage_path text,
   error_message text,
   created_at timestamptz not null default now(),
-  fulfilled_at timestamptz
+  fulfilled_at timestamptz,
+  buyer_email text,
+  amount_cents integer,
+  currency text,
+  email_status text
+    check (email_status is null or email_status in ('skipped', 'sent', 'failed')),
+  resend_email_id text,
+  email_sent_at timestamptz,
+  email_error text
 );
 
 create index if not exists idx_list_purchases_status_created
   on public.list_purchases (status, created_at desc);
+
+create index if not exists idx_list_purchases_created
+  on public.list_purchases (created_at desc);
 
 alter table public.list_purchases enable row level security;
 

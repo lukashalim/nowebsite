@@ -26,7 +26,7 @@ export async function sendListPurchaseCsvEmail(input: {
   csvUtf8: string;
   /** Used when CSV is too large to attach. */
   downloadUrl?: string;
-}): Promise<void> {
+}): Promise<string> {
   const resend = getResend();
   if (!resend) {
     throw new Error("Missing RESEND_API_KEY");
@@ -53,7 +53,7 @@ export async function sendListPurchaseCsvEmail(input: {
   text +=
     "\nIf you already downloaded the file in your browser, you can ignore this email.\n";
 
-  const { error } = await resend.emails.send({
+  const { data, error } = await resend.emails.send({
     from: FROM,
     to: input.to,
     subject,
@@ -72,4 +72,8 @@ export async function sendListPurchaseCsvEmail(input: {
   if (error) {
     throw new Error(error.message);
   }
+  if (!data?.id) {
+    throw new Error("Resend did not return an email id");
+  }
+  return data.id;
 }

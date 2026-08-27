@@ -103,6 +103,10 @@ export function ExtractAdminPanel() {
     <div className="mx-auto max-w-3xl space-y-8 p-4 sm:p-6">
       <header className="space-y-1">
         <p className="text-sm text-zinc-500">
+          <Link href="/admin/purchases" className="underline hover:text-zinc-800">
+            Purchases
+          </Link>
+          {" · "}
           <Link href="/scrape-progress" className="underline hover:text-zinc-800">
             Scrape progress →
           </Link>

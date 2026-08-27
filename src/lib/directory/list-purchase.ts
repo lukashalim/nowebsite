@@ -41,6 +41,8 @@ export const LIST_PURCHASE_FREE_ROWS = freeDirectoryCsvRowLimit(
 
 export type ListPurchaseStatus = "pending" | "fulfilled" | "failed";
 
+export type ListPurchaseEmailStatus = "skipped" | "sent" | "failed";
+
 export interface ListPurchaseRow {
   stripe_session_id: string;
   scope_kind: string;
@@ -53,6 +55,13 @@ export interface ListPurchaseRow {
   error_message: string | null;
   created_at: string;
   fulfilled_at: string | null;
+  buyer_email: string | null;
+  amount_cents: number | null;
+  currency: string | null;
+  email_status: ListPurchaseEmailStatus | null;
+  resend_email_id: string | null;
+  email_sent_at: string | null;
+  email_error: string | null;
 }
 
 export interface ListPurchaseMetadata {
@@ -242,6 +251,18 @@ function buyerEmailFromSession(session: Stripe.Checkout.Session): string | null 
   return null;
 }
 
+function purchasePaymentFromSession(session: Stripe.Checkout.Session): {
+  amount_cents: number | null;
+  currency: string | null;
+} {
+  const amount =
+    typeof session.amount_total === "number" && Number.isFinite(session.amount_total)
+      ? session.amount_total
+      : null;
+  const currency = session.currency?.trim().toLowerCase() || null;
+  return { amount_cents: amount, currency };
+}
+
 /**
  * Idempotent fulfillment from a paid Checkout Session.
  * Reads scope/filters only from session metadata.
@@ -261,6 +282,8 @@ export async function fulfillListPurchaseFromSession(
     return existing;
   }
 
+  const buyerEmail = buyerEmailFromSession(session);
+  const payment = purchasePaymentFromSession(session);
   const supabase = createSupabaseAdmin();
   const { error: upsertError } = await supabase.from("list_purchases").upsert(
     {
@@ -273,6 +296,9 @@ export async function fulfillListPurchaseFromSession(
       status: existing?.status === "failed" ? "pending" : (existing?.status ?? "pending"),
       storage_path: existing?.storage_path ?? null,
       error_message: null,
+      buyer_email: buyerEmail,
+      amount_cents: payment.amount_cents,
+      currency: payment.currency,
     },
     { onConflict: "stripe_session_id" },
   );
@@ -326,12 +352,19 @@ export async function fulfillListPurchaseFromSession(
 
     // Backup email — never fail fulfillment / webhook on Resend errors.
     try {
-      const to = buyerEmailFromSession(session);
+      const to = buyerEmail;
       if (!to) {
         console.error(
           "[list-purchase] email skipped: no buyer email on Checkout Session",
           { sessionId },
         );
+        await supabase
+          .from("list_purchases")
+          .update({
+            email_status: "skipped",
+            email_error: "No buyer email on Checkout Session",
+          })
+          .eq("stripe_session_id", sessionId);
       } else {
         const scopeLabel = listPurchaseScopeLabel(parsed.scope, parsed.filters);
         const csvBytes = Buffer.byteLength(csv, "utf8");
@@ -342,7 +375,7 @@ export async function fulfillListPurchaseFromSession(
             LIST_PURCHASE_EMAIL_LINK_TTL_SECONDS,
           );
         }
-        await sendListPurchaseCsvEmail({
+        const resendEmailId = await sendListPurchaseCsvEmail({
           to,
           scopeLabel,
           recordCount: remaining.length,
@@ -350,22 +383,46 @@ export async function fulfillListPurchaseFromSession(
           csvUtf8: csv,
           downloadUrl,
         });
+        await supabase
+          .from("list_purchases")
+          .update({
+            email_status: "sent",
+            resend_email_id: resendEmailId,
+            email_sent_at: new Date().toISOString(),
+            email_error: null,
+          })
+          .eq("stripe_session_id", sessionId);
         console.info("[list-purchase] email sent", {
           sessionId,
           to,
           attached: csvBytes <= LIST_PURCHASE_EMAIL_ATTACH_MAX_BYTES,
           recordCount: remaining.length,
+          resendEmailId,
         });
       }
     } catch (emailErr) {
+      const emailMessage =
+        emailErr instanceof Error ? emailErr.message : String(emailErr);
       console.error("[list-purchase] email failed (purchase still fulfilled)", {
         sessionId,
-        error:
-          emailErr instanceof Error ? emailErr.message : String(emailErr),
+        error: emailMessage,
       });
+      await supabase
+        .from("list_purchases")
+        .update({
+          email_status: "failed",
+          email_error: emailMessage.slice(0, 1000),
+        })
+        .eq("stripe_session_id", sessionId);
     }
 
-    return updated as ListPurchaseRow;
+    const { data: withEmail } = await supabase
+      .from("list_purchases")
+      .select("*")
+      .eq("stripe_session_id", sessionId)
+      .maybeSingle();
+
+    return (withEmail ?? updated) as ListPurchaseRow;
   } catch (err) {
     const message = err instanceof Error ? err.message : "Fulfillment failed";
     await supabase

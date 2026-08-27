@@ -6,7 +6,8 @@ export type RateLimitKind =
   | "directoryPage"
   | "directoryContacts"
   | "buyFullList"
-  | "ringreadySmsOptIn";
+  | "ringreadySmsOptIn"
+  | "adminLogin";
 
 interface RateLimitResult {
   success: boolean;
@@ -27,6 +28,7 @@ const LIMITS: Record<RateLimitKind, { requests: number; windowMs: number }> = {
   directoryContacts: { requests: 60, windowMs: 60 * 60 * 1000 },
   buyFullList: { requests: 20, windowMs: 60 * 60 * 1000 },
   ringreadySmsOptIn: { requests: 5, windowMs: 60 * 60 * 1000 },
+  adminLogin: { requests: 10, windowMs: 60 * 60 * 1000 },
 };
 
 function getRedis(): Redis | null {

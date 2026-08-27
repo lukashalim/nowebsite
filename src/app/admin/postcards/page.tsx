@@ -1,16 +1,15 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { headers } from "next/headers";
-import { notFound } from "next/navigation";
 import { z } from "zod";
+import { AdminNav } from "@/components/admin-nav";
 import {
   fetchAdminPostcardTracking,
   type PostcardTrackingMode,
   type PostcardTrackingPeriod,
   type PostcardTrackingStatus,
 } from "@/lib/admin/postcard-tracking";
-import { isLocalAdminEnabled } from "@/lib/local-admin";
+import { requireAdminPage } from "@/lib/admin/require-admin-page";
 
 export const dynamic = "force-dynamic";
 
@@ -83,10 +82,7 @@ function TabLink({
 }
 
 export default async function AdminPostcardsPage({ searchParams }: PageProps) {
-  const host = (await headers()).get("host");
-  if (!isLocalAdminEnabled(host)) {
-    notFound();
-  }
+  await requireAdminPage();
 
   const raw = await searchParams;
   const mode = modeSchema.safeParse(firstParam(raw.mode)).success
@@ -122,26 +118,7 @@ export default async function AdminPostcardsPage({ searchParams }: PageProps) {
             Test vs production uses separate usage event types.
           </p>
         </div>
-        <nav className="flex flex-wrap gap-2 text-sm">
-          <Link
-            href="/admin/usage"
-            className="rounded-md border border-zinc-300 px-3 py-1.5 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-900"
-          >
-            Usage
-          </Link>
-          <Link
-            href="/admin/scrape"
-            className="rounded-md border border-zinc-300 px-3 py-1.5 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-900"
-          >
-            Scrape
-          </Link>
-          <Link
-            href="/scrape-progress"
-            className="rounded-md border border-zinc-300 px-3 py-1.5 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-900"
-          >
-            Scrape progress
-          </Link>
-        </nav>
+        <AdminNav current="postcards" />
       </div>
 
       <div className="mb-6 flex flex-col gap-3">

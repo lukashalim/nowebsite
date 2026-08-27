@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
-import { notFound } from "next/navigation";
+import { AdminNav } from "@/components/admin-nav";
 import { ExtractAdminPanel } from "@/components/extract-admin-panel";
-import { isLocalAdminEnabled } from "@/lib/local-admin";
+import { requireAdminPage } from "@/lib/admin/require-admin-page";
 
 export const metadata: Metadata = {
   title: "Local ingest — NDJSON cache",
@@ -10,10 +9,14 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminScrapePage() {
-  const host = (await headers()).get("host");
-  if (!isLocalAdminEnabled(host)) {
-    notFound();
-  }
+  await requireAdminPage();
 
-  return <ExtractAdminPanel />;
+  return (
+    <>
+      <div className="mx-auto max-w-3xl px-4 pt-6 sm:px-6">
+        <AdminNav current="scrape" />
+      </div>
+      <ExtractAdminPanel />
+    </>
+  );
 }

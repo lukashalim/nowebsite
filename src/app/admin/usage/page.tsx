@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { headers } from "next/headers";
-import { notFound } from "next/navigation";
 import { z } from "zod";
+import { AdminNav } from "@/components/admin-nav";
+import { requireAdminPage } from "@/lib/admin/require-admin-page";
 import {
   fetchAdminUsageReport,
   USAGE_EVENT_LABELS,
@@ -12,7 +12,6 @@ import {
   type SegmentUtilization,
   type UsageSegment,
 } from "@/lib/admin/usage-stats";
-import { isLocalAdminEnabled } from "@/lib/local-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -410,10 +409,7 @@ function ServiceTable({ service }: { service: ServiceUsageRow }) {
 }
 
 export default async function AdminUsagePage({ searchParams }: PageProps) {
-  const host = (await headers()).get("host");
-  if (!isLocalAdminEnabled(host)) {
-    notFound();
-  }
+  await requireAdminPage();
 
   const raw = await searchParams;
   const parsedPeriod = periodSchema.safeParse(firstParam(raw.period));
@@ -435,26 +431,7 @@ export default async function AdminUsagePage({ searchParams }: PageProps) {
             user or anonymous session. CRM outreach is keyed by signed-in user.
           </p>
         </div>
-        <nav className="flex flex-wrap gap-2 text-sm">
-          <Link
-            href="/scrape-progress"
-            className="rounded-md border border-zinc-300 px-3 py-1.5 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-900"
-          >
-            Scrape progress
-          </Link>
-          <Link
-            href="/admin/postcards"
-            className="rounded-md border border-zinc-300 px-3 py-1.5 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-900"
-          >
-            Postcards
-          </Link>
-          <Link
-            href="/admin/scrape"
-            className="rounded-md border border-zinc-300 px-3 py-1.5 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-900"
-          >
-            Local scrape admin
-          </Link>
-        </nav>
+        <AdminNav current="usage" />
       </div>
 
       <SectionJumpNav />
