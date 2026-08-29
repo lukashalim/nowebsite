@@ -266,14 +266,9 @@ export async function POST(request: Request) {
   const slug = decodeURIComponent(slugEncoded);
   const liveDemoUrl = ringReadyTenantDemoUrl(username, slug);
 
-  const headline = await generatePostcardCallHeadline({
-    businessName: name,
+  const headline = generatePostcardCallHeadline({
     category,
     businessType: business_type,
-    city,
-    state,
-    servicesOffered: row.services_offered,
-    reviewHighlights: row.review_highlights,
     ownerName,
   });
 

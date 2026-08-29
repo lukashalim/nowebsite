@@ -26,7 +26,7 @@ const BLOCK_WIDTH = "2.7in";
 const BLOCK_LEFT = "1.775in";
 
 export function buildPostcardFrontHtml(input: {
-  /** e.g. "More roof repair calls" (owner prefix applied separately) */
+  /** e.g. "get more hvac jobs" (owner prefix applied separately) */
   headline: string;
   businessName: string;
   category?: string | null;
@@ -40,7 +40,7 @@ export function buildPostcardFrontHtml(input: {
 }): string {
   const name = escapeHtml(input.businessName.trim() || "Your business");
   const baseHeadline =
-    input.headline.trim() || "More local customer calls";
+    input.headline.trim() || "get more local jobs";
   const ownerPrefix = postcardOwnerHeadlinePrefix(input.ownerName);
   const headlineText = `${ownerPrefix}${baseHeadline}`;
   const headlineHtml = formatPostcardCallHeadlineHtml(
