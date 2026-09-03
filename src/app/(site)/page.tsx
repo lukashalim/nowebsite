@@ -98,6 +98,10 @@ export async function generateMetadata(): Promise<Metadata> {
     description,
     alternates: { canonical: absoluteUrl("/") },
     ...directoryOpenGraph({ title, description, path: "/" }),
+    other: {
+      "directree-verify":
+        "directree-verify=b73b6a8993cd24085a70f9cf2322181f",
+    },
   };
 }
 
