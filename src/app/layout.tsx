@@ -5,6 +5,7 @@ import { CrispChat } from "@/components/crisp-chat";
 import { GoogleAnalytics } from "@/components/google-analytics";
 import { LegalFooter } from "@/components/legal-footer";
 import { SiteJsonLdScript } from "@/components/site-jsonld-script";
+import { getClientSiteByHost } from "@/lib/client-sites";
 import {
   isRingReadyHost,
   RING_READY_ORIGIN,
@@ -24,6 +25,17 @@ const geistMono = Geist_Mono({
 
 export async function generateMetadata(): Promise<Metadata> {
   const host = (await headers()).get("host") ?? "";
+  const clientSite = getClientSiteByHost(host);
+  if (clientSite) {
+    return {
+      metadataBase: new URL(clientSite.origin),
+      title: {
+        default: clientSite.name,
+        template: "%s",
+      },
+      description: clientSite.description,
+    };
+  }
   if (isRingReadyHost(host)) {
     return {
       metadataBase: new URL(RING_READY_ORIGIN),
@@ -54,19 +66,20 @@ export default async function RootLayout({
 }>) {
   const host = (await headers()).get("host") ?? "";
   const isRingReady = isRingReadyHost(host);
+  const clientSite = getClientSiteByHost(host);
 
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <head>{!isRingReady ? <SiteJsonLdScript /> : null}</head>
+      <head>{!isRingReady && !clientSite ? <SiteJsonLdScript /> : null}</head>
       <body className="min-h-full flex flex-col">
         {children}
-        <LegalFooter />
-        {!isRingReady ? <CrispChat /> : null}
+        {!clientSite ? <LegalFooter /> : null}
+        {!isRingReady && !clientSite ? <CrispChat /> : null}
       </body>
-      {!isRingReady ? <GoogleAnalytics /> : null}
+      {!isRingReady && !clientSite ? <GoogleAnalytics /> : null}
     </html>
   );
 }

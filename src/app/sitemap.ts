@@ -9,6 +9,7 @@ import {
   DIRECTORY_MIN_UK_REGION_LISTINGS,
 } from "@/lib/directory/types";
 import { gbCityPath, gbCountryPath, gbRegionPath } from "@/lib/directory/paths";
+import { getClientSiteByHost } from "@/lib/client-sites";
 import { absoluteUrl } from "@/lib/site-url";
 import { isRingReadyHost } from "@/lib/ringready-site";
 
@@ -46,6 +47,18 @@ function hubEntry(
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const host = (await headers()).get("host") ?? "";
+  const clientSite = getClientSiteByHost(host);
+  if (clientSite) {
+    return [
+      {
+        url: clientSite.origin,
+        lastModified: new Date(),
+        changeFrequency: "weekly",
+        priority: 1,
+      },
+    ];
+  }
+
   const isRingReady = isRingReadyHost(host);
   if (isRingReady) {
     // Never expose a sitemap for ringreadysite.com.

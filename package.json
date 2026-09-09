@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:ringready": "next dev -p 3001",
+    "dev:client": "next dev -p 3002",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

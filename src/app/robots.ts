@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { headers } from "next/headers";
+import { getClientSiteByHost } from "@/lib/client-sites";
 import {
   isRingReadyHost,
   RING_READY_INDEXABLE_PATHS,
@@ -18,6 +19,19 @@ const PRODUCTION_DISALLOWS = [
 
 export default async function robots(): Promise<MetadataRoute.Robots> {
   const host = (await headers()).get("host") ?? "";
+  const clientSite = getClientSiteByHost(host);
+  if (clientSite) {
+    return {
+      rules: {
+        userAgent: "*",
+        allow: "/",
+        disallow: ["/live/", "/api/", "/admin/"],
+      },
+      sitemap: `${clientSite.origin}/sitemap.xml`,
+      host: new URL(clientSite.origin).host,
+    };
+  }
+
   const isRingReady = isRingReadyHost(host);
 
   if (isRingReady) {

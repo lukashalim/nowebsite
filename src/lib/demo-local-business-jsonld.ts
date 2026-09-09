@@ -6,6 +6,7 @@ import { absoluteUrl } from "@/lib/site-url";
 export function buildLocalBusinessJsonLd(
   b: DemoBusiness,
   publicPath?: string,
+  options?: { pageUrl?: string; description?: string },
 ): Record<string, unknown> {
   const name = b.name?.trim() || "Local business";
   const service =
@@ -18,9 +19,11 @@ export function buildLocalBusinessJsonLd(
   const areaLabel = [city, region].filter(Boolean).join(", ") || "your area";
 
   const salesBlurb = b.enrichment?.sales_summary?.trim();
-  const description = salesBlurb
-    ? salesBlurb.replace(/\s+/g, " ").slice(0, 500)
-    : `${name} offers ${service} in ${areaLabel}.`;
+  const description = (
+    options?.description?.trim() ||
+    salesBlurb ||
+    `${name} offers ${service} in ${areaLabel}.`
+  ).replace(/\s+/g, " ").slice(0, 500);
 
   const sameAs = collectSameAsUrls(
     b.facebook_url,
@@ -33,7 +36,7 @@ export function buildLocalBusinessJsonLd(
     "@type": "LocalBusiness",
     name,
     description,
-    url: absoluteUrl(publicPath ?? demoPublicPath(b)),
+    url: options?.pageUrl ?? absoluteUrl(publicPath ?? demoPublicPath(b)),
   };
 
   const areaServed = [city, region, postal].filter(Boolean);

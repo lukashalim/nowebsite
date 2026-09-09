@@ -36,6 +36,7 @@ export const RING_READY_RESERVED_FIRST_SEGMENTS = new Set([
   "robots.txt",
   "sitemap.xml",
   "united-kingdom",
+  "live",
 ]);
 
 function getHostPort(host: string): string | null {

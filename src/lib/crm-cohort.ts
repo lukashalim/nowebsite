@@ -141,7 +141,14 @@ function parseHours(value: unknown): DemoBusinessHour[] | null {
     const day = typeof row.day === "string" ? row.day.trim() : "";
     const opens = typeof row.opens === "string" ? row.opens.trim() : "";
     const closes = typeof row.closes === "string" ? row.closes.trim() : "";
-    const text = typeof row.text === "string" ? row.text.trim() : "";
+    const times = Array.isArray(row.times)
+      ? row.times
+          .filter((t): t is string => typeof t === "string")
+          .map((t) => t.trim())
+          .filter(Boolean)
+      : [];
+    const text =
+      (typeof row.text === "string" ? row.text.trim() : "") || times.join(", ");
     if (!day && !text) continue;
     out.push({
       day: day || "Hours",

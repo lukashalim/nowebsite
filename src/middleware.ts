@@ -7,6 +7,11 @@ import {
 } from "@/lib/admin/auth";
 import { parseCitySlug } from "@/lib/directory/slugs";
 import {
+  clientSiteApexHostname,
+  getClientSiteByHost,
+  isClientSiteAllowedPath,
+} from "@/lib/client-sites";
+import {
   getRingReadyRobotsHeader,
   isRingReadyAllowedPath,
   isRingReadyHost,
@@ -74,6 +79,39 @@ function copyCookies(from: NextResponse, to: NextResponse) {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const host = request.headers.get("host") ?? "";
+  const clientSite = getClientSiteByHost(host);
+
+  if (clientSite) {
+    const hostname = host.split(":")[0]?.toLowerCase() ?? "";
+    const apex = clientSiteApexHostname(clientSite);
+    if (
+      process.env.NODE_ENV === "production" &&
+      hostname === `www.${apex}`
+    ) {
+      const url = request.nextUrl.clone();
+      url.protocol = "https:";
+      url.hostname = apex;
+      url.port = "";
+      return NextResponse.redirect(url, 308);
+    }
+
+    if (!isClientSiteAllowedPath(pathname)) {
+      return new NextResponse(null, { status: 404 });
+    }
+
+    if (pathname === "/" || pathname === "") {
+      const url = request.nextUrl.clone();
+      url.pathname = `/live/${clientSite.id}`;
+      return NextResponse.rewrite(url);
+    }
+
+    return NextResponse.next();
+  }
+
+  if (pathname === "/live" || pathname.startsWith("/live/")) {
+    return new NextResponse(null, { status: 404 });
+  }
+
   const isRingReady = isRingReadyHost(host);
 
   const withRingReadyRobotsHeader = (response: NextResponse) => {
