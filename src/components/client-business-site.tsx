@@ -69,9 +69,9 @@ export function ClientBusinessSite({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <div className="min-h-screen bg-[#f4efe3] text-[#1b2b1c]" style={{ colorScheme: "light" }}>
-        <header className="border-b border-[#d9d0bc] bg-[#f7f3e9]/95 backdrop-blur">
+        <header className="fixed inset-x-0 top-0 z-50 border-b border-[#d9d0bc] bg-[#f7f3e9]/95 shadow-[0_1px_0_0_rgba(61,45,31,0.08)] backdrop-blur">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
-            <a href="#top" className="font-semibold tracking-tight">
+            <a href="#top" className="min-w-0 truncate font-semibold tracking-tight">
               {site.name}
             </a>
             <nav
@@ -91,7 +91,7 @@ export function ClientBusinessSite({
             {callHref ? (
               <a
                 href={callHref}
-                className="inline-flex items-center gap-2 rounded-full bg-[#2f6b3a] px-4 py-2 text-sm font-semibold text-white hover:bg-[#245830]"
+                className="inline-flex shrink-0 items-center gap-2 rounded-full bg-[#2f6b3a] px-4 py-2 text-sm font-semibold text-white hover:bg-[#245830]"
               >
                 <Phone className="size-4" aria-hidden />
                 Call {phone}
@@ -100,7 +100,7 @@ export function ClientBusinessSite({
           </div>
         </header>
 
-        <main id="top">
+        <main id="top" className="pt-[4.75rem]">
           <section className="bg-[#1b3a2a] text-[#f4efe3]">
             <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 sm:py-24">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#c4a35a]">
@@ -149,7 +149,7 @@ export function ClientBusinessSite({
 
           <section
             id="services"
-            className="border-y border-[#d9d0bc] bg-[#f7f3e9] py-14"
+            className="scroll-mt-24 border-y border-[#d9d0bc] bg-[#f7f3e9] py-14"
           >
             <div className="mx-auto max-w-5xl px-4 sm:px-6">
               <h2 className="text-2xl font-bold tracking-tight">Services</h2>
@@ -179,7 +179,7 @@ export function ClientBusinessSite({
           </section>
 
           {reviews.length > 0 ? (
-            <section id="reviews" className="mx-auto max-w-5xl px-4 py-14 sm:px-6">
+            <section id="reviews" className="mx-auto max-w-5xl scroll-mt-24 px-4 py-14 sm:px-6">
               <h2 className="text-2xl font-bold tracking-tight">
                 What customers are saying
               </h2>
@@ -217,7 +217,7 @@ export function ClientBusinessSite({
 
           <section
             id="contact"
-            className="border-t border-[#d9d0bc] bg-[#f7f3e9] py-14"
+            className="scroll-mt-24 border-t border-[#d9d0bc] bg-[#f7f3e9] py-14"
           >
             <div className="mx-auto grid max-w-5xl gap-10 px-4 sm:grid-cols-2 sm:px-6">
               <div>
