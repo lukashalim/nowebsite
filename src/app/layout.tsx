@@ -5,7 +5,10 @@ import { CrispChat } from "@/components/crisp-chat";
 import { GoogleAnalytics } from "@/components/google-analytics";
 import { LegalFooter } from "@/components/legal-footer";
 import { SiteJsonLdScript } from "@/components/site-jsonld-script";
-import { getClientSiteByHost } from "@/lib/client-sites";
+import {
+  clientSiteGaMeasurementId,
+  getClientSiteByHost,
+} from "@/lib/client-sites";
 import {
   isRingReadyHost,
   RING_READY_ORIGIN,
@@ -67,6 +70,9 @@ export default async function RootLayout({
   const host = (await headers()).get("host") ?? "";
   const isRingReady = isRingReadyHost(host);
   const clientSite = getClientSiteByHost(host);
+  const clientGaId = clientSite
+    ? clientSiteGaMeasurementId(clientSite)
+    : null;
 
   return (
     <html
@@ -79,7 +85,11 @@ export default async function RootLayout({
         {!clientSite ? <LegalFooter /> : null}
         {!isRingReady && !clientSite ? <CrispChat /> : null}
       </body>
-      {!isRingReady && !clientSite ? <GoogleAnalytics /> : null}
+      {clientGaId ? (
+        <GoogleAnalytics gaId={clientGaId} />
+      ) : !isRingReady && !clientSite ? (
+        <GoogleAnalytics />
+      ) : null}
     </html>
   );
 }

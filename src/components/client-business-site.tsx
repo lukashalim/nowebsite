@@ -13,6 +13,10 @@ import type { DemoBusiness } from "@/lib/crm-cohort";
 import type { ClientSite } from "@/lib/client-sites";
 import { buildLocalBusinessJsonLd } from "@/lib/demo-local-business-jsonld";
 import { openStreetMapLink } from "@/lib/demo-enrichment";
+import {
+  ClientSiteCallLink,
+  ClientSiteOutboundLink,
+} from "@/components/client-site-tracked-link";
 
 const SERVICE_ICONS = [Trees, Scissors, Leaf, Flame] as const;
 
@@ -89,13 +93,15 @@ export function ClientBusinessSite({
               </a>
             </nav>
             {callHref ? (
-              <a
+              <ClientSiteCallLink
                 href={callHref}
+                siteId={site.id}
+                location="header"
                 className="inline-flex shrink-0 items-center gap-2 rounded-full bg-[#2f6b3a] px-4 py-2 text-sm font-semibold text-white hover:bg-[#245830]"
               >
                 <Phone className="size-4" aria-hidden />
                 Call {phone}
-              </a>
+              </ClientSiteCallLink>
             ) : null}
           </div>
         </header>
@@ -128,13 +134,15 @@ export function ClientBusinessSite({
               ) : null}
               {callHref ? (
                 <div className="mt-8">
-                  <a
+                  <ClientSiteCallLink
                     href={callHref}
+                    siteId={site.id}
+                    location="hero"
                     className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#c4a35a] px-6 py-3 text-base font-semibold text-[#1b2b1c] hover:bg-[#b39148]"
                   >
                     <Phone className="size-5" aria-hidden />
                     Call {phone} for a quote
-                  </a>
+                  </ClientSiteCallLink>
                 </div>
               ) : null}
             </div>
@@ -225,13 +233,15 @@ export function ClientBusinessSite({
                 <ul className="mt-6 space-y-4 text-[#3d5340]">
                   {phone && callHref ? (
                     <li>
-                      <a
+                      <ClientSiteCallLink
                         href={callHref}
+                        siteId={site.id}
+                        location="contact"
                         className="inline-flex items-center gap-2 font-medium text-[#1b3a2a] hover:underline"
                       >
                         <Phone className="size-4" aria-hidden />
                         {phone}
-                      </a>
+                      </ClientSiteCallLink>
                     </li>
                   ) : null}
                   {business.address || locLine ? (
@@ -250,28 +260,34 @@ export function ClientBusinessSite({
                   ) : null}
                   {business.google_maps_link ? (
                     <li>
-                      <a
+                      <ClientSiteOutboundLink
                         href={business.google_maps_link}
+                        siteId={site.id}
+                        label="Google Maps"
+                        location="contact"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-2 font-medium text-[#1b3a2a] hover:underline"
                       >
                         <ExternalLink className="size-4" aria-hidden />
                         Google Maps
-                      </a>
+                      </ClientSiteOutboundLink>
                     </li>
                   ) : null}
                   {osm ? (
                     <li>
-                      <a
+                      <ClientSiteOutboundLink
                         href={osm}
+                        siteId={site.id}
+                        label="OpenStreetMap"
+                        location="contact"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-2 font-medium text-[#1b3a2a] hover:underline"
                       >
                         <MapPin className="size-4" aria-hidden />
                         OpenStreetMap
-                      </a>
+                      </ClientSiteOutboundLink>
                     </li>
                   ) : null}
                 </ul>
