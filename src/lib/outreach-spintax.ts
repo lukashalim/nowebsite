@@ -100,6 +100,7 @@ export interface OutreachTokenOpts {
   businessType?: string | null;
   demoLink?: string | null;
   senderName?: string | null;
+  angiCompetitors?: Array<{ name: string }> | null;
 }
 
 function outreachNameToken(opts: OutreachTokenOpts): string {
@@ -112,6 +113,29 @@ function outreachNameToken(opts: OutreachTokenOpts): string {
 
 function outreachBusinessNameToken(opts: OutreachTokenOpts): string {
   return opts.name?.trim() || "your business";
+}
+
+function angiCompetitorNames(
+  opts: OutreachTokenOpts,
+): [string, string, string] {
+  const names = (opts.angiCompetitors ?? [])
+    .map((c) => c.name?.trim())
+    .filter(Boolean) as string[];
+  return [
+    names[0] ?? "a nearby competitor",
+    names[1] ?? "another local pro",
+    names[2] ?? "other Angi leads",
+  ];
+}
+
+function angiCompetitorsListToken(opts: OutreachTokenOpts): string {
+  const names = (opts.angiCompetitors ?? [])
+    .map((c) => c.name?.trim())
+    .filter(Boolean) as string[];
+  if (names.length === 0) return "your competitors";
+  if (names.length === 1) return names[0]!;
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
 }
 
 export function applyOutreachTokens(
@@ -127,6 +151,8 @@ export function applyOutreachTokens(
   const demoLink = opts.demoLink?.trim() || SPINTAX_PREVIEW_SAMPLE_DEMO_LINK;
   const senderName =
     opts.senderName?.trim() || SPINTAX_PREVIEW_SAMPLE_SENDER_NAME;
+  const [c1, c2, c3] = angiCompetitorNames(opts);
+  const competitorsList = angiCompetitorsListToken(opts);
 
   return template
     .replaceAll("[Name]", nameToken)
@@ -134,7 +160,11 @@ export function applyOutreachTokens(
     .replaceAll("[category]", category)
     .replaceAll("{Business Name}", businessName)
     .replaceAll("{demo_link}", demoLink)
-    .replaceAll("{Your name}", senderName);
+    .replaceAll("{Your name}", senderName)
+    .replaceAll("{angi_competitor_1}", c1)
+    .replaceAll("{angi_competitor_2}", c2)
+    .replaceAll("{angi_competitor_3}", c3)
+    .replaceAll("{angi_competitors}", competitorsList);
 }
 
 export function buildOutreachMessage(
@@ -154,6 +184,11 @@ export function defaultSpintaxPreviewOpts(
     businessType: null,
     demoLink: SPINTAX_PREVIEW_SAMPLE_DEMO_LINK,
     senderName: SPINTAX_PREVIEW_SAMPLE_SENDER_NAME,
+    angiCompetitors: [
+      { name: "Acme Plumbing" },
+      { name: "City Pipe Pros" },
+      { name: "Harbor HVAC" },
+    ],
     ...overrides,
   };
 }

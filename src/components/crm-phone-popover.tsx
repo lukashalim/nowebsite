@@ -19,10 +19,12 @@ import { buildOutreachMessage } from "@/lib/outreach-spintax";
 import { normalizePhoneE164, type PhoneCountry } from "@/lib/phone-lookup";
 import {
   filterSpintaxTemplatesForLeadChannel,
-  type SpintaxAudience,
+  preferAngiSpintaxTemplate,
+  type SpintaxLeadAudienceContext,
 } from "@/lib/spintax-audience";
 import type { CrmUsageAction } from "@/lib/crm-limits";
 import type { SpintaxTemplate } from "@/lib/spintax-templates";
+import type { AngiCompetitor } from "@/lib/angi-listing";
 
 interface CrmPhonePopoverProps {
   phone: string;
@@ -36,7 +38,8 @@ interface CrmPhonePopoverProps {
   contactEmail: string | null;
   enrichmentEmail: string | null;
   senderName?: string | null;
-  leadAudience: SpintaxAudience;
+  leadAudience: SpintaxLeadAudienceContext;
+  angiCompetitors?: AngiCompetitor[] | null;
   templates: SpintaxTemplate[];
   existingNotes: string | null;
   outreachRemaining: number | null;
@@ -81,6 +84,7 @@ export function CrmPhonePopover({
   enrichmentEmail,
   senderName,
   leadAudience,
+  angiCompetitors,
   templates,
   existingNotes,
   outreachRemaining,
@@ -118,7 +122,8 @@ export function CrmPhonePopover({
       setSelectedSmsId(stored);
       return;
     }
-    setSelectedSmsId(smsTemplates[0].id);
+    const preferred = preferAngiSpintaxTemplate(smsTemplates);
+    if (preferred) setSelectedSmsId(preferred.id);
   }, [smsTemplates, userId]);
 
   useEffect(() => {
@@ -128,7 +133,8 @@ export function CrmPhonePopover({
       setSelectedCallId(stored);
       return;
     }
-    setSelectedCallId(callTemplates[0].id);
+    const preferred = preferAngiSpintaxTemplate(callTemplates);
+    if (preferred) setSelectedCallId(preferred.id);
   }, [callTemplates, userId]);
 
   useEffect(() => {
@@ -222,8 +228,10 @@ export function CrmPhonePopover({
 
     const message = buildOutreachMessage(selectedSmsTemplate.template, {
       name: businessName,
+      ownerName,
       mainCategory,
       businessType,
+      angiCompetitors,
     });
     window.localStorage.setItem(
       lastSmsTemplateStorageKey(userId),
@@ -301,9 +309,10 @@ export function CrmPhonePopover({
         "call",
         leadAudience,
       );
-      const callTemplate =
-        freshCallTemplates.find((t) => t.id === callTemplateId) ??
-        freshCallTemplates[0];
+      const callTemplate = preferAngiSpintaxTemplate(
+        freshCallTemplates,
+        callTemplateId,
+      );
       if (!callTemplate) {
         window.alert("No call script matches this lead type.");
         return;
@@ -316,6 +325,7 @@ export function CrmPhonePopover({
         businessType,
         demoLink: demoResult.url,
         senderName: senderName?.trim() || null,
+        angiCompetitors,
       };
 
       const scriptSteps = buildCallScriptSteps(
