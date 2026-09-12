@@ -78,11 +78,11 @@ body{width:6.25in;height:4.25in;font-family:${LOB_PRINT_FONT_FAMILY};color:#1818
 .copy{position:absolute;top:${COPY.top};left:${COPY.left};width:${COPY.width};max-height:${COPY.maxHeight};overflow:hidden}
 h1{font-size:${headlineSize};font-weight:700;line-height:1.12;letter-spacing:-0.03em;margin:0 0 .1in;color:#18181b}
 .support{font-size:10pt;line-height:1.3;color:#3f3f46;margin:0;max-width:100%}
-.qr-cluster{position:absolute;top:${QR_CLUSTER.top};left:${QR_CLUSTER.left};width:${QR_CLUSTER.width};text-align:center}
-.qr-label{height:.14in;line-height:.14in;font-size:8pt;font-weight:700;letter-spacing:.14em;color:#18181b;margin:0 0 .08in}
-.qr-slot{width:${QR_SIZE};height:${QR_SIZE};margin:0 auto;background:#fff}
-.qr-proof{font-size:7pt;line-height:1.25;color:#71717a;margin:.08in 0 0}
-.qr-phone{font-size:7.5pt;line-height:1.3;color:#3f3f46;margin:.06in 0 0}
+.qr-cluster{position:absolute;top:${QR_CLUSTER.top};left:${QR_CLUSTER.left};width:${QR_CLUSTER.width};height:1.95in;text-align:center}
+.qr-label{position:absolute;top:0;left:0;width:100%;height:.14in;line-height:.14in;font-size:8pt;font-weight:700;letter-spacing:.14em;color:#18181b}
+.qr-slot{position:absolute;top:.22in;left:.835in;width:${QR_SIZE};height:${QR_SIZE};background:#fff}
+.qr-proof{position:absolute;top:1.55in;left:0;width:100%;font-size:7pt;line-height:1.25;color:#71717a}
+.qr-phone{position:absolute;top:1.72in;left:0;width:100%;font-size:7.5pt;line-height:1.3;color:#3f3f46}
 </style>
 </head>
 <body>
