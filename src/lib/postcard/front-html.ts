@@ -1,17 +1,12 @@
 /**
  * Lob 4×6 postcard front HTML (landscape bleed 6.25″×4.25″).
- * Compact phone-frame mockup centered on Lob's full landscape artboard.
+ * Phone-frame mockup of the live site, with a 1in scan QR in the right gutter.
  */
 
 import "server-only";
 
 import { parseReviewHighlights } from "@/lib/demo-review-types";
 import { formatUsPhoneDisplay } from "@/lib/postcard/back-html";
-import {
-  formatPostcardCallHeadlineHtml,
-  headlineTrackingStyle,
-  postcardOwnerHeadlinePrefix,
-} from "@/lib/postcard/call-headline";
 import { pickPostcardReviewExcerpt } from "@/lib/postcard/review-excerpt";
 import {
   LOB_PRINT_FONT_FAMILY,
@@ -21,13 +16,12 @@ import {
 /** White handset icon for Lob print CTA (inline SVG — no external asset). */
 const CTA_PHONE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="#ffffff" aria-hidden="true"><path d="M6.62 10.79a15.15 15.15 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.01-.24c1.12.37 2.33.57 3.58.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.46.57 3.58a1 1 0 0 1-.25 1.02l-2.2 2.19z"/></svg>`;
 
-/** Centered block: (6.25 − 2.7) / 2 = 1.775in. */
-const BLOCK_WIDTH = "2.7in";
-const BLOCK_LEFT = "1.775in";
+const PHONE_WIDTH = "2.7in";
+const PHONE_LEFT = "0.50in";
+const QR_LEFT = "3.48in";
+const QR_SIZE = "1in";
 
 export function buildPostcardFrontHtml(input: {
-  /** e.g. "get more hvac jobs" (owner prefix applied separately) */
-  headline: string;
   businessName: string;
   category?: string | null;
   city?: string | null;
@@ -36,23 +30,19 @@ export function buildPostcardFrontHtml(input: {
   reviewCount?: number | null;
   reviewHighlights?: unknown;
   phone?: string | null;
-  ownerName?: string | null;
+  /** HTTPS PNG URL for the 1in front QR. Omitted if upload failed. */
+  qrImageUrl?: string | null;
 }): string {
   const name = escapeHtml(input.businessName.trim() || "Your business");
-  const baseHeadline =
-    input.headline.trim() || "get more local jobs";
-  const ownerPrefix = postcardOwnerHeadlinePrefix(input.ownerName);
-  const headlineText = `${ownerPrefix}${baseHeadline}`;
-  const headlineHtml = formatPostcardCallHeadlineHtml(
-    baseHeadline,
-    input.ownerName,
-  );
-  const headlineStyle = headlineTrackingStyle(headlineText.length);
   const category = escapeHtml(
     (input.category?.trim() || "Local business").toUpperCase(),
   );
   const loc = [input.city?.trim(), input.state?.trim()].filter(Boolean).join(", ");
   const locHtml = loc ? escapeHtml(loc) : "";
+  const city = input.city?.trim() ?? "";
+  const subline = city
+    ? `${city} · already live · yours to claim`
+    : "Already live · yours to claim";
 
   const rating =
     input.rating != null && Number.isFinite(Number(input.rating))
@@ -99,6 +89,14 @@ export function buildPostcardFrontHtml(input: {
     ? `<p class="review-name">— ${reviewerHtml}</p>`
     : "";
 
+  const qrUrl = safeQrSrc(input.qrImageUrl);
+  const qrCol = qrUrl
+    ? `<div class="qr-col">
+    <p class="qr-col-label">SCAN TO OPEN IT</p>
+    <img class="qr-img" src="${escapeHtml(qrUrl)}" width="300" height="300" alt="" />
+  </div>`
+    : "";
+
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -120,29 +118,30 @@ export function buildPostcardFrontHtml(input: {
       background: #f5f0e8;
       position: relative;
     }
-    .block {
+    .header {
       position: absolute;
-      top: 0.28in;
-      left: ${BLOCK_LEFT};
-      width: ${BLOCK_WIDTH};
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      top: 0.22in;
+      left: 0.38in;
+      width: 5.49in;
     }
-    .headline {
-      font-size: 14pt;
+    .header-title {
+      font-size: 12.5pt;
       font-weight: 700;
       line-height: 1.2;
       color: #064e3b;
-      text-align: center;
-      margin: 0 0 0.14in;
-      width: auto;
-      max-width: 100%;
-      display: inline-block;
+      letter-spacing: -0.02em;
       white-space: nowrap;
     }
-    .headline-emphasis {
-      color: #d97706;
+    .header-sub {
+      font-size: 8pt;
+      color: #78716c;
+      margin-top: 0.04in;
+    }
+    .phone-wrap {
+      position: absolute;
+      top: 0.70in;
+      left: ${PHONE_LEFT};
+      width: ${PHONE_WIDTH};
     }
     .phone {
       width: 100%;
@@ -253,11 +252,36 @@ export function buildPostcardFrontHtml(input: {
       font-size: 7pt;
       color: #78716c;
     }
+    .qr-col {
+      position: absolute;
+      top: 1.55in;
+      left: ${QR_LEFT};
+      width: 1.4in;
+      text-align: center;
+    }
+    .qr-col-label {
+      font-size: 7pt;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: #18181b;
+      margin: 0 0 0.06in;
+      white-space: nowrap;
+    }
+    .qr-img {
+      width: ${QR_SIZE};
+      height: ${QR_SIZE};
+      display: block;
+      margin: 0 auto;
+      background: #fff;
+    }
   </style>
 </head>
 <body>
-  <div class="block">
-    <p class="headline"${headlineStyle}>${headlineHtml}</p>
+  <div class="header">
+    <p class="header-title">This is the site customers see when they scan.</p>
+    <p class="header-sub">${escapeHtml(subline)}</p>
+  </div>
+  <div class="phone-wrap">
     <div class="phone">
       <div class="notch"></div>
       <div class="screen">
@@ -279,8 +303,24 @@ export function buildPostcardFrontHtml(input: {
       </div>
     </div>
   </div>
+  ${qrCol}
 </body>
 </html>`;
+}
+
+function safeQrSrc(value?: string | null): string | null {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed) return null;
+  if (/^[A-Za-z0-9._/-]+\.png$/.test(trimmed) && !trimmed.includes("..")) {
+    return trimmed;
+  }
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== "https:") return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
 }
 
 function escapeHtml(value: string): string {

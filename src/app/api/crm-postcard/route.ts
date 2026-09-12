@@ -22,10 +22,10 @@ import {
   leadToLobAddress,
 } from "@/lib/postcard/address";
 import { buildPostcardBackHtml, LOB_BACK_QR_PLACEMENT } from "@/lib/postcard/back-html";
-import { generatePostcardCallHeadline } from "@/lib/postcard/call-headline";
 import { shortenCompanyNameForLob } from "@/lib/postcard/company-name";
 import { buildPostcardFrontHtml } from "@/lib/postcard/front-html";
 import { assertCanSendPostcard, assertCanSendLivePostcardToLeadToday } from "@/lib/postcard/limits";
+import { uploadPostcardQrPublicUrl } from "@/lib/postcard/qr";
 import { buildPostcardScanUrl } from "@/lib/postcard/scan-link";
 import { createPostcardScanLinkUrl } from "@/lib/postcard/scan-links-db";
 import { ensureProfileUsername } from "@/lib/profile-username";
@@ -265,25 +265,7 @@ export async function POST(request: Request) {
   });
   const slug = decodeURIComponent(slugEncoded);
   const liveDemoUrl = ringReadyTenantDemoUrl(username, slug);
-
-  const headline = generatePostcardCallHeadline({
-    category,
-    businessType: business_type,
-    ownerName,
-  });
-
-  const frontHtml = buildPostcardFrontHtml({
-    headline,
-    businessName: name?.trim() || "your business",
-    category,
-    city,
-    state,
-    rating: Number.isFinite(rating) ? rating : null,
-    reviewCount: Number.isFinite(reviewCount) ? reviewCount : null,
-    reviewHighlights: row.review_highlights,
-    phone,
-    ownerName,
-  });
+  const businessName = name?.trim() || "";
 
   let scanUrl: string;
   try {
@@ -307,6 +289,28 @@ export async function POST(request: Request) {
     });
   }
 
+  let frontQrImageUrl: string | null = null;
+  try {
+    frontQrImageUrl = await uploadPostcardQrPublicUrl({
+      targetUrl: scanUrl,
+      placeId,
+    });
+  } catch (err) {
+    console.warn("[crm-postcard] front QR upload failed; sending without flip QR", err);
+  }
+
+  const frontHtml = buildPostcardFrontHtml({
+    businessName: businessName || "your business",
+    category,
+    city,
+    state,
+    rating: Number.isFinite(rating) ? rating : null,
+    reviewCount: Number.isFinite(reviewCount) ? reviewCount : null,
+    reviewHighlights: row.review_highlights,
+    phone,
+    qrImageUrl: frontQrImageUrl,
+  });
+
   let backHtml: string;
   try {
     const storedReturn = await getUserPostcardReturnStored(user.id);
@@ -317,7 +321,7 @@ export async function POST(request: Request) {
       twilio?.forwardingNumber ||
       null;
     backHtml = buildPostcardBackHtml({
-      businessName: name?.trim() || "your business",
+      businessName,
       contactPhone,
       ownerName,
     });
