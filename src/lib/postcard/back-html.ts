@@ -26,13 +26,14 @@ export const POSTCARD_QR_LABEL = "SCAN TO OPEN YOUR SITE";
  *
  * Slot: 1.25in, centered in the 2.92in left column at left 0.28in.
  *   left bleed = 0.28 + (2.92 − 1.25) / 2 = 1.115in → trim 0.990in
- * Cluster starts at 1.58in so the QR + CTA sit above the USPS barcode
- * ink-free band (about the bottom 0.625in of trim ≈ 3.50in on the artboard).
- *   top bleed = 1.58 + 0.22 = 1.80in → trim 1.675in
+ * Cluster starts at 1.70in so a 3-line headline + 2-line support clear the
+ * scan label, while the QR + CTA stay above the USPS barcode ink-free band
+ * (about the bottom 0.625in of trim ≈ 3.50in on the artboard).
+ *   top bleed = 1.70 + 0.22 = 1.92in → trim 1.795in
  */
 export const LOB_BACK_QR_PLACEMENT = {
   widthIn: "1.25",
-  topIn: "1.675",
+  topIn: "1.795",
   leftIn: "0.990",
   pages: "back" as const,
 } as const;
@@ -42,12 +43,12 @@ const COPY = {
   top: "0.22in",
   left: "0.28in",
   width: "2.92in",
-  maxHeight: "1.32in",
+  height: "1.40in",
 } as const;
 
 /** Pinned QR cluster — independent of headline line count. */
 const QR_CLUSTER = {
-  top: "1.58in",
+  top: "1.70in",
   left: "0.28in",
   width: "2.92in",
 } as const;
@@ -101,7 +102,7 @@ ${LOB_PRINT_FONT_LINKS}
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{width:6.25in;height:4.25in;font-family:${LOB_PRINT_FONT_FAMILY};color:#18181b;background:#fff;position:relative}
-.copy{position:absolute;top:${COPY.top};left:${COPY.left};width:${COPY.width};max-height:${COPY.maxHeight};overflow:hidden}
+.copy{position:absolute;top:${COPY.top};left:${COPY.left};width:${COPY.width};height:${COPY.height};overflow:hidden}
 h1{font-size:${headlineSize};font-weight:700;line-height:1.12;letter-spacing:-0.03em;margin:0 0 .08in;color:#18181b}
 .support{font-size:10pt;line-height:1.3;color:#3f3f46;margin:0;max-width:100%}
 .qr-cluster{position:absolute;top:${QR_CLUSTER.top};left:${QR_CLUSTER.left};width:${QR_CLUSTER.width};height:1.78in;text-align:center}
@@ -197,9 +198,9 @@ function stripHeadlineCategoryWords(value: string): string {
 }
 
 function headlineFontSize(text: string): string {
-  if (text.length <= 52) return "20pt";
-  if (text.length <= 70) return "17pt";
-  return "15pt";
+  if (text.length <= 48) return "18pt";
+  if (text.length <= 64) return "16pt";
+  return "14pt";
 }
 
 function escapeHtml(value: string): string {
