@@ -24,25 +24,26 @@ export const POSTCARD_QR_LABEL = "SCAN TO OPEN YOUR SITE";
  * Native QR overlay is measured from the 6×4 trim edge; HTML uses the
  * 6.25×4.25 bleed artboard. Subtract 0.125in bleed from slot coordinates.
  *
- * Slot: 1.25in, centered in the 2.92in left column at left 0.28in.
- *   left bleed = 0.28 + (2.92 − 1.25) / 2 = 1.115in → trim 0.990in
- * Cluster starts at 1.70in so a 3-line headline + 2-line support clear the
- * scan label, while the QR + CTA stay above the USPS barcode ink-free band
- * (about the bottom 0.625in of trim ≈ 3.50in on the artboard).
+ * Left column stays inside ~2.50in of trim so it does not collide with Lob's
+ * return address / barcode / recipient block (right ~3.375in of a 6in card).
+ *
+ * Slot: 1.25in, left-aligned in the column.
+ *   left bleed = 0.42in → trim 0.295in
+ * Cluster top 1.70in:
  *   top bleed = 1.70 + 0.22 = 1.92in → trim 1.795in
  */
 export const LOB_BACK_QR_PLACEMENT = {
   widthIn: "1.25",
   topIn: "1.795",
-  leftIn: "0.990",
+  leftIn: "0.295",
   pages: "back" as const,
 } as const;
 
-/** Left creative column — headline + supporting line only. */
+/** Left creative column — must not enter the USPS address zone. */
 const COPY = {
   top: "0.22in",
   left: "0.28in",
-  width: "2.92in",
+  width: "2.40in",
   height: "1.40in",
 } as const;
 
@@ -50,7 +51,7 @@ const COPY = {
 const QR_CLUSTER = {
   top: "1.70in",
   left: "0.28in",
-  width: "2.92in",
+  width: "2.40in",
 } as const;
 
 const QR_SIZE = "1.25in";
@@ -91,8 +92,8 @@ export function buildPostcardBackHtml(input: {
     : DEFAULT_SUPPORT;
 
   const phoneHtml = phoneDisplay
-    ? `Or text ${escapeHtml(phoneDisplay)} for the free 30-day trial`
-    : "Or text us for the free 30-day trial";
+    ? `Or text ${escapeHtml(phoneDisplay)}<br>for the free 30-day trial`
+    : "Or text us<br>for the free 30-day trial";
 
   const html = `<!DOCTYPE html>
 <html>
@@ -105,10 +106,10 @@ body{width:6.25in;height:4.25in;font-family:${LOB_PRINT_FONT_FAMILY};color:#1818
 .copy{position:absolute;top:${COPY.top};left:${COPY.left};width:${COPY.width};height:${COPY.height};overflow:hidden}
 h1{font-size:${headlineSize};font-weight:700;line-height:1.12;letter-spacing:-0.03em;margin:0 0 .08in;color:#18181b}
 .support{font-size:10pt;line-height:1.3;color:#3f3f46;margin:0;max-width:100%}
-.qr-cluster{position:absolute;top:${QR_CLUSTER.top};left:${QR_CLUSTER.left};width:${QR_CLUSTER.width};height:1.78in;text-align:center}
-.qr-label{position:absolute;top:0;left:0;width:100%;height:.14in;line-height:.14in;font-size:8pt;font-weight:700;letter-spacing:.12em;color:#18181b}
-.qr-slot{position:absolute;top:.22in;left:.835in;width:${QR_SIZE};height:${QR_SIZE};background:#fff}
-.qr-phone{position:absolute;top:1.54in;left:0;width:100%;font-size:7pt;line-height:1.25;letter-spacing:-0.01em;color:#3f3f46;white-space:nowrap}
+.qr-cluster{position:absolute;top:${QR_CLUSTER.top};left:${QR_CLUSTER.left};width:${QR_CLUSTER.width};height:1.85in;text-align:left}
+.qr-label{position:absolute;top:0;left:.14in;width:1.25in;height:.16in;line-height:.16in;font-size:6.5pt;font-weight:700;letter-spacing:.04em;color:#18181b;text-align:center;white-space:nowrap}
+.qr-slot{position:absolute;top:.22in;left:.14in;width:${QR_SIZE};height:${QR_SIZE};background:#fff}
+.qr-phone{position:absolute;top:1.54in;left:.14in;width:1.50in;font-size:7pt;line-height:1.3;color:#3f3f46;text-align:left}
 </style>
 </head>
 <body>
