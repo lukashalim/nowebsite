@@ -29,12 +29,12 @@ export const POSTCARD_QR_LABEL = "SCAN TO OPEN YOUR SITE";
  *
  * Slot: 1.25in, left-aligned in the column.
  *   left bleed = 0.42in → trim 0.295in
- * Cluster top 1.70in:
- *   top bleed = 1.70 + 0.22 = 1.92in → trim 1.795in
+ * Cluster top 1.55in:
+ *   top bleed = 1.55 + 0.22 = 1.77in → trim 1.645in
  */
 export const LOB_BACK_QR_PLACEMENT = {
   widthIn: "1.25",
-  topIn: "1.795",
+  topIn: "1.645",
   leftIn: "0.295",
   pages: "back" as const,
 } as const;
@@ -44,12 +44,12 @@ const COPY = {
   top: "0.22in",
   left: "0.28in",
   width: "2.40in",
-  height: "1.40in",
+  height: "1.28in",
 } as const;
 
 /** Pinned QR cluster — independent of headline line count. */
 const QR_CLUSTER = {
-  top: "1.70in",
+  top: "1.55in",
   left: "0.28in",
   width: "2.40in",
 } as const;
