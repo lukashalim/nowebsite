@@ -1,12 +1,15 @@
 /**
  * Lob 4×6 postcard front HTML (landscape bleed 6.25″×4.25″).
- * Phone-frame mockup of the live site, with a 1in scan QR in the right gutter.
+ * Phone-frame mockup of the live site, with a 1.25in scan QR in the right gutter.
  */
 
 import "server-only";
 
 import { parseReviewHighlights } from "@/lib/demo-review-types";
-import { formatUsPhoneDisplay } from "@/lib/postcard/back-html";
+import {
+  formatUsPhoneDisplay,
+  POSTCARD_QR_LABEL,
+} from "@/lib/postcard/back-html";
 import { pickPostcardReviewExcerpt } from "@/lib/postcard/review-excerpt";
 import {
   LOB_PRINT_FONT_FAMILY,
@@ -18,8 +21,8 @@ const CTA_PHONE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="11" heigh
 
 const PHONE_WIDTH = "2.7in";
 const PHONE_LEFT = "0.50in";
-const QR_LEFT = "3.48in";
-const QR_SIZE = "1in";
+const QR_LEFT = "3.42in";
+const QR_SIZE = "1.25in";
 
 export function buildPostcardFrontHtml(input: {
   businessName: string;
@@ -30,7 +33,7 @@ export function buildPostcardFrontHtml(input: {
   reviewCount?: number | null;
   reviewHighlights?: unknown;
   phone?: string | null;
-  /** HTTPS PNG URL for the 1in front QR. Omitted if upload failed. */
+  /** HTTPS PNG URL for the 1.25in front QR. Omitted if upload failed. */
   qrImageUrl?: string | null;
 }): string {
   const name = escapeHtml(input.businessName.trim() || "Your business");
@@ -92,7 +95,7 @@ export function buildPostcardFrontHtml(input: {
   const qrUrl = safeQrSrc(input.qrImageUrl);
   const qrCol = qrUrl
     ? `<div class="qr-col">
-    <p class="qr-col-label">SCAN TO OPEN IT</p>
+    <p class="qr-col-label">${POSTCARD_QR_LABEL}</p>
     <img class="qr-img" src="${escapeHtml(qrUrl)}" width="300" height="300" alt="" />
   </div>`
     : "";
@@ -254,17 +257,17 @@ export function buildPostcardFrontHtml(input: {
     }
     .qr-col {
       position: absolute;
-      top: 1.55in;
+      top: 1.45in;
       left: ${QR_LEFT};
-      width: 1.4in;
+      width: 1.55in;
       text-align: center;
     }
     .qr-col-label {
-      font-size: 7pt;
+      font-size: 6.5pt;
       font-weight: 700;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.06em;
       color: #18181b;
-      margin: 0 0 0.06in;
+      margin: 0 0 0.07in;
       white-space: nowrap;
     }
     .qr-img {

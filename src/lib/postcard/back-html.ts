@@ -18,18 +18,21 @@ import {
   LOB_PRINT_FONT_LINKS,
 } from "@/lib/postcard/lob-fonts";
 
+export const POSTCARD_QR_LABEL = "SCAN TO OPEN YOUR SITE";
+
 /**
  * Native QR overlay is measured from the 6×4 trim edge; HTML uses the
  * 6.25×4.25 bleed artboard. Subtract 0.125in bleed from slot coordinates.
  *
  * Slot: 1.25in, centered in the 2.92in left column at left 0.28in.
  *   left bleed = 0.28 + (2.92 − 1.25) / 2 = 1.115in → trim 0.990in
- * Label is a fixed 0.14in + 0.08in gap above the slot.
- *   top bleed = 2.05 + 0.14 + 0.08 = 2.27in → trim 2.145in
+ * Cluster starts at 1.58in so the QR + CTA sit above the USPS barcode
+ * ink-free band (about the bottom 0.625in of trim ≈ 3.50in on the artboard).
+ *   top bleed = 1.58 + 0.22 = 1.80in → trim 1.675in
  */
 export const LOB_BACK_QR_PLACEMENT = {
   widthIn: "1.25",
-  topIn: "2.145",
+  topIn: "1.675",
   leftIn: "0.990",
   pages: "back" as const,
 } as const;
@@ -39,29 +42,52 @@ const COPY = {
   top: "0.22in",
   left: "0.28in",
   width: "2.92in",
-  maxHeight: "1.72in",
+  maxHeight: "1.32in",
 } as const;
 
 /** Pinned QR cluster — independent of headline line count. */
 const QR_CLUSTER = {
-  top: "2.05in",
+  top: "1.58in",
   left: "0.28in",
   width: "2.92in",
 } as const;
 
 const QR_SIZE = "1.25in";
 
+const RESTAURANT_HINT =
+  /restaurant|sushi|cafe|café|diner|bistro|pizzeria|steakhouse|taqueria|ramen|noodle|buffet|trattoria|grill|takeout|take-out|food\s*truck/i;
+
+const RESTAURANT_SUPPORT =
+  "People find you on Google. They can't tap for a menu or a table.";
+const DEFAULT_SUPPORT =
+  "People find you on Google. They just have nowhere to tap.";
+
 export function buildPostcardBackHtml(input: {
   businessName: string;
+  /** Short DBA for the headline only — never the legal name. */
+  shortDba?: string | null;
   /** Sender contact for "Or text …" (E.164 or national). */
   contactPhone?: string | null;
   /** Owner name when known — first name prefixes the headline. */
   ownerName?: string | null;
+  category?: string | null;
+  businessType?: string | null;
 }): string {
   const phoneDisplay = formatUsPhoneDisplay(input.contactPhone);
-  const headlineText = addressSideHeadline(input.ownerName, input.businessName);
+  const headlineText = addressSideHeadline(
+    input.ownerName,
+    input.shortDba,
+    input.businessName,
+  );
   const headlineHtml = escapeHtml(headlineText);
   const headlineSize = headlineFontSize(headlineText);
+  const support = isPostcardRestaurantCategory(
+    input.category,
+    input.businessType,
+    input.businessName,
+  )
+    ? RESTAURANT_SUPPORT
+    : DEFAULT_SUPPORT;
 
   const phoneHtml = phoneDisplay
     ? `Or text ${escapeHtml(phoneDisplay)} for the free 30-day trial`
@@ -76,24 +102,22 @@ ${LOB_PRINT_FONT_LINKS}
 *{box-sizing:border-box;margin:0;padding:0}
 body{width:6.25in;height:4.25in;font-family:${LOB_PRINT_FONT_FAMILY};color:#18181b;background:#fff;position:relative}
 .copy{position:absolute;top:${COPY.top};left:${COPY.left};width:${COPY.width};max-height:${COPY.maxHeight};overflow:hidden}
-h1{font-size:${headlineSize};font-weight:700;line-height:1.12;letter-spacing:-0.03em;margin:0 0 .1in;color:#18181b}
+h1{font-size:${headlineSize};font-weight:700;line-height:1.12;letter-spacing:-0.03em;margin:0 0 .08in;color:#18181b}
 .support{font-size:10pt;line-height:1.3;color:#3f3f46;margin:0;max-width:100%}
-.qr-cluster{position:absolute;top:${QR_CLUSTER.top};left:${QR_CLUSTER.left};width:${QR_CLUSTER.width};height:1.95in;text-align:center}
-.qr-label{position:absolute;top:0;left:0;width:100%;height:.14in;line-height:.14in;font-size:8pt;font-weight:700;letter-spacing:.14em;color:#18181b}
+.qr-cluster{position:absolute;top:${QR_CLUSTER.top};left:${QR_CLUSTER.left};width:${QR_CLUSTER.width};height:1.78in;text-align:center}
+.qr-label{position:absolute;top:0;left:0;width:100%;height:.14in;line-height:.14in;font-size:8pt;font-weight:700;letter-spacing:.12em;color:#18181b}
 .qr-slot{position:absolute;top:.22in;left:.835in;width:${QR_SIZE};height:${QR_SIZE};background:#fff}
-.qr-proof{position:absolute;top:1.55in;left:0;width:100%;font-size:7pt;line-height:1.25;color:#71717a}
-.qr-phone{position:absolute;top:1.72in;left:0;width:100%;font-size:7.5pt;line-height:1.3;color:#3f3f46}
+.qr-phone{position:absolute;top:1.54in;left:0;width:100%;font-size:7pt;line-height:1.25;letter-spacing:-0.01em;color:#3f3f46;white-space:nowrap}
 </style>
 </head>
 <body>
 <div class="copy">
 <h1>${headlineHtml}</h1>
-<p class="support">People find you on Google. They just have nowhere to tap.</p>
+<p class="support">${escapeHtml(support)}</p>
 </div>
 <div class="qr-cluster">
-<p class="qr-label">SCAN TO OPEN YOUR SITE</p>
+<p class="qr-label">${POSTCARD_QR_LABEL}</p>
 <div class="qr-slot"></div>
-<p class="qr-proof">Live preview &middot; no login &middot; no credit card</p>
 <p class="qr-phone">${phoneHtml}</p>
 </div>
 </body>
@@ -125,12 +149,19 @@ export function formatUsPhoneDisplay(
   return `(${national.slice(0, 3)}) ${national.slice(3, 6)}-${national.slice(6)}`;
 }
 
+export function isPostcardRestaurantCategory(
+  ...values: Array<string | null | undefined>
+): boolean {
+  return values.some((value) => Boolean(value && RESTAURANT_HINT.test(value)));
+}
+
 export function addressSideHeadline(
   ownerName?: string | null,
+  shortDba?: string | null,
   businessName?: string | null,
 ): string {
   const ownerFirst = postcardOwnerFirstName(ownerName);
-  const brand = postcardBrandName(businessName);
+  const brand = postcardBrandName(shortDba, businessName);
   if (ownerFirst && brand) {
     return `${ownerFirst} — your ${brand} site is already built.`;
   }
@@ -143,12 +174,26 @@ export function addressSideHeadline(
   return "Your site is already built.";
 }
 
-function postcardBrandName(businessName?: string | null): string | null {
-  const trimmed = businessName?.trim() ?? "";
-  if (!trimmed) return null;
-  const brand = fallbackCompanyName(trimmed);
+/** Short DBA for the headline — strips legal suffixes and trailing category words. */
+export function postcardBrandName(
+  shortDba?: string | null,
+  businessName?: string | null,
+): string | null {
+  const preferred = shortDba?.trim() || businessName?.trim() || "";
+  if (!preferred) return null;
+  const brand = stripHeadlineCategoryWords(fallbackCompanyName(preferred));
   if (!brand || /^your business$/i.test(brand)) return null;
   return brand;
+}
+
+function stripHeadlineCategoryWords(value: string): string {
+  const stripped = value
+    .replace(
+      /\s+(?:restaurants?|cafes?|cafés?|diners?|bistros?|services?|company|group|llc)$/i,
+      "",
+    )
+    .trim();
+  return stripped || value;
 }
 
 function headlineFontSize(text: string): string {

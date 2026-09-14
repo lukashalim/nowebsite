@@ -254,10 +254,9 @@ export async function POST(request: Request) {
     }
   }
 
-  const companyName =
-    ownerName && name?.trim()
-      ? await shortenCompanyNameForLob(name)
-      : null;
+  const shortDba = name?.trim()
+    ? await shortenCompanyNameForLob(name)
+    : null;
 
   const slugEncoded = demoPathSegment({
     place_id: placeId,
@@ -322,8 +321,11 @@ export async function POST(request: Request) {
       null;
     backHtml = buildPostcardBackHtml({
       businessName,
+      shortDba,
       contactPhone,
       ownerName,
+      category,
+      businessType: business_type,
     });
   } catch (err) {
     return NextResponse.json(
@@ -339,7 +341,6 @@ export async function POST(request: Request) {
 
   let to: LobAddress = leadToLobAddress({
     name,
-    companyName,
     ownerName,
     address: address!,
     city: city!,
