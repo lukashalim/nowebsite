@@ -289,7 +289,7 @@ export async function POST(request: Request) {
 
   const frontHtml = buildPostcardFrontHtml({
     businessName: businessName || "your business",
-    category,
+    ownerName,
     city,
     state,
     rating: Number.isFinite(rating) ? rating : null,
