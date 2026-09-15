@@ -5,6 +5,13 @@ import {
   canAccessAdmin,
   safeAdminNextPath,
 } from "@/lib/admin/auth";
+import {
+  REPORT_COOKIE_NAME,
+  canAccessClientReport,
+  parseReportPath,
+  reportLoginPath,
+  safeReportNextPath,
+} from "@/lib/client-report/auth";
 import { parseCitySlug } from "@/lib/directory/slugs";
 import {
   clientSiteApexHostname,
@@ -46,6 +53,7 @@ const SKIP_RATE_LIMIT_PREFIXES = [
   "/sms-disclosure",
   "/compliance",
   "/admin",
+  "/report",
   "/_next",
   "/scrape-progress",
   "/extract-progress",
@@ -160,6 +168,48 @@ export async function middleware(request: NextRequest) {
     const response = NextResponse.next();
     response.headers.set("X-Robots-Tag", "noindex, nofollow");
     return response;
+  }
+
+  if (pathname === "/report" || pathname.startsWith("/report/")) {
+    const parsed = parseReportPath(pathname);
+    if (!parsed) {
+      return new NextResponse(null, { status: 404 });
+    }
+
+    const access = await canAccessClientReport({
+      siteId: parsed.siteId,
+      host,
+      reportToken: request.cookies.get(REPORT_COOKIE_NAME)?.value,
+      adminToken: request.cookies.get(ADMIN_COOKIE_NAME)?.value,
+    });
+
+    if (access === "not_found") {
+      return new NextResponse(null, { status: 404 });
+    }
+
+    if (parsed.isLogin && access === "allow") {
+      const nextPath = safeReportNextPath(
+        parsed.siteId,
+        request.nextUrl.searchParams.get("next"),
+      );
+      const url = request.nextUrl.clone();
+      const parsedNext = new URL(nextPath, request.nextUrl.origin);
+      url.pathname = parsedNext.pathname;
+      url.search = parsedNext.search;
+      return NextResponse.redirect(url);
+    }
+
+    if (!parsed.isLogin && !parsed.isLogout && access === "login") {
+      const url = request.nextUrl.clone();
+      url.pathname = reportLoginPath(parsed.siteId);
+      const nextValue = `${pathname}${request.nextUrl.search}`;
+      url.search = `?next=${encodeURIComponent(nextValue)}`;
+      return NextResponse.redirect(url);
+    }
+
+    const reportResponse = NextResponse.next();
+    reportResponse.headers.set("X-Robots-Tag", "noindex, nofollow");
+    return reportResponse;
   }
 
   if (

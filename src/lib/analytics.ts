@@ -35,6 +35,34 @@ export function trackCsvPurchaseClick(
 
 export type ClientSiteCallLocation = "header" | "hero" | "contact";
 
+export type ClientSiteEventType = "page_view" | "click_to_call";
+
+/** Best-effort first-party event. Never throws; never delays navigation. */
+export function sendClientSiteEvent(input: {
+  siteId: string;
+  eventType: ClientSiteEventType;
+  linkLocation?: ClientSiteCallLocation;
+}): void {
+  if (typeof window === "undefined") return;
+  try {
+    const body = JSON.stringify({
+      siteId: input.siteId,
+      eventType: input.eventType,
+      ...(input.linkLocation ? { linkLocation: input.linkLocation } : {}),
+    });
+    const blob = new Blob([body], { type: "application/json" });
+    if (navigator.sendBeacon?.("/api/client-site-event", blob)) return;
+    void fetch("/api/client-site-event", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+      keepalive: true,
+    });
+  } catch {
+    // Analytics must never break UX
+  }
+}
+
 export function trackClickToCall(
   siteId: string,
   linkLocation: ClientSiteCallLocation,
@@ -42,6 +70,11 @@ export function trackClickToCall(
   trackGaEvent("click_to_call", {
     site_id: siteId,
     link_location: linkLocation,
+  });
+  sendClientSiteEvent({
+    siteId,
+    eventType: "click_to_call",
+    linkLocation,
   });
 }
 

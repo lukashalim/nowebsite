@@ -19,6 +19,8 @@ export interface ClientSite {
   hosts: string[];
   placeId: string;
   services: ClientSiteService[];
+  /** E.164 number that receives service-request SMS (Tom). */
+  notifyPhone?: string;
   /** Dedicated GA4 measurement ID. Directory GA stays off this host. */
   gaMeasurementId?: string;
 }
@@ -39,6 +41,7 @@ export const CLIENT_SITES: ClientSite[] = [
     origin: "https://somerslawntree.com",
     hosts: ["somerslawntree.com", "www.somerslawntree.com"],
     placeId: "ChIJERB6J7pIR4gRScYINHwAvu0",
+    notifyPhone: "+17404638025",
     // Dedicated Somers GA4 property — never the directory ID G-4R9RG4CPG5.
     // Vercel / .env.local: NEXT_PUBLIC_SOMERS_GA_MEASUREMENT_ID=G-XXXXXXXX
     // After first events: GA4 Admin → Events → mark click_to_call as a key event.
@@ -118,6 +121,8 @@ function normalizePathname(pathname: string): string {
 export function isClientSiteAllowedPath(pathname: string): boolean {
   const normalized = normalizePathname(pathname);
   if (normalized === "/") return true;
+  if (normalized === "/api/client-site-event") return true;
+  if (normalized === "/api/client-site-service-request") return true;
   if (pathname.startsWith("/_next/")) return true;
   if (normalized === "/favicon.ico") return true;
   if (normalized === "/robots.txt") return true;
