@@ -108,14 +108,14 @@ export function ClientSiteServices({
               <button
                 type="button"
                 onClick={() => openRequest(service.title)}
-                className="flex h-full w-full flex-col rounded-2xl border border-[#d9d0bc] bg-white p-5 text-left shadow-sm transition hover:border-[#2f6b3a] hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2f6b3a]"
+                className="group flex h-full w-full cursor-pointer flex-col rounded-2xl border-2 border-[#d9d0bc] bg-white p-5 text-left shadow-sm transition duration-150 ease-in-out hover:-translate-y-0.5 hover:border-[#2f6b3a] hover:shadow-[0_8px_24px_rgba(16,24,16,0.12)] focus-visible:-translate-y-0.5 focus-visible:border-[#2f6b3a] focus-visible:shadow-[0_8px_24px_rgba(16,24,16,0.12)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2f6b3a]"
               >
                 <Icon className="size-6 text-[#2f6b3a]" aria-hidden />
                 <h3 className="mt-3 text-lg font-semibold">{service.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-[#3d5340]">
                   {service.description}
                 </p>
-                <span className="mt-4 text-sm font-semibold text-[#2f6b3a]">
+                <span className="mt-4 text-sm font-semibold text-[#2f6b3a] group-hover:text-[#245830] group-hover:underline group-focus-visible:text-[#245830] group-focus-visible:underline">
                   Get a text-back on this
                 </span>
               </button>
