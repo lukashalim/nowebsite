@@ -12,11 +12,13 @@ const FIELD_CLASS =
 interface ClientSiteServicesProps {
   siteId: string;
   services: ClientSiteService[];
+  shortDba?: string;
 }
 
 export function ClientSiteServices({
   siteId,
   services,
+  shortDba,
 }: ClientSiteServicesProps) {
   const titleId = useId();
   const [activeTitle, setActiveTitle] = useState<string | null>(null);
@@ -28,6 +30,9 @@ export function ClientSiteServices({
   const [done, setDone] = useState(false);
 
   const active = services.find((service) => service.title === activeTitle);
+  const submitLabel = shortDba?.trim()
+    ? `Text ${shortDba.trim()}`
+    : "Send it to the owner";
 
   useEffect(() => {
     if (!activeTitle) return;
@@ -81,13 +86,13 @@ export function ClientSiteServices({
         | null;
       if (!response.ok) {
         setError(
-          payload?.error || "Could not send the request. Call instead if you need.",
+          payload?.error || "Could not send it. Call instead if you need.",
         );
         return;
       }
       setDone(true);
     } catch {
-      setError("Could not send the request. Call instead if you need.");
+      setError("Could not send it. Call instead if you need.");
     } finally {
       setSubmitting(false);
     }
@@ -111,7 +116,7 @@ export function ClientSiteServices({
                   {service.description}
                 </p>
                 <span className="mt-4 text-sm font-semibold text-[#2f6b3a]">
-                  Request this service
+                  Get a text-back on this
                 </span>
               </button>
             </li>
@@ -135,7 +140,7 @@ export function ClientSiteServices({
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a7340]">
-                  Request
+                  GET A CALLBACK
                 </p>
                 <h3
                   id={titleId}
@@ -157,7 +162,7 @@ export function ClientSiteServices({
             {done ? (
               <div className="mt-5 space-y-4">
                 <p className="rounded-lg border border-[#c6dcc9] bg-white px-3 py-3 text-sm leading-relaxed text-[#245830]">
-                  Request sent. Tom will get a text with your address and number.
+                  Sent. The owner will get a text with your address and number.
                 </p>
                 <button
                   type="button"
@@ -170,8 +175,8 @@ export function ClientSiteServices({
             ) : (
               <form onSubmit={onSubmit} className="mt-5 space-y-4">
                 <p className="text-sm text-[#3d5340]">
-                  Leave your address and phone. We text Tom so he can get back
-                  to you.
+                  Leave your address and phone. The owner gets a text and
+                  replies from his cell.
                 </p>
                 <label className="block text-sm font-medium">
                   Address
@@ -226,7 +231,7 @@ export function ClientSiteServices({
                   disabled={submitting}
                   className="w-full rounded-lg bg-[#2f6b3a] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#245830] disabled:opacity-60"
                 >
-                  {submitting ? "Sending…" : "Send request"}
+                  {submitting ? "Sending…" : submitLabel}
                 </button>
               </form>
             )}

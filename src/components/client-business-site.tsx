@@ -159,10 +159,14 @@ export function ClientBusinessSite({
             <div className="mx-auto max-w-5xl px-4 sm:px-6">
               <h2 className="text-2xl font-bold tracking-tight">Services</h2>
               <p className="mt-2 text-sm text-[#3d5340]">
-                Tap a service to request it. Leave your address and phone — Tom
-                gets a text.
+                Tap a service. Leave your address and phone — the owner gets a
+                text.
               </p>
-              <ClientSiteServices siteId={site.id} services={site.services} />
+              <ClientSiteServices
+                siteId={site.id}
+                services={site.services}
+                shortDba={site.shortDba}
+              />
             </div>
           </section>
 
