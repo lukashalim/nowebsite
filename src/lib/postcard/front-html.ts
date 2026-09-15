@@ -1,6 +1,7 @@
 /**
  * Lob 4×6 postcard front HTML (landscape bleed 6.25″×4.25″).
- * Phone-frame mockup of the live site, with a 1.25in scan QR in the right gutter.
+ * Phone-frame mockup of the live site. Native QR shares {@link POSTCARD_QR_SLOT}
+ * with the address side so Lob can overlay both faces.
  */
 
 import "server-only";
@@ -9,6 +10,7 @@ import { parseReviewHighlights } from "@/lib/demo-review-types";
 import {
   formatUsPhoneDisplay,
   POSTCARD_QR_LABEL,
+  POSTCARD_QR_SLOT,
 } from "@/lib/postcard/back-html";
 import { pickPostcardReviewExcerpt } from "@/lib/postcard/review-excerpt";
 import {
@@ -20,9 +22,8 @@ import {
 const CTA_PHONE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="#ffffff" aria-hidden="true"><path d="M6.62 10.79a15.15 15.15 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.01-.24c1.12.37 2.33.57 3.58.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.46.57 3.58a1 1 0 0 1-.25 1.02l-2.2 2.19z"/></svg>`;
 
 const PHONE_WIDTH = "2.7in";
-const PHONE_LEFT = "0.50in";
-const QR_LEFT = "3.42in";
-const QR_SIZE = "1.25in";
+/** Right of the shared native QR slot (0.42 + 1.25 + gap). */
+const PHONE_LEFT = "1.90in";
 
 export function buildPostcardFrontHtml(input: {
   businessName: string;
@@ -33,8 +34,6 @@ export function buildPostcardFrontHtml(input: {
   reviewCount?: number | null;
   reviewHighlights?: unknown;
   phone?: string | null;
-  /** HTTPS PNG URL for the 1.25in front QR. Omitted if upload failed. */
-  qrImageUrl?: string | null;
 }): string {
   const name = escapeHtml(input.businessName.trim() || "Your business");
   const category = escapeHtml(
@@ -92,13 +91,10 @@ export function buildPostcardFrontHtml(input: {
     ? `<p class="review-name">— ${reviewerHtml}</p>`
     : "";
 
-  const qrUrl = safeQrSrc(input.qrImageUrl);
-  const qrCol = qrUrl
-    ? `<div class="qr-col">
+  const qrCol = `<div class="qr-col">
     <p class="qr-col-label">${POSTCARD_QR_LABEL}</p>
-    <img class="qr-img" src="${escapeHtml(qrUrl)}" width="300" height="300" alt="" />
-  </div>`
-    : "";
+    <div class="qr-slot"></div>
+  </div>`;
 
   return `<!DOCTYPE html>
 <html>
@@ -257,24 +253,30 @@ export function buildPostcardFrontHtml(input: {
     }
     .qr-col {
       position: absolute;
-      top: 1.45in;
-      left: ${QR_LEFT};
-      width: 1.55in;
-      text-align: center;
+      top: ${POSTCARD_QR_SLOT.clusterTop};
+      left: ${POSTCARD_QR_SLOT.clusterLeft};
+      width: ${POSTCARD_QR_SLOT.clusterWidth};
     }
     .qr-col-label {
+      position: absolute;
+      top: 0;
+      left: ${POSTCARD_QR_SLOT.slotLeft};
+      width: ${POSTCARD_QR_SLOT.size};
+      height: 0.16in;
+      line-height: 0.16in;
       font-size: 6.5pt;
       font-weight: 700;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.04em;
       color: #18181b;
-      margin: 0 0 0.07in;
+      text-align: center;
       white-space: nowrap;
     }
-    .qr-img {
-      width: ${QR_SIZE};
-      height: ${QR_SIZE};
-      display: block;
-      margin: 0 auto;
+    .qr-slot {
+      position: absolute;
+      top: ${POSTCARD_QR_SLOT.slotTop};
+      left: ${POSTCARD_QR_SLOT.slotLeft};
+      width: ${POSTCARD_QR_SLOT.size};
+      height: ${POSTCARD_QR_SLOT.size};
       background: #fff;
     }
   </style>
@@ -309,21 +311,6 @@ export function buildPostcardFrontHtml(input: {
   ${qrCol}
 </body>
 </html>`;
-}
-
-function safeQrSrc(value?: string | null): string | null {
-  const trimmed = value?.trim() ?? "";
-  if (!trimmed) return null;
-  if (/^[A-Za-z0-9._/-]+\.png$/.test(trimmed) && !trimmed.includes("..")) {
-    return trimmed;
-  }
-  try {
-    const parsed = new URL(trimmed);
-    if (parsed.protocol !== "https:") return null;
-    return parsed.toString();
-  } catch {
-    return null;
-  }
 }
 
 function escapeHtml(value: string): string {

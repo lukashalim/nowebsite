@@ -4,7 +4,8 @@
  * in the left safe column; Lob address/postage on the right.
  *
  * QR slot is absolutely positioned so it never moves when the headline wraps
- * — must match {@link LOB_BACK_QR_PLACEMENT} for Lob's native qr_code overlay.
+ * — must match {@link LOB_QR_PLACEMENT} for Lob's native qr_code overlay.
+ * Lob can only stamp one position; `pages: "front,back"` repeats it on both faces.
  *
  * Lob inline HTML must stay under 10,000 characters.
  */
@@ -20,6 +21,15 @@ import {
 
 export const POSTCARD_QR_LABEL = "SCAN TO OPEN YOUR SITE";
 
+export const POSTCARD_QR_SLOT = {
+  clusterTop: "1.55in",
+  clusterLeft: "0.28in",
+  clusterWidth: "2.40in",
+  slotTop: "0.22in",
+  slotLeft: "0.14in",
+  size: "1.25in",
+} as const;
+
 /**
  * Native QR overlay is measured from the 6×4 trim edge; HTML uses the
  * 6.25×4.25 bleed artboard. Subtract 0.125in bleed from slot coordinates.
@@ -28,33 +38,25 @@ export const POSTCARD_QR_LABEL = "SCAN TO OPEN YOUR SITE";
  * return address / barcode / recipient block (right ~3.375in of a 6in card).
  *
  * Slot: 1.25in, left-aligned in the column.
- *   left bleed = 0.42in → trim 0.295in
- * Cluster top 1.55in:
+ *   left bleed = 0.28 + 0.14 = 0.42in → trim 0.295in
  *   top bleed = 1.55 + 0.22 = 1.77in → trim 1.645in
+ *
+ * Same coordinates on front and back — Lob cannot place two different spots.
  */
-export const LOB_BACK_QR_PLACEMENT = {
+export const LOB_QR_PLACEMENT = {
   widthIn: "1.25",
   topIn: "1.645",
   leftIn: "0.295",
-  pages: "back" as const,
+  pages: "front,back" as const,
 } as const;
 
 /** Left creative column — must not enter the USPS address zone. */
 const COPY = {
   top: "0.22in",
-  left: "0.28in",
-  width: "2.40in",
+  left: POSTCARD_QR_SLOT.clusterLeft,
+  width: POSTCARD_QR_SLOT.clusterWidth,
   height: "1.28in",
 } as const;
-
-/** Pinned QR cluster — independent of headline line count. */
-const QR_CLUSTER = {
-  top: "1.55in",
-  left: "0.28in",
-  width: "2.40in",
-} as const;
-
-const QR_SIZE = "1.25in";
 
 const RESTAURANT_HINT =
   /restaurant|sushi|cafe|café|diner|bistro|pizzeria|steakhouse|taqueria|ramen|noodle|buffet|trattoria|grill|takeout|take-out|food\s*truck/i;
@@ -106,10 +108,10 @@ body{width:6.25in;height:4.25in;font-family:${LOB_PRINT_FONT_FAMILY};color:#1818
 .copy{position:absolute;top:${COPY.top};left:${COPY.left};width:${COPY.width};height:${COPY.height};overflow:hidden}
 h1{font-size:${headlineSize};font-weight:700;line-height:1.12;letter-spacing:-0.03em;margin:0 0 .08in;color:#18181b}
 .support{font-size:10pt;line-height:1.3;color:#3f3f46;margin:0;max-width:100%}
-.qr-cluster{position:absolute;top:${QR_CLUSTER.top};left:${QR_CLUSTER.left};width:${QR_CLUSTER.width};height:1.85in;text-align:left}
-.qr-label{position:absolute;top:0;left:.14in;width:1.25in;height:.16in;line-height:.16in;font-size:6.5pt;font-weight:700;letter-spacing:.04em;color:#18181b;text-align:center;white-space:nowrap}
-.qr-slot{position:absolute;top:.22in;left:.14in;width:${QR_SIZE};height:${QR_SIZE};background:#fff}
-.qr-phone{position:absolute;top:1.54in;left:.14in;width:1.50in;font-size:7pt;line-height:1.3;color:#3f3f46;text-align:left}
+.qr-cluster{position:absolute;top:${POSTCARD_QR_SLOT.clusterTop};left:${POSTCARD_QR_SLOT.clusterLeft};width:${POSTCARD_QR_SLOT.clusterWidth};height:1.85in;text-align:left}
+.qr-label{position:absolute;top:0;left:${POSTCARD_QR_SLOT.slotLeft};width:${POSTCARD_QR_SLOT.size};height:.16in;line-height:.16in;font-size:6.5pt;font-weight:700;letter-spacing:.04em;color:#18181b;text-align:center;white-space:nowrap}
+.qr-slot{position:absolute;top:${POSTCARD_QR_SLOT.slotTop};left:${POSTCARD_QR_SLOT.slotLeft};width:${POSTCARD_QR_SLOT.size};height:${POSTCARD_QR_SLOT.size};background:#fff}
+.qr-phone{position:absolute;top:1.54in;left:${POSTCARD_QR_SLOT.slotLeft};width:1.50in;font-size:7pt;line-height:1.3;color:#3f3f46;text-align:left}
 </style>
 </head>
 <body>
