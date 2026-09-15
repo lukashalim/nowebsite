@@ -1,20 +1,20 @@
 import {
   Clock3,
   ExternalLink,
-  Flame,
-  Leaf,
   MapPin,
   Phone,
-  Scissors,
   Star,
-  Trees,
 } from "lucide-react";
 import type { DemoBusiness } from "@/lib/crm-cohort";
 import type { ClientSite } from "@/lib/client-sites";
 import { buildLocalBusinessJsonLd } from "@/lib/demo-local-business-jsonld";
 import { openStreetMapLink } from "@/lib/demo-enrichment";
-
-const SERVICE_ICONS = [Trees, Scissors, Leaf, Flame] as const;
+import { ClientSitePageBeacon } from "@/components/client-site-page-beacon";
+import { ClientSiteServices } from "@/components/client-site-services";
+import {
+  ClientSiteCallLink,
+  ClientSiteOutboundLink,
+} from "@/components/client-site-tracked-link";
 
 function telHref(phone: string): string {
   const digits = phone.replace(/\D/g, "");
@@ -64,6 +64,7 @@ export function ClientBusinessSite({
 
   return (
     <>
+      <ClientSitePageBeacon siteId={site.id} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -89,13 +90,15 @@ export function ClientBusinessSite({
               </a>
             </nav>
             {callHref ? (
-              <a
+              <ClientSiteCallLink
                 href={callHref}
+                siteId={site.id}
+                location="header"
                 className="inline-flex shrink-0 items-center gap-2 rounded-full bg-[#2f6b3a] px-4 py-2 text-sm font-semibold text-white hover:bg-[#245830]"
               >
                 <Phone className="size-4" aria-hidden />
                 Call {phone}
-              </a>
+              </ClientSiteCallLink>
             ) : null}
           </div>
         </header>
@@ -128,13 +131,15 @@ export function ClientBusinessSite({
               ) : null}
               {callHref ? (
                 <div className="mt-8">
-                  <a
+                  <ClientSiteCallLink
                     href={callHref}
+                    siteId={site.id}
+                    location="hero"
                     className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#c4a35a] px-6 py-3 text-base font-semibold text-[#1b2b1c] hover:bg-[#b39148]"
                   >
                     <Phone className="size-5" aria-hidden />
                     Call {phone} for a quote
-                  </a>
+                  </ClientSiteCallLink>
                 </div>
               ) : null}
             </div>
@@ -153,28 +158,11 @@ export function ClientBusinessSite({
           >
             <div className="mx-auto max-w-5xl px-4 sm:px-6">
               <h2 className="text-2xl font-bold tracking-tight">Services</h2>
-              <ul className="mt-8 grid gap-4 sm:grid-cols-2">
-                {site.services.map((service, index) => {
-                  const Icon = SERVICE_ICONS[index] ?? Trees;
-                  return (
-                    <li
-                      key={service.title}
-                      className="rounded-2xl border border-[#d9d0bc] bg-white p-5 shadow-sm"
-                    >
-                      <Icon
-                        className="size-6 text-[#2f6b3a]"
-                        aria-hidden
-                      />
-                      <h3 className="mt-3 text-lg font-semibold">
-                        {service.title}
-                      </h3>
-                      <p className="mt-2 text-sm leading-relaxed text-[#3d5340]">
-                        {service.description}
-                      </p>
-                    </li>
-                  );
-                })}
-              </ul>
+              <p className="mt-2 text-sm text-[#3d5340]">
+                Tap a service to request it. Leave your address and phone — Tom
+                gets a text.
+              </p>
+              <ClientSiteServices siteId={site.id} services={site.services} />
             </div>
           </section>
 
@@ -225,13 +213,15 @@ export function ClientBusinessSite({
                 <ul className="mt-6 space-y-4 text-[#3d5340]">
                   {phone && callHref ? (
                     <li>
-                      <a
+                      <ClientSiteCallLink
                         href={callHref}
+                        siteId={site.id}
+                        location="contact"
                         className="inline-flex items-center gap-2 font-medium text-[#1b3a2a] hover:underline"
                       >
                         <Phone className="size-4" aria-hidden />
                         {phone}
-                      </a>
+                      </ClientSiteCallLink>
                     </li>
                   ) : null}
                   {business.address || locLine ? (
@@ -250,28 +240,34 @@ export function ClientBusinessSite({
                   ) : null}
                   {business.google_maps_link ? (
                     <li>
-                      <a
+                      <ClientSiteOutboundLink
                         href={business.google_maps_link}
+                        siteId={site.id}
+                        label="Google Maps"
+                        location="contact"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-2 font-medium text-[#1b3a2a] hover:underline"
                       >
                         <ExternalLink className="size-4" aria-hidden />
                         Google Maps
-                      </a>
+                      </ClientSiteOutboundLink>
                     </li>
                   ) : null}
                   {osm ? (
                     <li>
-                      <a
+                      <ClientSiteOutboundLink
                         href={osm}
+                        siteId={site.id}
+                        label="OpenStreetMap"
+                        location="contact"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-2 font-medium text-[#1b3a2a] hover:underline"
                       >
                         <MapPin className="size-4" aria-hidden />
                         OpenStreetMap
-                      </a>
+                      </ClientSiteOutboundLink>
                     </li>
                   ) : null}
                 </ul>

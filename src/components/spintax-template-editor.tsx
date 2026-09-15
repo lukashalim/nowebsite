@@ -89,6 +89,7 @@ export function SpintaxTemplateEditor({
       facebook: [],
       no_facebook: [],
       any: [],
+      angi: [],
     };
     for (const t of channelTemplates) {
       groups[t.audience].push(t);
@@ -472,7 +473,8 @@ export function SpintaxTemplateEditor({
                     <span className="text-xs text-zinc-500 dark:text-zinc-400">
                       Use {"{option A|option B}"} for spintax. Tokens: [Name],
                       [category], {"{Business Name}"}, {"{demo_link}"},{" "}
-                      {"{Your name}"}.
+                      {"{Your name}"}, {"{angi_competitors}"},{" "}
+                      {"{angi_competitor_1}"}.
                     </span>
                   </label>
                 </>
@@ -492,7 +494,7 @@ export function SpintaxTemplateEditor({
                     />
                     <span className="text-xs text-zinc-500 dark:text-zinc-400">
                       Use {"{option A|option B}"} for spintax and [Name] /
-                      [category] for lead tokens.
+                      [category] / {"{angi_competitors}"} for lead tokens.
                     </span>
                   </label>
 

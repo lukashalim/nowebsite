@@ -1,0 +1,45 @@
+**RingReadySite — Post-Scan Callback Script**
+ 
+*Used when a Lob QR-scan webhook fires and you**'**re calling the business back while interest is still warm. Written to work whether or not the person who answers is the person who actually scanned the code.*
+ 
+## **Opening (works regardless of who picks up)**
+ 
+*"**Hey, is this [Business name]? This is Lukas — I sent over a postcard with a preview website built for you guys, wanted to see if anyone had a chance to check it out?**"*
+ 
+## **Branch 1: They saw it (or say ****"****yeah, that was me****"****)**
+ 
+*"**Cool — so that**'**s actually already live and built off your Google listing. The way this works: I**'**ll put it on its own domain, hook up a tracking number so you can see exactly how many calls it**'**s bringing in, and you don**'**t pay anything for 30 days. If it**'**s not worth anything to you, no cost, no hard feelings. If it is, it**'**s $197 a month after that.**"*
+ 
+**→ Go to Close**
+ 
+## **Branch 2: They haven****'****t seen it / sound lukewarm**
+ 
+*"**No worries — it**'**s the site with your reviews and a call button, should only take you 10 seconds to glance at. Basically the pitch is: I already built it, it**'**s free to try for 30 days, and you only pay if it**'**s actually bringing you calls.**"*
+ 
+**→ Go to Close**
+ 
+## **Branch 3: Not the right person / don****'****t know what you****'****re talking about**
+ 
+*"**No worries — it**'**s a live demo site I built off your Google listing, has your reviews and a call button and everything. Is [likely-owner name, if known], or whoever handles that stuff, around, or is there a better number to reach them?**"*
+ 
+If it's a wrong number or unrelated employee:
+ 
+*"**Ah, gotcha — is there a better number for whoever runs [Business]?**"*
+ 
+## **Close (always end with a specific next step — never leave it open-ended)**
+ 
+*"**If you**'**re good with it, I just need about 5 minutes tomorrow to point your Google listing at the live site — what**'**s a good time, morning or afternoon?**"*
+ 
+## **Voicemail (keep under 20 seconds)**
+ 
+*"**Hey, this is Lukas — I sent over a postcard about a free website for [Business]. It**'**s the real deal, no catch — free for 30 days, you only pay if it actually brings you calls. I**'**ll try you again, but feel free to just text this number back if you want to get it set up.**"*
+ 
+## **Objection handles**
+ 
+**"****How****'****d you get my number?****"****: **"It's on your Google listing — I build these for local businesses I find on Google Maps."
+ 
+**"****Is this a scam?****"****: **"Totally fair to ask — there's no card, no signup, nothing to lose. If it doesn't work for you in 30 days, it just goes offline."
+ 
+**"****I don****'****t have time right now.****"****: **"Totally get it — can I just grab 5 minutes tomorrow instead? Morning or afternoon better?" (Always re-close to a specific time.)
+ 
+*Note: once you**'**ve made a handful of these calls, track which objections come up most — that**'**s the fastest way to tighten this script further based on real reactions

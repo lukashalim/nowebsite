@@ -14,6 +14,7 @@ import { NotesCell } from "@/components/notes-cell";
 import { OutreachSpintaxButton } from "@/components/outreach-spintax-button";
 import { OwnerNameInput } from "@/components/owner-name-input";
 import { StageSelect } from "@/components/stage-select";
+import { CheckAngiListingButton } from "@/components/check-angi-listing-button";
 import type { CrmOutreachRecordedHandler } from "@/components/crm-free-usage-layout";
 import { useCrmOutreachRecorded } from "@/components/crm-free-usage-layout";
 import type {
@@ -30,7 +31,7 @@ import {
   isEligibleForCrmSpintax,
   resolveFacebookPageUrl,
 } from "@/lib/outreach-spintax";
-import { leadSpintaxAudience } from "@/lib/spintax-audience";
+import { leadSpintaxAudienceContext } from "@/lib/spintax-audience";
 import type { SpintaxTemplate } from "@/lib/spintax-templates";
 
 interface CrmLeadsTableBodyProps {
@@ -123,12 +124,13 @@ export function CrmLeadsTableBody({
           facebook_url: b.facebook_url,
           crm_contact_surface: b.crm_contact_surface ?? null,
           listing_website: b.listing_website,
+          has_angi_listing: b.has_angi_listing,
         };
         const spintaxEligible = isEligibleForCrmSpintax(
           webPresence,
           outreachRow,
         );
-        const spintaxLeadAudience = leadSpintaxAudience(outreachRow);
+        const spintaxLeadAudience = leadSpintaxAudienceContext(outreachRow);
         const contactCount = contactCounts[b.place_id] ?? b.contact_count ?? 0;
 
         return (
@@ -144,7 +146,24 @@ export function CrmLeadsTableBody({
                     TEST
                   </span>
                 ) : null}
+                {b.has_angi_listing === true ? (
+                  <span
+                    className="rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-900 dark:bg-orange-950/60 dark:text-orange-200"
+                    title={
+                      b.angi_listing_url ??
+                      "Likely Angi Approved / paying (profile scrape)"
+                    }
+                  >
+                    Angi
+                  </span>
+                ) : null}
               </span>
+              <div className="mt-1">
+                <CheckAngiListingButton
+                  placeId={b.place_id}
+                  hasAngiListing={b.has_angi_listing}
+                />
+              </div>
             </td>
             <td className="px-3 py-3 text-zinc-600 dark:text-zinc-300">
               <span className="inline-flex items-start gap-1.5">
@@ -205,6 +224,7 @@ export function CrmLeadsTableBody({
                 state={b.state}
                 postalCode={b.postal_code}
                 leadAudience={spintaxLeadAudience}
+                angiCompetitors={b.angi_competitors}
                 templates={spintaxTemplates}
                 existingNotes={b.notes}
                 outreachRemaining={outreachRemaining}
@@ -225,6 +245,7 @@ export function CrmLeadsTableBody({
                 businessType={b.business_type}
                 eligible={spintaxEligible}
                 leadAudience={spintaxLeadAudience}
+                angiCompetitors={b.angi_competitors}
                 templates={spintaxTemplates}
                 facebookUrl={resolveFacebookPageUrl(outreachRow)}
                 outreachRemaining={outreachRemaining}

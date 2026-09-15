@@ -62,7 +62,7 @@ export function adminCookieOptions(): {
     secure:
       process.env.VERCEL === "1" || process.env.NODE_ENV === "production",
     sameSite: "lax",
-    path: "/admin",
+    path: "/",
     maxAge: ADMIN_COOKIE_MAX_AGE_SECONDS,
   };
 }

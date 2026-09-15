@@ -9,8 +9,14 @@ export async function POST(request: Request) {
     new URL("/admin/login", request.url),
     303,
   );
+  const options = adminCookieOptions();
   response.cookies.set(ADMIN_COOKIE_NAME, "", {
-    ...adminCookieOptions(),
+    ...options,
+    maxAge: 0,
+  });
+  response.cookies.set(ADMIN_COOKIE_NAME, "", {
+    ...options,
+    path: "/admin",
     maxAge: 0,
   });
   return response;

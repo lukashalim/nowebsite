@@ -8,10 +8,12 @@ import { incrementContactCount } from "@/app/actions/update-contact";
 import { buildOutreachMessage } from "@/lib/outreach-spintax";
 import {
   filterSpintaxTemplatesForLeadChannel,
-  type SpintaxAudience,
+  preferAngiSpintaxTemplate,
+  type SpintaxLeadAudienceContext,
 } from "@/lib/spintax-audience";
 import type { CrmUsageAction } from "@/lib/crm-limits";
 import type { SpintaxTemplate } from "@/lib/spintax-templates";
+import type { AngiCompetitor } from "@/lib/angi-listing";
 
 interface OutreachSpintaxButtonProps {
   placeId: string;
@@ -20,7 +22,8 @@ interface OutreachSpintaxButtonProps {
   mainCategory: string | null;
   businessType: string | null;
   eligible: boolean;
-  leadAudience: SpintaxAudience;
+  leadAudience: SpintaxLeadAudienceContext;
+  angiCompetitors?: AngiCompetitor[] | null;
   templates: SpintaxTemplate[];
   facebookUrl?: string | null;
   outreachRemaining: number | null;
@@ -31,8 +34,12 @@ interface OutreachSpintaxButtonProps {
   onContactCountChange?: (next: number) => void;
 }
 
-function lastUsedStorageKey(userId: string, leadAudience: SpintaxAudience): string {
-  return `crm:lastSpintaxTemplateId:${userId}:${leadAudience}`;
+function lastUsedStorageKey(
+  userId: string,
+  leadAudience: SpintaxLeadAudienceContext,
+): string {
+  const angi = leadAudience.hasAngiListing ? "angi" : "noangi";
+  return `crm:lastSpintaxTemplateId:${userId}:${leadAudience.surface}:${angi}`;
 }
 
 function normalizeFacebookUrl(url: string): string {
@@ -49,6 +56,7 @@ export function OutreachSpintaxButton({
   businessType,
   eligible,
   leadAudience,
+  angiCompetitors,
   templates,
   facebookUrl,
   outreachRemaining,
@@ -81,7 +89,8 @@ export function OutreachSpintaxButton({
       setSelectedId(stored);
       return;
     }
-    setSelectedId(matchingTemplates[0].id);
+    const preferred = preferAngiSpintaxTemplate(matchingTemplates);
+    if (preferred) setSelectedId(preferred.id);
   }, [matchingTemplates, userId, leadAudience]);
 
   useEffect(() => {
@@ -137,6 +146,7 @@ export function OutreachSpintaxButton({
       name: businessName,
       mainCategory,
       businessType,
+      angiCompetitors,
     });
     await navigator.clipboard.writeText(message);
     window.localStorage.setItem(
