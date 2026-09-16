@@ -1,3 +1,4 @@
+import Image from "next/image";
 import {
   Clock3,
   ExternalLink,
@@ -61,6 +62,9 @@ export function ClientBusinessSite({
     pageUrl: site.origin,
     description: site.description,
   });
+  if (site.logoSrc) {
+    jsonLd.logo = `${site.origin}${site.logoSrc}`;
+  }
 
   return (
     <>
@@ -72,8 +76,21 @@ export function ClientBusinessSite({
       <div className="min-h-screen bg-[#f4efe3] text-[#1b2b1c]" style={{ colorScheme: "light" }}>
         <header className="fixed inset-x-0 top-0 z-50 border-b border-[#d9d0bc] bg-[#f7f3e9]/95 shadow-[0_1px_0_0_rgba(61,45,31,0.08)] backdrop-blur">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
-            <a href="#top" className="min-w-0 truncate font-semibold tracking-tight">
-              {site.name}
+            <a href="#top" className="flex min-w-0 items-center">
+              {site.logoSrc ? (
+                <Image
+                  src={site.logoSrc}
+                  alt={site.name}
+                  width={1120}
+                  height={957}
+                  className="h-11 w-auto sm:h-12"
+                  priority
+                />
+              ) : (
+                <span className="truncate font-semibold tracking-tight">
+                  {site.name}
+                </span>
+              )}
             </a>
             <nav
               aria-label="Page"
@@ -103,15 +120,28 @@ export function ClientBusinessSite({
           </div>
         </header>
 
-        <main id="top" className="pt-[4.75rem]">
+        <main id="top" className="pt-20">
           <section className="bg-[#1b3a2a] text-[#f4efe3]">
             <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 sm:py-24">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#c4a35a]">
                 Washington Court House, Ohio
               </p>
-              <h1 className="mt-4 max-w-3xl text-4xl font-extrabold tracking-tight sm:text-5xl">
-                {site.name}
-              </h1>
+              {site.logoSrc ? (
+                <h1 className="mt-6 w-44 sm:w-56 md:w-64">
+                  <Image
+                    src={site.logoSrc}
+                    alt={site.name}
+                    width={1120}
+                    height={957}
+                    className="h-auto w-full"
+                    priority
+                  />
+                </h1>
+              ) : (
+                <h1 className="mt-4 max-w-3xl text-4xl font-extrabold tracking-tight sm:text-5xl">
+                  {site.name}
+                </h1>
+              )}
               <p className="mt-4 max-w-2xl text-lg text-[#e4dcc8]">
                 {site.tagline} for homes and properties around {locLine || "Ohio"}.
               </p>
@@ -307,7 +337,18 @@ export function ClientBusinessSite({
         </main>
 
         <footer className="border-t border-[#d9d0bc] bg-[#1b3a2a] px-4 py-8 text-center text-sm text-[#e4dcc8] sm:px-6">
-          <p className="font-semibold text-[#f4efe3]">{site.name}</p>
+          {site.logoSrc ? (
+            <Image
+              src={site.logoSrc}
+              alt=""
+              width={1120}
+              height={957}
+              className="mx-auto h-16 w-auto"
+            />
+          ) : null}
+          <p className={site.logoSrc ? "mt-3 font-semibold text-[#f4efe3]" : "font-semibold text-[#f4efe3]"}>
+            {site.name}
+          </p>
           <p className="mt-2">
             {locLine}
             {phone ? ` · ${phone}` : ""}
