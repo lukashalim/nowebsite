@@ -179,6 +179,21 @@ export function CrmFilters({
         </label>
 
         <label className={labelClass}>
+          Angi listing
+          <select
+            name="angiListing"
+            defaultValue={params.angiListing}
+            className={`${fieldClass} min-w-[9rem]`}
+            title="Likely Angi Approved / paying (Playwright profile scrape, SERP fallback). Use Yes for Angi postcard cohorts."
+          >
+            <option value="all">All</option>
+            <option value="yes">Angi (paid)</option>
+            <option value="no">Not Angi (paid)</option>
+            <option value="not_checked">Not checked</option>
+          </select>
+        </label>
+
+        <label className={labelClass}>
           Stage
           <select
             name="stage"

@@ -11,7 +11,8 @@ import type { CrmWebPresence } from "@/lib/crm-params";
 import { recordCrmUsage } from "@/lib/crm-usage";
 import {
   filterSpintaxTemplatesForLeadChannel,
-  leadSpintaxAudience,
+  leadSpintaxAudienceContext,
+  preferAngiSpintaxTemplate,
   templateMatchesLeadAudience,
 } from "@/lib/spintax-audience";
 import { getUserProfile, isPro } from "@/lib/subscription";
@@ -20,6 +21,7 @@ import {
   TEST_LEAD_BLOCKED_MESSAGE,
   shouldBlockTestLead,
 } from "@/lib/crm-test-lead";
+import { parseAngiCompetitorsJson } from "@/lib/angi-listing";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,6 +30,8 @@ interface OutreachDbRow extends FacebookOutreachRow {
   main_category: string | null;
   business_type: string | null;
   has_website: boolean | null;
+  has_angi_listing: boolean | null;
+  angi_competitors: unknown;
 }
 
 export async function POST(req: Request) {
@@ -84,7 +88,7 @@ export async function POST(req: Request) {
     const { data: row, error } = await supabase
       .from("businesses_nowebsite")
       .select(
-        "place_id, name, facebook_url, crm_contact_surface, listing_website, main_category, business_type, has_website, is_test",
+        "place_id, name, facebook_url, crm_contact_surface, listing_website, main_category, business_type, has_website, has_angi_listing, angi_competitors, is_test",
       )
       .eq("place_id", placeId)
       .maybeSingle();
@@ -116,7 +120,10 @@ export async function POST(req: Request) {
       );
     }
 
-    const leadAudience = leadSpintaxAudience(outreachRow);
+    const leadAudience = leadSpintaxAudienceContext(outreachRow);
+    const angiCompetitors = parseAngiCompetitorsJson(
+      outreachRow.angi_competitors,
+    );
 
     let templateText = templateOverride.trim();
     if (templateId && user) {
@@ -158,7 +165,10 @@ export async function POST(req: Request) {
         "facebook",
         leadAudience,
       );
-      templateText = matching[0]?.template ?? "";
+      templateText =
+        preferAngiSpintaxTemplate(matching)?.template ??
+        matching[0]?.template ??
+        "";
     }
 
     if (!templateText) {
@@ -173,6 +183,7 @@ export async function POST(req: Request) {
       name: outreachRow.name,
       mainCategory: outreachRow.main_category,
       businessType: outreachRow.business_type,
+      angiCompetitors,
     });
 
     return NextResponse.json({

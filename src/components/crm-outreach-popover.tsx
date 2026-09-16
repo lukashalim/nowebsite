@@ -23,10 +23,12 @@ import {
 } from "@/lib/postcard/address";
 import {
   filterSpintaxTemplatesForLeadChannel,
-  type SpintaxAudience,
+  preferAngiSpintaxTemplate,
+  type SpintaxLeadAudienceContext,
 } from "@/lib/spintax-audience";
 import type { CrmUsageAction } from "@/lib/crm-limits";
 import type { SpintaxTemplate } from "@/lib/spintax-templates";
+import type { AngiCompetitor } from "@/lib/angi-listing";
 
 export type OutreachChannel = "call" | "text" | "mail";
 
@@ -58,7 +60,8 @@ interface CrmOutreachPopoverProps {
   city: string | null;
   state: string | null;
   postalCode: string | null;
-  leadAudience: SpintaxAudience;
+  leadAudience: SpintaxLeadAudienceContext;
+  angiCompetitors?: AngiCompetitor[] | null;
   templates: SpintaxTemplate[];
   existingNotes: string | null;
   outreachRemaining: number | null;
@@ -142,6 +145,7 @@ export function CrmOutreachPopover({
   state,
   postalCode,
   leadAudience,
+  angiCompetitors,
   templates,
   existingNotes,
   outreachRemaining,
@@ -243,7 +247,8 @@ export function CrmOutreachPopover({
       setSelectedSmsId(stored);
       return;
     }
-    setSelectedSmsId(smsTemplates[0].id);
+    const preferred = preferAngiSpintaxTemplate(smsTemplates);
+    if (preferred) setSelectedSmsId(preferred.id);
   }, [smsTemplates, userId]);
 
   useEffect(() => {
@@ -253,7 +258,8 @@ export function CrmOutreachPopover({
       setSelectedCallId(stored);
       return;
     }
-    setSelectedCallId(callTemplates[0].id);
+    const preferred = preferAngiSpintaxTemplate(callTemplates);
+    if (preferred) setSelectedCallId(preferred.id);
   }, [callTemplates, userId]);
 
   useEffect(() => {
@@ -359,8 +365,10 @@ export function CrmOutreachPopover({
 
     const message = buildOutreachMessage(selectedSmsTemplate.template, {
       name: businessName,
+      ownerName,
       mainCategory,
       businessType,
+      angiCompetitors,
     });
     window.localStorage.setItem(
       lastSmsTemplateStorageKey(userId),
@@ -441,9 +449,10 @@ export function CrmOutreachPopover({
         "call",
         leadAudience,
       );
-      const callTemplate =
-        freshCallTemplates.find((t) => t.id === callTemplateId) ??
-        freshCallTemplates[0];
+      const callTemplate = preferAngiSpintaxTemplate(
+        freshCallTemplates,
+        callTemplateId,
+      );
       if (!callTemplate) {
         window.alert("No call script matches this lead type.");
         return;
@@ -456,6 +465,7 @@ export function CrmOutreachPopover({
         businessType,
         demoLink: demoResult.url,
         senderName: senderName?.trim() || null,
+        angiCompetitors,
       };
 
       const scriptSteps = buildCallScriptSteps(

@@ -94,6 +94,24 @@ export const DEFAULT_SPINTAX_TEMPLATES: DefaultSpintaxTemplate[] = [
       "{I put together a quick demo of what a simple site could look like for you. Mind if I text you the link?|I made a short preview you can check on your phone. OK if I send it?}",
   },
   {
+    name: "Call — Angi leads",
+    channel: "call",
+    audience: "angi",
+    template:
+      "{Hi|Hey} [Name], I noticed you're on Angi for [category]. {A lot of|Many} pros tell me they're {tired of paying for those leads|paying Angi every month for shared leads}. {Do you have a minute?|Got thirty seconds?}",
+    pivot_template:
+      "Angi shares the same leads with other [category] nearby — folks like {angi_competitors}. You're paying for ads and still competing for the same callback.",
+    offer_template:
+      "{I put together a quick demo of a simple site that can pull more direct leads without paying Angi for ads. Mind if I text you the link?|Want to see how you can get more leads without paying for Angi ads?}",
+  },
+  {
+    name: "SMS — Angi leads",
+    channel: "sms",
+    audience: "angi",
+    template:
+      "{Hey|Hi} [Name] - saw you're on Angi. Tired of paying for leads they also send to {angi_competitors}? {Made|Put together} a quick demo of a site that gets more direct leads. {Want me to send it?|OK if I text the link?}",
+  },
+  {
     name: "Demo link",
     channel: "email",
     audience: "any",

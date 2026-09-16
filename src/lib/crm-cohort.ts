@@ -1,4 +1,5 @@
 import type { BusinessLead } from "@/lib/business";
+import { parseAngiCompetitorsJson } from "@/lib/angi-listing";
 import {
   parseContactEnrichment,
   type ContactEnrichment,
@@ -49,7 +50,7 @@ import { cache } from "react";
 export type { DemoReviewHighlight } from "@/lib/demo-review-types";
 
 export const CRM_BUSINESS_LIST_COLUMNS =
-  "place_id, demo_slug, name, address, city, state, country, postal_code, business_type, main_category, rating, reviews, phone, phone_line_type, google_maps_link, facebook_url, listing_website, crm_contact_surface, contact_enrichment, is_test" as const;
+  "place_id, demo_slug, name, address, city, state, country, postal_code, business_type, main_category, rating, reviews, phone, phone_line_type, has_angi_listing, angi_listing_url, angi_listing_title, angi_listing_confidence, angi_competitors, angi_listing_checked_at, angi_owner_name, google_maps_link, facebook_url, listing_website, crm_contact_surface, contact_enrichment, is_test" as const;
 
 const DEMO_CORE_COLUMNS =
   "place_id, demo_slug, name, address, city, state, postal_code, business_type, main_category, rating, reviews, phone, google_maps_link, facebook_url, listing_website, crm_contact_surface, contact_enrichment" as const;
@@ -262,6 +263,28 @@ function applyPhoneLineTypeFilter<
       return q.is("phone_line_type", null);
     default: {
       const _x: never = phoneLineType;
+      return _x;
+    }
+  }
+}
+
+function applyAngiListingFilter<
+  T extends {
+    eq: (column: string, value: unknown) => T;
+    is: (column: string, value: null) => T;
+  },
+>(q: T, angiListing: CrmSearchParams["angiListing"]): T {
+  switch (angiListing) {
+    case "all":
+      return q;
+    case "yes":
+      return q.eq("has_angi_listing", true);
+    case "no":
+      return q.eq("has_angi_listing", false);
+    case "not_checked":
+      return q.is("has_angi_listing", null);
+    default: {
+      const _x: never = angiListing;
       return _x;
     }
   }
@@ -531,6 +554,7 @@ export async function fetchCrmBusinessRows(
     }
 
     q = applyPhoneLineTypeFilter(q, p.phoneLineType);
+    q = applyAngiListingFilter(q, p.angiListing);
     q = applyOutreachModeFilter(q, p.outreachMode);
 
     const postcardFiltered = await applyPostcardStatusFilter(q, userId, p);
@@ -556,10 +580,10 @@ export async function fetchCrmBusinessRows(
 
     if (error) {
       const hint =
-        /crm_contact_surface|listing_website|phone_line_type|crm_timezone|is_test|schema cache/i.test(
+        /crm_contact_surface|listing_website|phone_line_type|has_angi_listing|angi_competitors|angi_owner_name|crm_timezone|is_test|schema cache/i.test(
           error.message,
         )
-          ? " Run scrape/sql migrations in Supabase (e.g. add-listing-website-crm-contact-surface.sql, add-phone-line-type.sql, add-is-test-crm-leads.sql), then refresh."
+          ? " Run scrape/sql migrations in Supabase (e.g. add-listing-website-crm-contact-surface.sql, add-phone-line-type.sql, add-angi-listing.sql, add-is-test-crm-leads.sql), then refresh."
           : "";
       return { rows: [], total: 0, error: error.message + hint };
     }
@@ -574,9 +598,18 @@ export async function fetchCrmBusinessRows(
       );
       return {
         ...row,
+        angi_competitors: parseAngiCompetitorsJson(
+          (row as { angi_competitors?: unknown }).angi_competitors,
+        ),
         contact_count: userContact?.contact_count ?? 0,
         stage: userContact?.stage ?? "new",
-        owner_name: userContact?.owner_name ?? null,
+        owner_name:
+          userContact?.owner_name?.trim() ||
+          (typeof (row as { angi_owner_name?: unknown }).angi_owner_name ===
+          "string"
+            ? (row as { angi_owner_name: string }).angi_owner_name
+            : null) ||
+          null,
         notes: userContact?.notes ?? null,
         contact_email: userContact?.contact_email ?? null,
         enrichment_email: extractDemoPublicEmail(enrichment),
