@@ -179,6 +179,27 @@ export function CrmFilters({
         </label>
 
         <label className={labelClass}>
+          Postcard address
+          <select
+            name="addressKind"
+            defaultValue={params.addressKind}
+            className={`${fieldClass} min-w-[10rem]`}
+            title="Lob US verification of the Maps street. Owner likely = residential or PO Box. Shared = 5+ listings at the same street+ZIP."
+          >
+            <option value="all">All</option>
+            <option value="owner_likely">Owner likely</option>
+            <option value="residential">Residential</option>
+            <option value="po_box">PO Box</option>
+            <option value="commercial">Commercial</option>
+            <option value="cmra">CMRA / UPS Store</option>
+            <option value="shared">Shared suite</option>
+            <option value="undeliverable">Undeliverable</option>
+            <option value="unknown">Unknown</option>
+            <option value="not_checked">Not scored</option>
+          </select>
+        </label>
+
+        <label className={labelClass}>
           Angi listing
           <select
             name="angiListing"

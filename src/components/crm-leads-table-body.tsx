@@ -33,6 +33,10 @@ import {
 } from "@/lib/outreach-spintax";
 import { leadSpintaxAudienceContext } from "@/lib/spintax-audience";
 import type { SpintaxTemplate } from "@/lib/spintax-templates";
+import {
+  isOwnerLikelyPostcardAddress,
+  postcardAddressKindLabel,
+} from "@/lib/postcard/address-kind";
 
 interface CrmLeadsTableBodyProps {
   rows: BusinessLead[];
@@ -176,6 +180,18 @@ export function CrmLeadsTableBody({
                     .filter(Boolean)
                     .join(", ") || b.address || "—"}
                 </span>
+                {postcardAddressKindLabel(b.postcard_address_kind) ? (
+                  <span
+                    className={
+                      isOwnerLikelyPostcardAddress(b.postcard_address_kind)
+                        ? "mt-0.5 shrink-0 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-200"
+                        : "mt-0.5 shrink-0 rounded bg-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                    }
+                    title="Lob verification of the Maps street. Residential and PO Box are addresses the owner is more likely to see."
+                  >
+                    {postcardAddressKindLabel(b.postcard_address_kind)}
+                  </span>
+                ) : null}
                 {b.google_maps_link ? (
                   <a
                     href={b.google_maps_link}
@@ -223,6 +239,7 @@ export function CrmLeadsTableBody({
                 city={b.city}
                 state={b.state}
                 postalCode={b.postal_code}
+                postcardAddressKind={b.postcard_address_kind}
                 leadAudience={spintaxLeadAudience}
                 angiCompetitors={b.angi_competitors}
                 templates={spintaxTemplates}

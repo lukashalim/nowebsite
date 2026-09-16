@@ -22,6 +22,12 @@ import {
   isMailableLeadAddress,
 } from "@/lib/postcard/address";
 import {
+  isOwnerLikelyPostcardAddress,
+  isPostcardAddressKind,
+  postcardAddressKindLabel,
+  type PostcardAddressKind,
+} from "@/lib/postcard/address-kind";
+import {
   filterSpintaxTemplatesForLeadChannel,
   preferAngiSpintaxTemplate,
   type SpintaxLeadAudienceContext,
@@ -60,6 +66,7 @@ interface CrmOutreachPopoverProps {
   city: string | null;
   state: string | null;
   postalCode: string | null;
+  postcardAddressKind?: PostcardAddressKind | null;
   leadAudience: SpintaxLeadAudienceContext;
   angiCompetitors?: AngiCompetitor[] | null;
   templates: SpintaxTemplate[];
@@ -144,6 +151,7 @@ export function CrmOutreachPopover({
   city,
   state,
   postalCode,
+  postcardAddressKind = null,
   leadAudience,
   angiCompetitors,
   templates,
@@ -181,6 +189,10 @@ export function CrmOutreachPopover({
   const [mailBusy, setMailBusy] = useState(false);
   const [mailError, setMailError] = useState<string | null>(null);
   const [mailSuccess, setMailSuccess] = useState<string | null>(null);
+  const [allowNonResidential, setAllowNonResidential] = useState(false);
+  const [liveScoredKind, setLiveScoredKind] = useState<PostcardAddressKind | null>(
+    null,
+  );
   const [callPhase, setCallPhase] = useState<CallModalPhase>("IDLE");
   const [callLeadData, setCallLeadData] = useState<CallLeadData | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -213,6 +225,19 @@ export function CrmOutreachPopover({
           : null;
   const mailSendDisabled =
     mailBusy || !mailable || mailBlockedReason != null;
+
+  const scoredAddressKind = isPostcardAddressKind(liveScoredKind)
+    ? liveScoredKind
+    : isPostcardAddressKind(postcardAddressKind)
+      ? postcardAddressKind
+      : null;
+  const needsNonResidentialOverride =
+    !sendTestMode &&
+    scoredAddressKind != null &&
+    !isOwnerLikelyPostcardAddress(scoredAddressKind);
+  const mailKindDisabled =
+    mailSendDisabled ||
+    (needsNonResidentialOverride && !allowNonResidential);
 
   const smsTemplates = useMemo(
     () => filterSpintaxTemplatesForLeadChannel(templates, "sms", leadAudience),
@@ -521,7 +546,7 @@ export function CrmOutreachPopover({
   }
 
   async function sendPostcard() {
-    if (!mailable || mailBlockedReason) return;
+    if (!mailable || mailBlockedReason || mailKindDisabled) return;
     setMailBusy(true);
     setMailError(null);
     setMailSuccess(null);
@@ -534,6 +559,8 @@ export function CrmOutreachPopover({
           ownerName,
           allowTest: allowTest || undefined,
           mode: sendTestMode ? "test" : "live",
+          allowNonResidential:
+            allowNonResidential || undefined,
         }),
       });
       const data = (await res.json()) as {
@@ -543,7 +570,11 @@ export function CrmOutreachPopover({
         postcardId?: string;
         url?: string | null;
         testMode?: boolean;
+        postcard_address_kind?: string;
       };
+      if (isPostcardAddressKind(data.postcard_address_kind)) {
+        setLiveScoredKind(data.postcard_address_kind);
+      }
       if (!res.ok || !data.ok) {
         setMailError(data.error || "Failed to send postcard");
         if (typeof data.remaining === "number") {
@@ -784,6 +815,20 @@ export function CrmOutreachPopover({
                   {addressLines.map((line) => (
                     <p key={line}>{line}</p>
                   ))}
+                  {postcardAddressKindLabel(scoredAddressKind) ? (
+                    <p className="mt-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                      Maps pin: {postcardAddressKindLabel(scoredAddressKind)}.
+                      Residential and PO Box are where the owner is more likely
+                      to see mail. Commercial, CMRA, and shared suites usually
+                      are not.
+                    </p>
+                  ) : (
+                    <p className="mt-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                      This is the Google Maps pin, not necessarily a home. Live
+                      send verifies with Lob and blocks commercial / CMRA /
+                      shared suites unless you override.
+                    </p>
+                  )}
                 </div>
                 {mailBlockedReason === "no_key" ? (
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
@@ -846,6 +891,22 @@ export function CrmOutreachPopover({
                         ? "Test mode — proof only, skips USPS verification."
                         : "Production mode — verifies via Lob before send."}
                     </p>
+                    {needsNonResidentialOverride ? (
+                      <label className="flex items-start gap-2 text-[11px] text-zinc-600 dark:text-zinc-300">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5"
+                          checked={allowNonResidential}
+                          onChange={(e) =>
+                            setAllowNonResidential(e.target.checked)
+                          }
+                        />
+                        <span>
+                          Mail anyway — this is not a home / PO Box (
+                          {postcardAddressKindLabel(scoredAddressKind)})
+                        </span>
+                      </label>
+                    ) : null}
                     {mailError ? (
                       <p
                         className="text-xs text-red-600 dark:text-red-400"
@@ -862,7 +923,7 @@ export function CrmOutreachPopover({
                     <button
                       type="button"
                       onClick={() => void sendPostcard()}
-                      disabled={mailSendDisabled}
+                      disabled={mailKindDisabled}
                       className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
                     >
                       <Mail className="size-4" aria-hidden />

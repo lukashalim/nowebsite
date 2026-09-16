@@ -20,7 +20,8 @@
     "demo:dispatch": "node --import ./scrape/env-nowebsite-queue.mjs --import tsx ./scrape/dispatch.mjs",
     "postcard:screenshots": "node --import ./scrape/env-nowebsite-queue.mjs ./scrape/generate-postcard-screenshots.mjs",
     "angi:backfill": "node --import ./scrape/env-nowebsite-queue.mjs --import tsx ./scrape/backfill-angi-listing.mjs",
-    "enrich-md-mhic": "node --import ./scrape/env-nowebsite-queue.mjs --import tsx ./scrape/enrich-md-mhic.mjs"
+    "enrich-md-mhic": "node --import ./scrape/env-nowebsite-queue.mjs --import tsx ./scrape/enrich-md-mhic.mjs",
+    "postcard:score-addresses": "node --import ./scrape/env-nowebsite-queue.mjs --import tsx ./scrape/backfill-postcard-address-kind.mjs"
   },
   "dependencies": {
     "@next/third-parties": "^16.2.10",

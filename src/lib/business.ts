@@ -1,5 +1,6 @@
 import type { AngiCompetitor } from "@/lib/angi-listing";
 import type { CrmStage } from "@/lib/crm-stage";
+import type { PostcardAddressKind } from "@/lib/postcard/address-kind";
 
 export interface BusinessLead {
   place_id: string;
@@ -18,6 +19,8 @@ export interface BusinessLead {
   phone: string | null;
   /** Telnyx carrier lookup bucket (home-services backfill). */
   phone_line_type?: "mobile" | "landline_or_voip" | "unknown" | null;
+  /** Lob USAV + occupancy bucket for the Maps street (postcard send). */
+  postcard_address_kind?: PostcardAddressKind | null;
   /** DataForSEO SERP Angi/HomeAdvisor listing detection. */
   has_angi_listing?: boolean | null;
   angi_listing_url?: string | null;

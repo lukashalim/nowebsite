@@ -30,6 +30,17 @@ export type LobUsDeliverability =
   | "undeliverable"
   | string;
 
+export type LobAddressType = "residential" | "commercial" | string;
+
+export type LobRecordType =
+  | "street"
+  | "highrise"
+  | "firm"
+  | "po_box"
+  | "rural_route"
+  | "general_delivery"
+  | string;
+
 export interface LobUsVerificationResult {
   deliverability: LobUsDeliverability;
   primary_line: string;
@@ -37,6 +48,14 @@ export interface LobUsVerificationResult {
   city: string;
   state: string;
   zip_code: string;
+  /** Lob `components.address_type`. */
+  address_type: string | null;
+  /** Lob `components.record_type`. */
+  record_type: string | null;
+  /** Lob `deliverability_analysis.dpv_cmra` (Y/N). */
+  dpv_cmra: string | null;
+  pmb_designator: string | null;
+  pmb_number: string | null;
 }
 
 /** Values accepted under Lob "Normal" (and Strict's deliverable-only subset). */
@@ -207,6 +226,11 @@ export async function verifyUsAddress(
     (typeof json.zip_code === "string" && json.zip_code.trim()) ||
     input.zip_code.trim();
 
+  const analysis = (json.deliverability_analysis ?? {}) as Record<
+    string,
+    unknown
+  >;
+
   return {
     deliverability: String(json.deliverability ?? "undeliverable"),
     primary_line: primary || input.primary_line.trim(),
@@ -214,7 +238,18 @@ export async function verifyUsAddress(
     city,
     state,
     zip_code: zip,
+    address_type: optionalTrimmedString(components.address_type),
+    record_type: optionalTrimmedString(components.record_type),
+    dpv_cmra: optionalTrimmedString(analysis.dpv_cmra),
+    pmb_designator: optionalTrimmedString(components.pmb_designator),
+    pmb_number: optionalTrimmedString(components.pmb_number),
   };
+}
+
+function optionalTrimmedString(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const t = value.trim();
+  return t ? t : null;
 }
 
 export interface LobPostcardQrCode {

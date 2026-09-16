@@ -21,6 +21,15 @@ import {
   isMailableLeadAddress,
   leadToLobAddress,
 } from "@/lib/postcard/address";
+import {
+  classifyPostcardAddressKind,
+  countOccupancyPeers,
+  isCmraVerification,
+  isOwnerLikelyPostcardAddress,
+  occupancyKey,
+  postcardAddressKindLabel,
+  postcardAddressKindPatch,
+} from "@/lib/postcard/address-kind";
 import { buildPostcardBackHtml, LOB_BACK_QR_PLACEMENT } from "@/lib/postcard/back-html";
 import { generatePostcardCallHeadline } from "@/lib/postcard/call-headline";
 import { shortenCompanyNameForLob } from "@/lib/postcard/company-name";
@@ -65,6 +74,8 @@ export async function POST(request: Request) {
     allowTest?: boolean;
     /** CRM Mail Test vs Production — selects which stored Lob key to use. */
     mode?: "test" | "live" | "production";
+    /** Live send to a commercial/CMRA/shared Maps pin. */
+    allowNonResidential?: boolean;
   };
   try {
     body = (await request.json()) as {
@@ -72,6 +83,7 @@ export async function POST(request: Request) {
       ownerName?: string | null;
       allowTest?: boolean;
       mode?: "test" | "live" | "production";
+      allowNonResidential?: boolean;
     };
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
@@ -356,11 +368,74 @@ export async function POST(request: Request) {
         zip_code: to.address_zip,
       });
 
+      const zipPrefix = postal_code!.replace(/\D/g, "").slice(0, 5);
+      let peerRows: Array<{
+        place_id?: string | null;
+        address?: string | null;
+        postal_code?: string | null;
+      }> = [];
+      if (zipPrefix.length === 5) {
+        const { data: peers } = await admin
+          .from("businesses_nowebsite")
+          .select("place_id, address, postal_code")
+          .eq("is_invalid", false)
+          .like("postal_code", `${zipPrefix}%`)
+          .limit(2000);
+        peerRows = peers ?? [];
+      }
+      const peerCount = countOccupancyPeers(
+        peerRows,
+        occupancyKey(address, postal_code),
+        placeId,
+      );
+      const isCmra = isCmraVerification({
+        dpvCmra: verified.dpv_cmra,
+        pmbDesignator: verified.pmb_designator,
+        pmbNumber: verified.pmb_number,
+      });
+      const kind = classifyPostcardAddressKind({
+        deliverability: verified.deliverability,
+        addressType: verified.address_type,
+        recordType: verified.record_type,
+        dpvCmra: verified.dpv_cmra,
+        pmbDesignator: verified.pmb_designator,
+        pmbNumber: verified.pmb_number,
+        peerCount,
+      });
+      const patch = postcardAddressKindPatch({
+        kind,
+        recordType: verified.record_type,
+        isCmra,
+        peerCount,
+      });
+      const { error: kindErr } = await admin
+        .from("businesses_nowebsite")
+        .update(patch)
+        .eq("place_id", placeId);
+      if (kindErr) {
+        console.warn("[crm-postcard] address kind persist failed", kindErr.message);
+      }
+
       if (!isAcceptableUsDeliverability(verified.deliverability)) {
         return NextResponse.json(
           {
             error: `Address failed Lob deliverability check (${verified.deliverability}). Fix the street/city/state/ZIP, or set Lob account strictness to Normal/Relaxed.`,
             deliverability: verified.deliverability,
+            postcard_address_kind: kind,
+          },
+          { status: 422 },
+        );
+      }
+
+      if (
+        !isOwnerLikelyPostcardAddress(kind) &&
+        body.allowNonResidential !== true
+      ) {
+        const label = postcardAddressKindLabel(kind) ?? kind;
+        return NextResponse.json(
+          {
+            error: `Maps pin is ${label} — the owner is unlikely to see mail there. Check “Mail anyway” to send to this address.`,
+            postcard_address_kind: kind,
           },
           { status: 422 },
         );

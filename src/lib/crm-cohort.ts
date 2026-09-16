@@ -12,6 +12,19 @@ import {
   type CrmSearchParams,
   type CrmWebPresence,
 } from "@/lib/crm-params";
+import { isPostcardAddressKind, type PostcardAddressKind } from "@/lib/postcard/address-kind";
+import {
+  parseContactEnrichment,
+  type ContactEnrichment,
+} from "@/lib/contact-enrichment-schema";
+import { extractDemoPublicEmail, toFiniteNumber } from "@/lib/demo-enrichment";
+import { isCrmStage, type CrmStage } from "@/lib/crm-stage";
+import {
+  defaultCrmDemoCohortFilters,
+  type CrmPostcardStatus,
+  type CrmSearchParams,
+  type CrmWebPresence,
+} from "@/lib/crm-params";
 import {
   fetchUserPostcardPlaceIdSets,
   postcardTrackingModeFromCrm,
@@ -50,7 +63,7 @@ import { cache } from "react";
 export type { DemoReviewHighlight } from "@/lib/demo-review-types";
 
 export const CRM_BUSINESS_LIST_COLUMNS =
-  "place_id, demo_slug, name, address, city, state, country, postal_code, business_type, main_category, rating, reviews, phone, phone_line_type, has_angi_listing, angi_listing_url, angi_listing_title, angi_listing_confidence, angi_competitors, angi_listing_checked_at, angi_owner_name, google_maps_link, facebook_url, listing_website, crm_contact_surface, contact_enrichment, is_test" as const;
+  "place_id, demo_slug, name, address, city, state, country, postal_code, business_type, main_category, rating, reviews, phone, phone_line_type, postcard_address_kind, has_angi_listing, angi_listing_url, angi_listing_title, angi_listing_confidence, angi_competitors, angi_listing_checked_at, angi_owner_name, google_maps_link, facebook_url, listing_website, crm_contact_surface, contact_enrichment, is_test" as const;
 
 const DEMO_CORE_COLUMNS =
   "place_id, demo_slug, name, address, city, state, postal_code, business_type, main_category, rating, reviews, phone, google_maps_link, facebook_url, listing_website, crm_contact_surface, contact_enrichment" as const;
@@ -242,6 +255,35 @@ function parseUserContactStage(raw: unknown): CrmStage {
     return raw;
   }
   return "new";
+}
+
+function applyAddressKindFilter<
+  T extends {
+    eq: (column: string, value: unknown) => T;
+    in: (column: string, values: string[]) => T;
+    is: (column: string, value: null) => T;
+  },
+>(q: T, addressKind: CrmSearchParams["addressKind"]): T {
+  switch (addressKind) {
+    case "all":
+      return q;
+    case "owner_likely":
+      return q.in("postcard_address_kind", ["residential", "po_box"]);
+    case "residential":
+    case "po_box":
+    case "commercial":
+    case "cmra":
+    case "shared":
+    case "undeliverable":
+    case "unknown":
+      return q.eq("postcard_address_kind", addressKind);
+    case "not_checked":
+      return q.is("postcard_address_kind", null);
+    default: {
+      const _x: never = addressKind;
+      return _x;
+    }
+  }
 }
 
 function applyPhoneLineTypeFilter<
@@ -554,6 +596,7 @@ export async function fetchCrmBusinessRows(
     }
 
     q = applyPhoneLineTypeFilter(q, p.phoneLineType);
+    q = applyAddressKindFilter(q, p.addressKind);
     q = applyAngiListingFilter(q, p.angiListing);
     q = applyOutreachModeFilter(q, p.outreachMode);
 
@@ -580,10 +623,10 @@ export async function fetchCrmBusinessRows(
 
     if (error) {
       const hint =
-        /crm_contact_surface|listing_website|phone_line_type|has_angi_listing|angi_competitors|angi_owner_name|crm_timezone|is_test|schema cache/i.test(
+        /crm_contact_surface|listing_website|phone_line_type|postcard_address_kind|has_angi_listing|angi_competitors|angi_owner_name|crm_timezone|is_test|schema cache/i.test(
           error.message,
         )
-          ? " Run scrape/sql migrations in Supabase (e.g. add-listing-website-crm-contact-surface.sql, add-phone-line-type.sql, add-angi-listing.sql, add-is-test-crm-leads.sql), then refresh."
+          ? " Run scrape/sql migrations in Supabase (e.g. add-listing-website-crm-contact-surface.sql, add-phone-line-type.sql, add-postcard-address-kind.sql, add-angi-listing.sql, add-is-test-crm-leads.sql), then refresh."
           : "";
       return { rows: [], total: 0, error: error.message + hint };
     }
@@ -598,6 +641,12 @@ export async function fetchCrmBusinessRows(
       );
       return {
         ...row,
+        postcard_address_kind: isPostcardAddressKind(
+          (row as { postcard_address_kind?: unknown }).postcard_address_kind,
+        )
+          ? ((row as { postcard_address_kind: PostcardAddressKind })
+              .postcard_address_kind)
+          : null,
         angi_competitors: parseAngiCompetitorsJson(
           (row as { angi_competitors?: unknown }).angi_competitors,
         ),

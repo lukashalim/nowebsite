@@ -80,6 +80,20 @@ export const crmPhoneLineTypeValues = [
 ] as const;
 export type CrmPhoneLineType = (typeof crmPhoneLineTypeValues)[number];
 
+export const crmAddressKindValues = [
+  "all",
+  "owner_likely",
+  "residential",
+  "po_box",
+  "commercial",
+  "cmra",
+  "shared",
+  "undeliverable",
+  "unknown",
+  "not_checked",
+] as const;
+export type CrmAddressKind = (typeof crmAddressKindValues)[number];
+
 export const crmAngiListingValues = [
   "all",
   "yes",
@@ -145,6 +159,7 @@ export const crmSearchParamsSchema = z
     /** All = broad no-website cohort; Facebook / WhatsApp narrow by Maps listing; Yes = has a real site. */
     webPresence: z.enum(crmWebPresenceValues).default("all"),
     phoneLineType: z.enum(crmPhoneLineTypeValues).default("all"),
+    addressKind: z.enum(crmAddressKindValues).default("all"),
     angiListing: z.enum(crmAngiListingValues).default("all"),
     outreachMode: z.enum(crmOutreachModeValues).default("all"),
     /** Lob test vs production postcard events; only applied when outreachMode is mail. */
@@ -233,6 +248,7 @@ function rawToFlat(raw: Record<string, string | string[] | undefined>) {
     minRating: firstParam(raw.minRating),
     webPresence: normalizeWebPresence(raw),
     phoneLineType: firstParam(raw.phoneLineType),
+    addressKind: firstParam(raw.addressKind),
     angiListing: firstParam(raw.angiListing),
     outreachMode: firstParam(raw.outreachMode),
     postcardMode: firstParam(raw.postcardMode),
@@ -274,6 +290,8 @@ function appendCrmFilterParams(sp: URLSearchParams, params: CrmSearchParams): vo
     sp.set("webPresence", params.webPresence);
   if (params.phoneLineType !== "all")
     sp.set("phoneLineType", params.phoneLineType);
+  if (params.addressKind !== "all")
+    sp.set("addressKind", params.addressKind);
   if (params.angiListing !== "all")
     sp.set("angiListing", params.angiListing);
   if (params.outreachMode !== "all")

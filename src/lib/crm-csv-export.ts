@@ -10,6 +10,7 @@ const CSV_COLUMNS = [
   "reviews",
   "phone",
   "phone_line_type",
+  "postcard_address_kind",
   "has_angi_listing",
   "angi_listing_url",
   "angi_competitors",
@@ -56,6 +57,7 @@ export function buildCrmLeadsCsv(
       cell(b.reviews),
       cell(b.phone),
       cell(b.phone_line_type),
+      cell(b.postcard_address_kind),
       cell(
         b.has_angi_listing == null
           ? ""
