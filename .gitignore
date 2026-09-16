@@ -52,6 +52,9 @@ Same
 # vercel
 .vercel
 
+# generated MHIC / pipeline exports
+/data/*.csv
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

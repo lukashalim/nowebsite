@@ -1,7 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   isSpintaxAudience,
-  SPINTAX_AUDIENCE_VALUES,
   type SpintaxAudience,
 } from "@/lib/spintax-audience";
 import {
@@ -69,35 +68,48 @@ export async function ensureDefaultSpintaxTemplates(
   let hasSmsTemplates = false;
   let hasCallTemplates = false;
   let hasEmailTemplates = false;
+  let hasAngiCallTemplate = false;
+  let hasAngiSmsTemplate = false;
 
   for (const row of rows ?? []) {
     const record = row as { audience?: string; channel?: string };
     const channelRaw = String(record.channel ?? "facebook");
     const channel = isSpintaxChannel(channelRaw) ? channelRaw : "facebook";
+    const audienceRaw = String(record.audience ?? "facebook");
+    const audience = isSpintaxAudience(audienceRaw) ? audienceRaw : "facebook";
     if (channel === "sms") {
       hasSmsTemplates = true;
+      if (audience === "angi") hasAngiSmsTemplate = true;
       continue;
     }
     if (channel === "call") {
       hasCallTemplates = true;
+      if (audience === "angi") hasAngiCallTemplate = true;
       continue;
     }
     if (channel === "email") {
       hasEmailTemplates = true;
       continue;
     }
-    const audienceRaw = String(record.audience ?? "facebook");
-    const audience = isSpintaxAudience(audienceRaw) ? audienceRaw : "facebook";
     facebookAudiencesPresent.add(audience);
   }
 
-  const facebookAudiencesToSeed = SPINTAX_AUDIENCE_VALUES.filter(
-    (audience) => audience !== "any" && !facebookAudiencesPresent.has(audience),
+  const facebookAudiencesToSeed = (["facebook", "no_facebook"] as const).filter(
+    (audience) => !facebookAudiencesPresent.has(audience),
+  );
+
+  const angiCallDefaults = DEFAULT_CALL_SPINTAX_TEMPLATES.filter(
+    (t) => t.audience === "angi",
+  );
+  const angiSmsDefaults = DEFAULT_SMS_SPINTAX_TEMPLATES.filter(
+    (t) => t.audience === "angi",
   );
 
   const toInsert = [
     ...DEFAULT_FACEBOOK_SPINTAX_TEMPLATES.filter((t) =>
-      facebookAudiencesToSeed.includes(t.audience),
+      facebookAudiencesToSeed.includes(
+        t.audience as "facebook" | "no_facebook",
+      ),
     ).map((t) => ({
       user_id: userId,
       name: t.name,
@@ -106,7 +118,15 @@ export async function ensureDefaultSpintaxTemplates(
       channel: t.channel,
     })),
     ...(hasSmsTemplates
-      ? []
+      ? hasAngiSmsTemplate
+        ? []
+        : angiSmsDefaults.map((t) => ({
+            user_id: userId,
+            name: t.name,
+            template: t.template,
+            audience: t.audience,
+            channel: t.channel,
+          }))
       : DEFAULT_SMS_SPINTAX_TEMPLATES.map((t) => ({
           user_id: userId,
           name: t.name,
@@ -115,7 +135,17 @@ export async function ensureDefaultSpintaxTemplates(
           channel: t.channel,
         }))),
     ...(hasCallTemplates
-      ? []
+      ? hasAngiCallTemplate
+        ? []
+        : angiCallDefaults.map((t) => ({
+            user_id: userId,
+            name: t.name,
+            template: t.template,
+            pivot_template: t.pivot_template ?? null,
+            offer_template: t.offer_template ?? null,
+            audience: t.audience,
+            channel: t.channel,
+          }))
       : DEFAULT_CALL_SPINTAX_TEMPLATES.map((t) => ({
           user_id: userId,
           name: t.name,

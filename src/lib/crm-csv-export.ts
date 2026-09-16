@@ -10,6 +10,10 @@ const CSV_COLUMNS = [
   "reviews",
   "phone",
   "phone_line_type",
+  "postcard_address_kind",
+  "has_angi_listing",
+  "angi_listing_url",
+  "angi_competitors",
   "main_category",
   "stage",
   "owner_name",
@@ -53,6 +57,21 @@ export function buildCrmLeadsCsv(
       cell(b.reviews),
       cell(b.phone),
       cell(b.phone_line_type),
+      cell(b.postcard_address_kind),
+      cell(
+        b.has_angi_listing == null
+          ? ""
+          : b.has_angi_listing
+            ? "yes"
+            : "no",
+      ),
+      cell(b.angi_listing_url),
+      cell(
+        (b.angi_competitors ?? [])
+          .map((c) => c.name)
+          .filter(Boolean)
+          .join("; "),
+      ),
       cell(b.main_category),
       cell(b.stage),
       cell(b.owner_name),

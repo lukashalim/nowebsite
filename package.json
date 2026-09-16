@@ -18,7 +18,9 @@
     "demo:pipeline": "node --import ./scrape/env-nowebsite-pipeline-cohort.mjs --import tsx ./scrape/pipeline.mjs",
     "demo:poller": "node --import ./scrape/env-nowebsite-queue.mjs --import tsx ./scrape/poller.mjs",
     "demo:dispatch": "node --import ./scrape/env-nowebsite-queue.mjs --import tsx ./scrape/dispatch.mjs",
-    "postcard:screenshots": "node --import ./scrape/env-nowebsite-queue.mjs ./scrape/generate-postcard-screenshots.mjs"
+    "postcard:screenshots": "node --import ./scrape/env-nowebsite-queue.mjs ./scrape/generate-postcard-screenshots.mjs",
+    "enrich-md-mhic": "node --import ./scrape/env-nowebsite-queue.mjs --import tsx ./scrape/enrich-md-mhic.mjs",
+    "postcard:score-addresses": "node --import ./scrape/env-nowebsite-queue.mjs --import tsx ./scrape/backfill-postcard-address-kind.mjs"
   },
   "dependencies": {
     "@next/third-parties": "^16.2.10",
@@ -27,6 +29,7 @@
     "@supabase/supabase-js": "^2.105.1",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
+    "apify-client": "^2.25.0",
     "dotenv": "^17.4.2",
     "lucide-react": "^1.12.0",
     "next": "16.2.4",

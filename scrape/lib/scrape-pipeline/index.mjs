@@ -78,9 +78,8 @@ export function loadEnvLocal() {
   ];
   const p = candidates.find((f) => existsSync(f));
   if (!p) {
-    throw new Error(
-      "Missing .env.local (checked cwd and parent). Run from repo root or scrape/ with .env.local present.",
-    );
+    // Cloud Agent secrets are injected as process.env; a local file is optional.
+    return;
   }
   const raw = readFileSync(p, "utf8");
   for (const line of raw.split("\n")) {

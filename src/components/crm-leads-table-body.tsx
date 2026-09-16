@@ -14,6 +14,7 @@ import { NotesCell } from "@/components/notes-cell";
 import { OutreachSpintaxButton } from "@/components/outreach-spintax-button";
 import { OwnerNameInput } from "@/components/owner-name-input";
 import { StageSelect } from "@/components/stage-select";
+import { CheckAngiListingButton } from "@/components/check-angi-listing-button";
 import type { CrmOutreachRecordedHandler } from "@/components/crm-free-usage-layout";
 import { useCrmOutreachRecorded } from "@/components/crm-free-usage-layout";
 import type {
@@ -30,8 +31,12 @@ import {
   isEligibleForCrmSpintax,
   resolveFacebookPageUrl,
 } from "@/lib/outreach-spintax";
-import { leadSpintaxAudience } from "@/lib/spintax-audience";
+import { leadSpintaxAudienceContext } from "@/lib/spintax-audience";
 import type { SpintaxTemplate } from "@/lib/spintax-templates";
+import {
+  isOwnerLikelyPostcardAddress,
+  postcardAddressKindLabel,
+} from "@/lib/postcard/address-kind";
 
 interface CrmLeadsTableBodyProps {
   rows: BusinessLead[];
@@ -123,12 +128,13 @@ export function CrmLeadsTableBody({
           facebook_url: b.facebook_url,
           crm_contact_surface: b.crm_contact_surface ?? null,
           listing_website: b.listing_website,
+          has_angi_listing: b.has_angi_listing,
         };
         const spintaxEligible = isEligibleForCrmSpintax(
           webPresence,
           outreachRow,
         );
-        const spintaxLeadAudience = leadSpintaxAudience(outreachRow);
+        const spintaxLeadAudience = leadSpintaxAudienceContext(outreachRow);
         const contactCount = contactCounts[b.place_id] ?? b.contact_count ?? 0;
 
         return (
@@ -144,7 +150,24 @@ export function CrmLeadsTableBody({
                     TEST
                   </span>
                 ) : null}
+                {b.has_angi_listing === true ? (
+                  <span
+                    className="rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-900 dark:bg-orange-950/60 dark:text-orange-200"
+                    title={
+                      b.angi_listing_url ??
+                      "Likely Angi Approved / paying (profile scrape)"
+                    }
+                  >
+                    Angi
+                  </span>
+                ) : null}
               </span>
+              <div className="mt-1">
+                <CheckAngiListingButton
+                  placeId={b.place_id}
+                  hasAngiListing={b.has_angi_listing}
+                />
+              </div>
             </td>
             <td className="px-3 py-3 text-zinc-600 dark:text-zinc-300">
               <span className="inline-flex items-start gap-1.5">
@@ -157,6 +180,18 @@ export function CrmLeadsTableBody({
                     .filter(Boolean)
                     .join(", ") || b.address || "—"}
                 </span>
+                {postcardAddressKindLabel(b.postcard_address_kind) ? (
+                  <span
+                    className={
+                      isOwnerLikelyPostcardAddress(b.postcard_address_kind)
+                        ? "mt-0.5 shrink-0 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-200"
+                        : "mt-0.5 shrink-0 rounded bg-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                    }
+                    title="Lob verification of the Maps street. Residential and PO Box are addresses the owner is more likely to see."
+                  >
+                    {postcardAddressKindLabel(b.postcard_address_kind)}
+                  </span>
+                ) : null}
                 {b.google_maps_link ? (
                   <a
                     href={b.google_maps_link}
@@ -204,7 +239,9 @@ export function CrmLeadsTableBody({
                 city={b.city}
                 state={b.state}
                 postalCode={b.postal_code}
+                postcardAddressKind={b.postcard_address_kind}
                 leadAudience={spintaxLeadAudience}
+                angiCompetitors={b.angi_competitors}
                 templates={spintaxTemplates}
                 existingNotes={b.notes}
                 outreachRemaining={outreachRemaining}
@@ -225,6 +262,7 @@ export function CrmLeadsTableBody({
                 businessType={b.business_type}
                 eligible={spintaxEligible}
                 leadAudience={spintaxLeadAudience}
+                angiCompetitors={b.angi_competitors}
                 templates={spintaxTemplates}
                 facebookUrl={resolveFacebookPageUrl(outreachRow)}
                 outreachRemaining={outreachRemaining}
