@@ -100,12 +100,12 @@ async function main() {
   if (!dryRun) {
     if (!apiKey) {
       throw new Error(
-        "LOB_SECRET_KEY (or LOB_API_KEY) is required in .env.local. Use the live secret key (live_…), not LOB_PUBLISHABLE_KEY.",
+        "LOB_LIVE_SECRET_KEY (or LOB_SECRET_KEY / LOB_API_KEY) is required in .env.local. Use the live secret (live_…), not LOB_LIVE_PUBLISHABLE_KEY.",
       );
     }
     if (!isLobLiveMode(apiKey)) {
       throw new Error(
-        "LOB_SECRET_KEY must be a live_ secret key (test keys cannot score real US addresses)",
+        "LOB_LIVE_SECRET_KEY must be a live_ secret key (test keys cannot score real US addresses)",
       );
     }
   }
