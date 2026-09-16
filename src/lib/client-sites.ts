@@ -21,8 +21,10 @@ export interface ClientSite {
   services: ClientSiteService[];
   /** Short brand / DBA for CTAs (e.g. "Somers Tree"). Not the owner's first name. */
   shortDba?: string;
-  /** Public path for the header/hero mark (e.g. "/somerslogo.png"). */
+  /** Public path for the header mark (e.g. "/somerslogo.png"). */
   logoSrc?: string;
+  /** Optional photo for the desktop hero aside. Service cards peek if omitted. */
+  heroImageSrc?: string;
   /** E.164 number that receives service-request SMS (Tom). */
   notifyPhone?: string;
   /** Dedicated GA4 measurement ID. Directory GA stays off this host. */
@@ -37,7 +39,7 @@ export const CLIENT_SITES: ClientSite[] = [
       "Somers Lawn & Tree | Lawn Care & Tree Service in Washington Court House, OH",
     description:
       "Lawn care, tree service, landscaping, and firewood in Washington Court House, Ohio. Call Tom Somers at (740) 463-8025.",
-    tagline: "Lawn care, tree service, landscaping & firewood",
+    tagline: "Lawn care, tree service, and firewood",
     about:
       "Somers Lawn & Tree is a local lawn care, tree service, landscaping, and firewood company based in Washington Court House, Ohio. Owner Tom Somers and his crew are known for fair prices, careful cleanup, and doing the job when they say they will — from tree work and brush piles to mowing and firewood.",
     areaServed:
@@ -137,7 +139,13 @@ export function isClientSiteAllowedPath(pathname: string): boolean {
   if (normalized.includes("twitter-image")) return true;
   if (normalized === "/icon" || normalized.startsWith("/icon.")) return true;
   if (normalized.startsWith("/apple-icon")) return true;
-  if (CLIENT_SITES.some((site) => site.logoSrc && normalized === site.logoSrc)) {
+  if (
+    CLIENT_SITES.some(
+      (site) =>
+        (site.logoSrc && normalized === site.logoSrc) ||
+        (site.heroImageSrc && normalized === site.heroImageSrc),
+    )
+  ) {
     return true;
   }
   if (/^\/[^/]+\.(png|jpe?g|webp|svg|gif|ico)$/i.test(normalized)) {

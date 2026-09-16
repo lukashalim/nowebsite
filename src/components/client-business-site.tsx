@@ -11,7 +11,11 @@ import type { ClientSite } from "@/lib/client-sites";
 import { buildLocalBusinessJsonLd } from "@/lib/demo-local-business-jsonld";
 import { openStreetMapLink } from "@/lib/demo-enrichment";
 import { ClientSitePageBeacon } from "@/components/client-site-page-beacon";
-import { ClientSiteServices } from "@/components/client-site-services";
+import {
+  ClientSiteServiceFlow,
+  ClientSiteServicePeek,
+  ClientSiteServices,
+} from "@/components/client-site-services";
 import {
   ClientSiteCallLink,
   ClientSiteOutboundLink,
@@ -48,10 +52,18 @@ export function ClientBusinessSite({
 }: ClientBusinessSiteProps) {
   const phone = business.phone?.trim() || null;
   const callHref = phone ? telHref(phone) : null;
+  const cityState =
+    [business.city, business.state].filter(Boolean).join(", ") || "";
   const locLine =
     [business.city, business.state, business.postal_code]
       .filter(Boolean)
       .join(", ") || "";
+  const aroundLine = business.postal_code?.trim()
+    ? `Homes and properties around ${business.postal_code.trim()}`
+    : cityState
+      ? `Homes and properties around ${cityState}`
+      : "Homes and properties nearby";
+  const showHeroAside = Boolean(site.heroImageSrc) || site.services.length > 0;
   const osm = openStreetMapLink(
     business.latitude ?? null,
     business.longitude ?? null,
@@ -74,8 +86,13 @@ export function ClientBusinessSite({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <div className="min-h-screen bg-[#f4efe3] text-[#1b2b1c]" style={{ colorScheme: "light" }}>
+        <ClientSiteServiceFlow
+          siteId={site.id}
+          services={site.services}
+          shortDba={site.shortDba}
+        >
         <header className="fixed inset-x-0 top-0 z-50 border-b border-[#d9d0bc] bg-[#f7f3e9]/95 shadow-[0_1px_0_0_rgba(61,45,31,0.08)] backdrop-blur">
-          <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
+          <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
             <a href="#top" className="flex min-w-0 items-center">
               {site.logoSrc ? (
                 <Image
@@ -112,72 +129,78 @@ export function ClientBusinessSite({
                 href={callHref}
                 siteId={site.id}
                 location="header"
-                className="inline-flex shrink-0 items-center gap-2 rounded-full bg-[#2f6b3a] px-4 py-2 text-sm font-semibold text-white hover:bg-[#245830]"
+                aria-label={`Call ${phone}`}
+                className="inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-[#2f6b3a] text-white hover:bg-[#245830]"
               >
-                <Phone className="size-4" aria-hidden />
-                Call {phone}
+                <Phone className="size-5" aria-hidden />
               </ClientSiteCallLink>
             ) : null}
           </div>
         </header>
 
-        <main id="top" className="pt-20">
+        <main id="top" className="pt-[4.25rem] sm:pt-[4.5rem]">
           <section className="bg-[#1b3a2a] text-[#f4efe3]">
-            <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 sm:py-24">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#c4a35a]">
-                Washington Court House, Ohio
-              </p>
-              {site.logoSrc ? (
-                <h1 className="mt-6 w-44 sm:w-56 md:w-64">
+            <div
+              className={`mx-auto grid max-w-5xl items-center gap-8 px-4 py-8 sm:px-6 sm:py-10 ${showHeroAside ? "lg:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)]" : ""}`}
+            >
+              <div>
+                {cityState ? (
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#c4a35a]">
+                    {cityState}
+                  </p>
+                ) : null}
+                <h1 className="mt-3 max-w-xl text-3xl font-extrabold tracking-tight sm:text-4xl">
+                  {site.tagline}
+                </h1>
+                <p className="mt-3 text-base text-[#e4dcc8] sm:text-lg">
+                  {aroundLine}
+                </p>
+                {business.rating != null ? (
+                  <p className="mt-4 inline-flex items-center gap-2 text-[#f4efe3]">
+                    <Star
+                      className="size-5 fill-[#c4a35a] text-[#c4a35a]"
+                      aria-hidden
+                    />
+                    <span className="tabular-nums">
+                      {Number(business.rating).toFixed(1)}
+                      {business.reviews != null
+                        ? ` · ${business.reviews} Google reviews`
+                        : ""}
+                    </span>
+                  </p>
+                ) : null}
+                {callHref ? (
+                  <div className="mt-5">
+                    <ClientSiteCallLink
+                      href={callHref}
+                      siteId={site.id}
+                      location="hero"
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#c4a35a] px-6 py-3 text-base font-semibold text-[#1b2b1c] hover:bg-[#b39148]"
+                    >
+                      <Phone className="size-5" aria-hidden />
+                      Call {phone} for a quote
+                    </ClientSiteCallLink>
+                  </div>
+                ) : null}
+              </div>
+              {site.heroImageSrc ? (
+                <div className="relative hidden aspect-[4/3] overflow-hidden rounded-2xl lg:block">
                   <Image
-                    src={site.logoSrc}
-                    alt={site.name}
-                    width={1120}
-                    height={957}
-                    className="h-auto w-full"
-                    sizes="(max-width: 640px) 176px, (max-width: 768px) 224px, 256px"
+                    src={site.heroImageSrc}
+                    alt=""
+                    fill
+                    className="object-cover"
+                    sizes="320px"
                     priority
                   />
-                </h1>
-              ) : (
-                <h1 className="mt-4 max-w-3xl text-4xl font-extrabold tracking-tight sm:text-5xl">
-                  {site.name}
-                </h1>
-              )}
-              <p className="mt-4 max-w-2xl text-lg text-[#e4dcc8]">
-                {site.tagline} for homes and properties around {locLine || "Ohio"}.
-              </p>
-              {business.rating != null ? (
-                <p className="mt-6 inline-flex items-center gap-2 text-[#f4efe3]">
-                  <Star
-                    className="size-5 fill-[#c4a35a] text-[#c4a35a]"
-                    aria-hidden
-                  />
-                  <span className="tabular-nums">
-                    {Number(business.rating).toFixed(1)} stars
-                    {business.reviews != null
-                      ? ` · ${business.reviews} Google reviews`
-                      : ""}
-                  </span>
-                </p>
-              ) : null}
-              {callHref ? (
-                <div className="mt-8">
-                  <ClientSiteCallLink
-                    href={callHref}
-                    siteId={site.id}
-                    location="hero"
-                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#c4a35a] px-6 py-3 text-base font-semibold text-[#1b2b1c] hover:bg-[#b39148]"
-                  >
-                    <Phone className="size-5" aria-hidden />
-                    Call {phone} for a quote
-                  </ClientSiteCallLink>
                 </div>
-              ) : null}
+              ) : (
+                <ClientSiteServicePeek />
+              )}
             </div>
           </section>
 
-          <section className="mx-auto max-w-5xl px-4 py-14 sm:px-6">
+          <section className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
             <h2 className="text-2xl font-bold tracking-tight">About us</h2>
             <p className="mt-4 max-w-3xl leading-relaxed text-[#3d5340]">
               {site.about}
@@ -186,7 +209,7 @@ export function ClientBusinessSite({
 
           <section
             id="services"
-            className="scroll-mt-24 border-y border-[#d9d0bc] bg-[#f7f3e9] py-14"
+            className="scroll-mt-24 border-y border-[#d9d0bc] bg-[#f7f3e9] py-10"
           >
             <div className="mx-auto max-w-5xl px-4 sm:px-6">
               <h2 className="text-2xl font-bold tracking-tight">Services</h2>
@@ -194,11 +217,7 @@ export function ClientBusinessSite({
                 Tap a service. Leave your address and phone — the owner gets a
                 text.
               </p>
-              <ClientSiteServices
-                siteId={site.id}
-                services={site.services}
-                shortDba={site.shortDba}
-              />
+              <ClientSiteServices />
             </div>
           </section>
 
@@ -337,6 +356,7 @@ export function ClientBusinessSite({
             </div>
           </section>
         </main>
+        </ClientSiteServiceFlow>
 
         <footer className="border-t border-[#d9d0bc] bg-[#1b3a2a] px-4 py-8 text-center text-sm text-[#e4dcc8] sm:px-6">
           {site.logoSrc ? (
