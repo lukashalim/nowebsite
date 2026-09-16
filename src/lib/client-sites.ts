@@ -137,5 +137,11 @@ export function isClientSiteAllowedPath(pathname: string): boolean {
   if (normalized.includes("twitter-image")) return true;
   if (normalized === "/icon" || normalized.startsWith("/icon.")) return true;
   if (normalized.startsWith("/apple-icon")) return true;
+  if (CLIENT_SITES.some((site) => site.logoSrc && normalized === site.logoSrc)) {
+    return true;
+  }
+  if (/^\/[^/]+\.(png|jpe?g|webp|svg|gif|ico)$/i.test(normalized)) {
+    return true;
+  }
   return false;
 }

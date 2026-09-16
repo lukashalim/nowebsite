@@ -84,6 +84,7 @@ export function ClientBusinessSite({
                   width={1120}
                   height={957}
                   className="h-11 w-auto sm:h-12"
+                  sizes="48px"
                   priority
                 />
               ) : (
@@ -134,6 +135,7 @@ export function ClientBusinessSite({
                     width={1120}
                     height={957}
                     className="h-auto w-full"
+                    sizes="(max-width: 640px) 176px, (max-width: 768px) 224px, 256px"
                     priority
                   />
                 </h1>
@@ -344,6 +346,7 @@ export function ClientBusinessSite({
               width={1120}
               height={957}
               className="mx-auto h-16 w-auto"
+              sizes="64px"
             />
           ) : null}
           <p className={site.logoSrc ? "mt-3 font-semibold text-[#f4efe3]" : "font-semibold text-[#f4efe3]"}>
