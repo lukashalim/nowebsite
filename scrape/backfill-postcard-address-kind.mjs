@@ -5,8 +5,8 @@
  *   npm run postcard:score-addresses -- --dry-run --limit 20
  *   npm run postcard:score-addresses -- --force --limit 50
  *
- * Env: LOB_SECRET_KEY (or LOB_API_KEY) must be a live_ secret.
- * Do not use LOB_PUBLISHABLE_KEY — test/publishable keys cannot score real addresses.
+ * Env: LOB_LIVE_SECRET_KEY (or LOB_SECRET_KEY / LOB_API_KEY) must be a live_ secret.
+ * Do not use LOB_LIVE_PUBLISHABLE_KEY or LOB_PUBLISHABLE_KEY — they cannot score real addresses.
  * Optional: POSTCARD_ADDRESS_BACKFILL_BATCH (default 25), POSTCARD_ADDRESS_SLEEP_MS (default 300).
  *
  * Prerequisite: run scrape/sql/add-postcard-address-kind.sql in the Supabase SQL editor.
@@ -47,6 +47,7 @@ function parseLimit(argv) {
 
 function resolveLiveLobKey() {
   const candidates = [
+    process.env.LOB_LIVE_SECRET_KEY,
     process.env.LOB_SECRET_KEY,
     process.env.LOB_API_KEY,
     process.env.lob_api_key,
