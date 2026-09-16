@@ -1,6 +1,7 @@
 /**
  * Lob 4×6 postcard front HTML (landscape bleed 6.25″×4.25″).
- * Phone-frame mockup of the live site, with a 1.25in scan QR in the right gutter.
+ * Phone-frame mockup of the live site. Native QR shares {@link POSTCARD_QR_SLOT}
+ * with the address side so Lob can overlay both faces.
  */
 
 import "server-only";
@@ -9,7 +10,9 @@ import { parseReviewHighlights } from "@/lib/demo-review-types";
 import {
   formatUsPhoneDisplay,
   POSTCARD_QR_LABEL,
+  POSTCARD_QR_SLOT,
 } from "@/lib/postcard/back-html";
+import { postcardOwnerFirstName } from "@/lib/postcard/call-headline";
 import { pickPostcardReviewExcerpt } from "@/lib/postcard/review-excerpt";
 import {
   LOB_PRINT_FONT_FAMILY,
@@ -20,32 +23,24 @@ import {
 const CTA_PHONE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="#ffffff" aria-hidden="true"><path d="M6.62 10.79a15.15 15.15 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.01-.24c1.12.37 2.33.57 3.58.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.46.57 3.58a1 1 0 0 1-.25 1.02l-2.2 2.19z"/></svg>`;
 
 const PHONE_WIDTH = "2.7in";
-const PHONE_LEFT = "0.50in";
-const QR_LEFT = "3.42in";
-const QR_SIZE = "1.25in";
+/** Right of the shared native QR slot (0.42 + 1.25 + gap). */
+const PHONE_LEFT = "1.90in";
 
 export function buildPostcardFrontHtml(input: {
   businessName: string;
-  category?: string | null;
+  ownerName?: string | null;
   city?: string | null;
   state?: string | null;
   rating?: number | null;
   reviewCount?: number | null;
   reviewHighlights?: unknown;
   phone?: string | null;
-  /** HTTPS PNG URL for the 1.25in front QR. Omitted if upload failed. */
-  qrImageUrl?: string | null;
 }): string {
   const name = escapeHtml(input.businessName.trim() || "Your business");
-  const category = escapeHtml(
-    (input.category?.trim() || "Local business").toUpperCase(),
-  );
   const loc = [input.city?.trim(), input.state?.trim()].filter(Boolean).join(", ");
   const locHtml = loc ? escapeHtml(loc) : "";
-  const city = input.city?.trim() ?? "";
-  const subline = city
-    ? `${city} · already live · yours to claim`
-    : "Already live · yours to claim";
+  const headline = previewSideHeadline(input.ownerName);
+  const headlineSize = previewHeadlineSize(headline);
 
   const rating =
     input.rating != null && Number.isFinite(Number(input.rating))
@@ -55,6 +50,7 @@ export function buildPostcardFrontHtml(input: {
     input.reviewCount != null && Number.isFinite(Number(input.reviewCount))
       ? Math.round(Number(input.reviewCount))
       : null;
+  const listingLine = googleListingLine(reviewCount);
 
   const highlights = parseReviewHighlights(input.reviewHighlights) ?? [];
   const pickedReview = pickPostcardReviewExcerpt(highlights);
@@ -92,13 +88,10 @@ export function buildPostcardFrontHtml(input: {
     ? `<p class="review-name">— ${reviewerHtml}</p>`
     : "";
 
-  const qrUrl = safeQrSrc(input.qrImageUrl);
-  const qrCol = qrUrl
-    ? `<div class="qr-col">
+  const qrCol = `<div class="qr-col">
     <p class="qr-col-label">${POSTCARD_QR_LABEL}</p>
-    <img class="qr-img" src="${escapeHtml(qrUrl)}" width="300" height="300" alt="" />
-  </div>`
-    : "";
+    <div class="qr-slot"></div>
+  </div>`;
 
   return `<!DOCTYPE html>
 <html>
@@ -123,22 +116,23 @@ export function buildPostcardFrontHtml(input: {
     }
     .header {
       position: absolute;
-      top: 0.22in;
+      top: 0.16in;
       left: 0.38in;
       width: 5.49in;
     }
     .header-title {
-      font-size: 12.5pt;
+      font-size: ${headlineSize};
       font-weight: 700;
-      line-height: 1.2;
+      line-height: 1.15;
       color: #064e3b;
-      letter-spacing: -0.02em;
-      white-space: nowrap;
+      letter-spacing: -0.03em;
     }
     .header-sub {
-      font-size: 8pt;
-      color: #78716c;
-      margin-top: 0.04in;
+      font-size: 7.5pt;
+      font-weight: 400;
+      line-height: 1.25;
+      color: #57534e;
+      margin-top: 0.03in;
     }
     .phone-wrap {
       position: absolute;
@@ -176,13 +170,6 @@ export function buildPostcardFrontHtml(input: {
     .hero {
       background: #064e3b;
       padding: 0.24in 0.14in 0.14in;
-    }
-    .eyebrow {
-      font-size: 6pt;
-      font-weight: 700;
-      letter-spacing: 0.12em;
-      color: #a7f3d0;
-      margin-bottom: 0.05in;
     }
     .title {
       font-size: 12pt;
@@ -257,39 +244,44 @@ export function buildPostcardFrontHtml(input: {
     }
     .qr-col {
       position: absolute;
-      top: 1.45in;
-      left: ${QR_LEFT};
-      width: 1.55in;
-      text-align: center;
+      top: ${POSTCARD_QR_SLOT.clusterTop};
+      left: ${POSTCARD_QR_SLOT.clusterLeft};
+      width: ${POSTCARD_QR_SLOT.clusterWidth};
     }
     .qr-col-label {
+      position: absolute;
+      top: 0;
+      left: ${POSTCARD_QR_SLOT.slotLeft};
+      width: ${POSTCARD_QR_SLOT.size};
+      height: 0.16in;
+      line-height: 0.16in;
       font-size: 6.5pt;
       font-weight: 700;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.04em;
       color: #18181b;
-      margin: 0 0 0.07in;
+      text-align: center;
       white-space: nowrap;
     }
-    .qr-img {
-      width: ${QR_SIZE};
-      height: ${QR_SIZE};
-      display: block;
-      margin: 0 auto;
+    .qr-slot {
+      position: absolute;
+      top: ${POSTCARD_QR_SLOT.slotTop};
+      left: ${POSTCARD_QR_SLOT.slotLeft};
+      width: ${POSTCARD_QR_SLOT.size};
+      height: ${POSTCARD_QR_SLOT.size};
       background: #fff;
     }
   </style>
 </head>
 <body>
   <div class="header">
-    <p class="header-title">This is the site customers see when they scan.</p>
-    <p class="header-sub">${escapeHtml(subline)}</p>
+    <p class="header-title">${escapeHtml(headline)}</p>
+    <p class="header-sub">${escapeHtml(listingLine)}</p>
   </div>
   <div class="phone-wrap">
     <div class="phone">
       <div class="notch"></div>
       <div class="screen">
         <div class="hero">
-          <p class="eyebrow">${category}</p>
           <p class="title">${name}</p>
         </div>
         <div class="body">
@@ -311,19 +303,25 @@ export function buildPostcardFrontHtml(input: {
 </html>`;
 }
 
-function safeQrSrc(value?: string | null): string | null {
-  const trimmed = value?.trim() ?? "";
-  if (!trimmed) return null;
-  if (/^[A-Za-z0-9._/-]+\.png$/.test(trimmed) && !trimmed.includes("..")) {
-    return trimmed;
+/** Preview-side headline — em dash after the first name. */
+export function previewSideHeadline(ownerName?: string | null): string {
+  const first = postcardOwnerFirstName(ownerName);
+  const rest = "your competitors have websites. Where’s yours?";
+  return first ? `${first} — ${rest}` : `Your competitors have websites. Where’s yours?`;
+}
+
+/** Small listing line under the headline. */
+export function googleListingLine(reviewCount: number | null): string {
+  if (reviewCount != null) {
+    return `Google listing: ${reviewCount.toLocaleString("en-US")} reviews. Website: none.`;
   }
-  try {
-    const parsed = new URL(trimmed);
-    if (parsed.protocol !== "https:") return null;
-    return parsed.toString();
-  } catch {
-    return null;
-  }
+  return "Google listing: no website.";
+}
+
+function previewHeadlineSize(text: string): string {
+  if (text.length <= 54) return "12pt";
+  if (text.length <= 62) return "10.5pt";
+  return "9.5pt";
 }
 
 function escapeHtml(value: string): string {

@@ -21,11 +21,10 @@ import {
   isMailableLeadAddress,
   leadToLobAddress,
 } from "@/lib/postcard/address";
-import { buildPostcardBackHtml, LOB_BACK_QR_PLACEMENT } from "@/lib/postcard/back-html";
+import { buildPostcardBackHtml, LOB_QR_PLACEMENT } from "@/lib/postcard/back-html";
 import { shortenCompanyNameForLob } from "@/lib/postcard/company-name";
 import { buildPostcardFrontHtml } from "@/lib/postcard/front-html";
 import { assertCanSendPostcard, assertCanSendLivePostcardToLeadToday } from "@/lib/postcard/limits";
-import { uploadPostcardQrPublicUrl } from "@/lib/postcard/qr";
 import { buildPostcardScanUrl } from "@/lib/postcard/scan-link";
 import { createPostcardScanLinkUrl } from "@/lib/postcard/scan-links-db";
 import { ensureProfileUsername } from "@/lib/profile-username";
@@ -288,26 +287,15 @@ export async function POST(request: Request) {
     });
   }
 
-  let frontQrImageUrl: string | null = null;
-  try {
-    frontQrImageUrl = await uploadPostcardQrPublicUrl({
-      targetUrl: scanUrl,
-      placeId,
-    });
-  } catch (err) {
-    console.warn("[crm-postcard] front QR upload failed; sending without flip QR", err);
-  }
-
   const frontHtml = buildPostcardFrontHtml({
     businessName: businessName || "your business",
-    category,
+    ownerName,
     city,
     state,
     rating: Number.isFinite(rating) ? rating : null,
     reviewCount: Number.isFinite(reviewCount) ? reviewCount : null,
     reviewHighlights: row.review_highlights,
     phone,
-    qrImageUrl: frontQrImageUrl,
   });
 
   let backHtml: string;
@@ -425,10 +413,10 @@ export async function POST(request: Request) {
       useType: "marketing",
       qrCode: {
         redirectUrl: scanUrl,
-        widthIn: LOB_BACK_QR_PLACEMENT.widthIn,
-        topIn: LOB_BACK_QR_PLACEMENT.topIn,
-        leftIn: LOB_BACK_QR_PLACEMENT.leftIn,
-        pages: LOB_BACK_QR_PLACEMENT.pages,
+        widthIn: LOB_QR_PLACEMENT.widthIn,
+        topIn: LOB_QR_PLACEMENT.topIn,
+        leftIn: LOB_QR_PLACEMENT.leftIn,
+        pages: LOB_QR_PLACEMENT.pages,
       },
     });
     const proof = await waitForLobPostcardProof(lobApiKey, postcard.id);
