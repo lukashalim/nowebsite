@@ -4,7 +4,7 @@ const LINK_CLASS =
   "rounded-md border border-zinc-300 px-3 py-1.5 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-900";
 
 interface AdminNavProps {
-  current?: "purchases" | "usage" | "postcards" | "scrape";
+  current?: "purchases" | "usage" | "postcards" | "scrape" | "somers-report";
 }
 
 export function AdminNav({ current }: AdminNavProps) {
@@ -28,6 +28,11 @@ export function AdminNav({ current }: AdminNavProps) {
       {current !== "scrape" ? (
         <Link href="/admin/scrape" className={LINK_CLASS}>
           Scrape
+        </Link>
+      ) : null}
+      {current !== "somers-report" ? (
+        <Link href="/report/somers-lawn-tree" className={LINK_CLASS}>
+          Somers report
         </Link>
       ) : null}
       <Link href="/scrape-progress" className={LINK_CLASS}>

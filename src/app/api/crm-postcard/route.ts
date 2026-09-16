@@ -30,8 +30,7 @@ import {
   postcardAddressKindLabel,
   postcardAddressKindPatch,
 } from "@/lib/postcard/address-kind";
-import { buildPostcardBackHtml, LOB_BACK_QR_PLACEMENT } from "@/lib/postcard/back-html";
-import { generatePostcardCallHeadline } from "@/lib/postcard/call-headline";
+import { buildPostcardBackHtml, LOB_QR_PLACEMENT } from "@/lib/postcard/back-html";
 import { shortenCompanyNameForLob } from "@/lib/postcard/company-name";
 import { buildPostcardFrontHtml } from "@/lib/postcard/front-html";
 import { assertCanSendPostcard, assertCanSendLivePostcardToLeadToday } from "@/lib/postcard/limits";
@@ -266,10 +265,9 @@ export async function POST(request: Request) {
     }
   }
 
-  const companyName =
-    ownerName && name?.trim()
-      ? await shortenCompanyNameForLob(name)
-      : null;
+  const shortDba = name?.trim()
+    ? await shortenCompanyNameForLob(name)
+    : null;
 
   const slugEncoded = demoPathSegment({
     place_id: placeId,
@@ -277,25 +275,7 @@ export async function POST(request: Request) {
   });
   const slug = decodeURIComponent(slugEncoded);
   const liveDemoUrl = ringReadyTenantDemoUrl(username, slug);
-
-  const headline = generatePostcardCallHeadline({
-    category,
-    businessType: business_type,
-    ownerName,
-  });
-
-  const frontHtml = buildPostcardFrontHtml({
-    headline,
-    businessName: name?.trim() || "your business",
-    category,
-    city,
-    state,
-    rating: Number.isFinite(rating) ? rating : null,
-    reviewCount: Number.isFinite(reviewCount) ? reviewCount : null,
-    reviewHighlights: row.review_highlights,
-    phone,
-    ownerName,
-  });
+  const businessName = name?.trim() || "";
 
   let scanUrl: string;
   try {
@@ -319,6 +299,17 @@ export async function POST(request: Request) {
     });
   }
 
+  const frontHtml = buildPostcardFrontHtml({
+    businessName: businessName || "your business",
+    ownerName,
+    city,
+    state,
+    rating: Number.isFinite(rating) ? rating : null,
+    reviewCount: Number.isFinite(reviewCount) ? reviewCount : null,
+    reviewHighlights: row.review_highlights,
+    phone,
+  });
+
   let backHtml: string;
   try {
     const storedReturn = await getUserPostcardReturnStored(user.id);
@@ -329,9 +320,12 @@ export async function POST(request: Request) {
       twilio?.forwardingNumber ||
       null;
     backHtml = buildPostcardBackHtml({
-      businessName: name?.trim() || "your business",
+      businessName,
+      shortDba,
       contactPhone,
       ownerName,
+      category,
+      businessType: business_type,
     });
   } catch (err) {
     return NextResponse.json(
@@ -347,7 +341,6 @@ export async function POST(request: Request) {
 
   let to: LobAddress = leadToLobAddress({
     name,
-    companyName,
     ownerName,
     address: address!,
     city: city!,
@@ -495,10 +488,10 @@ export async function POST(request: Request) {
       useType: "marketing",
       qrCode: {
         redirectUrl: scanUrl,
-        widthIn: LOB_BACK_QR_PLACEMENT.widthIn,
-        topIn: LOB_BACK_QR_PLACEMENT.topIn,
-        leftIn: LOB_BACK_QR_PLACEMENT.leftIn,
-        pages: LOB_BACK_QR_PLACEMENT.pages,
+        widthIn: LOB_QR_PLACEMENT.widthIn,
+        topIn: LOB_QR_PLACEMENT.topIn,
+        leftIn: LOB_QR_PLACEMENT.leftIn,
+        pages: LOB_QR_PLACEMENT.pages,
       },
     });
     const proof = await waitForLobPostcardProof(lobApiKey, postcard.id);

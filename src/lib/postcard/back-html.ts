@@ -1,295 +1,215 @@
 /**
-
  * Lob 4×6 postcard back HTML (landscape bleed 6.25″×4.25″).
-
- * Creative in the left safe column; Lob address/postage on the right.
-
- * SCAN card is absolutely positioned so the QR slot never moves when the
-
- * headline wraps — must match {@link LOB_BACK_QR_PLACEMENT} for Lob's
-
- * native qr_code overlay.
-
+ * Address side is the visual "front": sparse personalized copy + giant QR
+ * in the left safe column; Lob address/postage on the right.
+ *
+ * QR slot is absolutely positioned so it never moves when the headline wraps
+ * — must match {@link LOB_QR_PLACEMENT} for Lob's native qr_code overlay.
+ * Lob can only stamp one position; `pages: "front,back"` repeats it on both faces.
+ *
  * Lob inline HTML must stay under 10,000 characters.
-
  */
 
-
+import "server-only";
 
 import { postcardOwnerFirstName } from "@/lib/postcard/call-headline";
-
+import { fallbackCompanyName } from "@/lib/postcard/company-name";
 import {
-
   LOB_PRINT_FONT_FAMILY,
-
   LOB_PRINT_FONT_LINKS,
-
 } from "@/lib/postcard/lob-fonts";
 
+export const POSTCARD_QR_LABEL = "SCAN TO OPEN YOUR SITE";
 
-
-/** Forest green from the SCAN card mockup. */
-
-const SCAN_GREEN = "#1a4731";
-
-
-
-/** Accent red for "competitors" in the back headline. */
-
-const HEADLINE_ACCENT_RED = "#B91C1C";
-
-
+export const POSTCARD_QR_SLOT = {
+  clusterTop: "1.55in",
+  clusterLeft: "0.28in",
+  clusterWidth: "2.40in",
+  slotTop: "0.22in",
+  slotLeft: "0.14in",
+  size: "1.25in",
+} as const;
 
 /**
-
- * Lob positions native QR codes from the 6×4 trim edge, while the HTML uses
-
- * the 6.25×4.25 bleed artboard. Subtract the 0.125in bleed from the slot's
-
- * artboard coordinates so the QR overlays `.qr-slot` exactly.
-
+ * Native QR overlay is measured from the 6×4 trim edge; HTML uses the
+ * 6.25×4.25 bleed artboard. Subtract 0.125in bleed from slot coordinates.
+ *
+ * Left column stays inside ~2.50in of trim so it does not collide with Lob's
+ * return address / barcode / recipient block (right ~3.375in of a 6in card).
+ *
+ * Slot: 1.25in, left-aligned in the column.
+ *   left bleed = 0.28 + 0.14 = 0.42in → trim 0.295in
+ *   top bleed = 1.55 + 0.22 = 1.77in → trim 1.645in
+ *
+ * Same coordinates on front and back — Lob cannot place two different spots.
  */
-
-export const LOB_BACK_QR_PLACEMENT = {
-
+export const LOB_QR_PLACEMENT = {
   widthIn: "1.25",
-
-  topIn: "2.585",
-
-  leftIn: "0.730",
-
-  pages: "back" as const,
-
+  topIn: "1.645",
+  leftIn: "0.295",
+  pages: "front,back" as const,
 } as const;
 
-
-
-/** Left creative column — widened slightly so the h1 fits on one line. */
-
+/** Left creative column — must not enter the USPS address zone. */
 const COPY = {
-
   top: "0.22in",
-
-  left: "0.28in",
-
-  width: "2.92in",
-
-  maxHeight: "1.88in",
-
+  left: POSTCARD_QR_SLOT.clusterLeft,
+  width: POSTCARD_QR_SLOT.clusterWidth,
+  height: "1.28in",
 } as const;
 
+const RESTAURANT_HINT =
+  /restaurant|sushi|cafe|café|diner|bistro|pizzeria|steakhouse|taqueria|ramen|noodle|buffet|trattoria|grill|takeout|take-out|food\s*truck/i;
 
-
-/** Pinned SCAN card — independent of headline line count. */
-
-const SCAN_CARD = {
-
-  top: "2.14in",
-
-  left: "0.28in",
-
-  width: "2.4in",
-
-} as const;
-
-
+const RESTAURANT_SUPPORT =
+  "People find you on Google. They can't tap for a menu or a table.";
+const DEFAULT_SUPPORT =
+  "People find you on Google. They just have nowhere to tap.";
 
 export function buildPostcardBackHtml(input: {
-
   businessName: string;
-
-  /** Sender contact for "Call/text us at …" (E.164 or national). */
-
+  /** Short DBA for the headline only — never the legal name. */
+  shortDba?: string | null;
+  /** Sender contact for "Or text …" (E.164 or national). */
   contactPhone?: string | null;
-
-  /** Owner first name when known — bold-prefixed on the mobile-site pitch line. */
-
+  /** Owner name when known — first name prefixes the headline. */
   ownerName?: string | null;
-
+  category?: string | null;
+  businessType?: string | null;
 }): string {
-
   const phoneDisplay = formatUsPhoneDisplay(input.contactPhone);
-
-  const pitchPhoneDisplay = phoneDisplay?.replace(
-
-    /(\(\d{3}\) \d{3})-(\d{4})/,
-
-    "$1 $2",
-
+  const headlineText = addressSideHeadline(
+    input.ownerName,
+    input.shortDba,
+    input.businessName,
   );
+  const headlineHtml = escapeHtml(headlineText);
+  const headlineSize = headlineFontSize(headlineText);
+  const support = isPostcardRestaurantCategory(
+    input.category,
+    input.businessType,
+    input.businessName,
+  )
+    ? RESTAURANT_SUPPORT
+    : DEFAULT_SUPPORT;
 
-  const pitchCtaHtml = pitchPhoneDisplay
-    ? `Text ${escapeHtml(pitchPhoneDisplay)} to activate your <span class="pitch-accent">free&nbsp;30-day&nbsp;trial</span> — no credit card needed.`
-    : `Text us to activate your <span class="pitch-accent">free&nbsp;30-day&nbsp;trial</span> — no credit card needed.`;
-
-  const valuePropHtml = escapeHtml(
-
-    "You look great on Google, but have no website. That's a goldmine waiting to be tapped.",
-
-  );
-
-  const footerHtml = phoneDisplay
-
-    ? `<p class="scan-footer">Call/text us at ${escapeHtml(phoneDisplay)}</p>`
-
-    : "";
-
-  const ownerFirst = postcardOwnerFirstName(input.ownerName);
-
-  const mobileSitePitchHtml = ownerFirst
-    ? `<strong>${escapeHtml(ownerFirst)} - </strong>Your mobile site is already built.`
-    : "Your mobile site is already built.";
-
-
+  const phoneHtml = phoneDisplay
+    ? `Or text ${escapeHtml(phoneDisplay)}<br>for the free 30-day trial`
+    : "Or text us<br>for the free 30-day trial";
 
   const html = `<!DOCTYPE html>
-
 <html>
-
 <head>
-
 <meta charset="UTF-8"/>
-
 ${LOB_PRINT_FONT_LINKS}
-
 <style>
-
 *{box-sizing:border-box;margin:0;padding:0}
-
 body{width:6.25in;height:4.25in;font-family:${LOB_PRINT_FONT_FAMILY};color:#18181b;background:#fff;position:relative}
-
-.copy{position:absolute;top:${COPY.top};left:${COPY.left};width:${COPY.width};max-height:${COPY.maxHeight};overflow:hidden;padding-right:.02in;padding-bottom:.04in}
-
-h1{font-size:13pt;font-weight:700;line-height:1.15;margin-bottom:.08in;white-space:nowrap;letter-spacing:-0.022em}
-
-h1 .headline-accent{color:${HEADLINE_ACCENT_RED}}
-
-.pitch-line{font-size:9pt;line-height:1.4;color:#3f3f46;margin:0 0 .06in;max-width:100%}
-
-.pitch-line.pitch-cta{font-size:8.25pt;letter-spacing:-0.02em}
-
-.pitch-line:last-child{margin-bottom:0}
-
-.pitch-accent{color:${SCAN_GREEN};font-weight:700}
-
-.scan-card{position:absolute;top:${SCAN_CARD.top};left:${SCAN_CARD.left};width:${SCAN_CARD.width};border:2.5px solid ${SCAN_GREEN};border-radius:.1in;overflow:hidden;background:#fff;text-align:center}
-
-.scan-head{background:${SCAN_GREEN};padding:.08in .08in .07in;line-height:1.15}
-
-.scan-line1{font-size:10pt;font-weight:700;letter-spacing:.04em;color:#fff}
-
-.scan-line2{font-size:10pt;font-weight:700;letter-spacing:.04em;color:#fff;margin-top:.02in}
-
-.scan-body{padding:.08in .1in .04in}
-
-.qr-slot{width:1.25in;height:1.25in;margin:0 auto;background:#fff}
-
-.scan-footer{font-size:7.5pt;line-height:1.25;color:#666;padding:0 .08in .08in}
-
+.copy{position:absolute;top:${COPY.top};left:${COPY.left};width:${COPY.width};height:${COPY.height};overflow:hidden}
+h1{font-size:${headlineSize};font-weight:700;line-height:1.12;letter-spacing:-0.03em;margin:0 0 .08in;color:#18181b}
+.support{font-size:10pt;line-height:1.3;color:#3f3f46;margin:0;max-width:100%}
+.qr-cluster{position:absolute;top:${POSTCARD_QR_SLOT.clusterTop};left:${POSTCARD_QR_SLOT.clusterLeft};width:${POSTCARD_QR_SLOT.clusterWidth};height:1.85in;text-align:left}
+.qr-label{position:absolute;top:0;left:${POSTCARD_QR_SLOT.slotLeft};width:${POSTCARD_QR_SLOT.size};height:.16in;line-height:.16in;font-size:6.5pt;font-weight:700;letter-spacing:.04em;color:#18181b;text-align:center;white-space:nowrap}
+.qr-slot{position:absolute;top:${POSTCARD_QR_SLOT.slotTop};left:${POSTCARD_QR_SLOT.slotLeft};width:${POSTCARD_QR_SLOT.size};height:${POSTCARD_QR_SLOT.size};background:#fff}
+.qr-phone{position:absolute;top:1.54in;left:${POSTCARD_QR_SLOT.slotLeft};width:1.50in;font-size:7pt;line-height:1.3;color:#3f3f46;text-align:left}
 </style>
-
 </head>
-
 <body>
-
 <div class="copy">
-
-<h1>Calls going to your <span class="headline-accent">competitors</span>?</h1>
-
-<p class="pitch-line">${mobileSitePitchHtml}</p>
-
-<p class="pitch-line">${valuePropHtml}</p>
-
-<p class="pitch-line pitch-cta">${pitchCtaHtml}</p>
-
+<h1>${headlineHtml}</h1>
+<p class="support">${escapeHtml(support)}</p>
 </div>
-
-<div class="scan-card">
-
-<div class="scan-head">
-
-<p class="scan-line1">SCAN TO SEE</p>
-
-<p class="scan-line2">YOUR SITE</p>
-
+<div class="qr-cluster">
+<p class="qr-label">${POSTCARD_QR_LABEL}</p>
+<div class="qr-slot"></div>
+<p class="qr-phone">${phoneHtml}</p>
 </div>
-
-<div class="scan-body"><div class="qr-slot"></div></div>
-
-${footerHtml}
-
-</div>
-
 </body>
-
 </html>`;
 
-
-
   if (html.length > 10000) {
-
     throw new Error(
-
       `Postcard back HTML is ${html.length} chars (Lob limit 10000).`,
-
     );
-
   }
-
-
 
   return html;
-
 }
-
-
 
 /** Format a US number as (XXX) XXX-XXXX when possible. */
-
 export function formatUsPhoneDisplay(
-
   phone: string | null | undefined,
-
 ): string | null {
-
   if (!phone?.trim()) return null;
-
   const digits = phone.replace(/\D/g, "");
-
   let national = digits;
-
   if (national.length === 11 && national.startsWith("1")) {
-
     national = national.slice(1);
-
   }
-
   if (national.length !== 10) {
-
     const trimmed = phone.trim();
-
     return trimmed || null;
-
   }
-
   return `(${national.slice(0, 3)}) ${national.slice(3, 6)}-${national.slice(6)}`;
-
 }
 
+export function isPostcardRestaurantCategory(
+  ...values: Array<string | null | undefined>
+): boolean {
+  return values.some((value) => Boolean(value && RESTAURANT_HINT.test(value)));
+}
 
+export function addressSideHeadline(
+  ownerName?: string | null,
+  shortDba?: string | null,
+  businessName?: string | null,
+): string {
+  const ownerFirst = postcardOwnerFirstName(ownerName);
+  const brand = postcardBrandName(shortDba, businessName);
+  if (ownerFirst && brand) {
+    return `${ownerFirst} — your ${brand} site is already built.`;
+  }
+  if (ownerFirst) {
+    return `${ownerFirst} — your site is already built.`;
+  }
+  if (brand) {
+    return `Your ${brand} site is already built.`;
+  }
+  return "Your site is already built.";
+}
+
+/** Short DBA for the headline — strips legal suffixes and trailing category words. */
+export function postcardBrandName(
+  shortDba?: string | null,
+  businessName?: string | null,
+): string | null {
+  const preferred = shortDba?.trim() || businessName?.trim() || "";
+  if (!preferred) return null;
+  const brand = stripHeadlineCategoryWords(fallbackCompanyName(preferred));
+  if (!brand || /^your business$/i.test(brand)) return null;
+  return brand;
+}
+
+function stripHeadlineCategoryWords(value: string): string {
+  const stripped = value
+    .replace(
+      /\s+(?:restaurants?|cafes?|cafés?|diners?|bistros?|services?|company|group|llc)$/i,
+      "",
+    )
+    .trim();
+  return stripped || value;
+}
+
+function headlineFontSize(text: string): string {
+  if (text.length <= 48) return "18pt";
+  if (text.length <= 64) return "16pt";
+  return "14pt";
+}
 
 function escapeHtml(value: string): string {
-
   return value
-
     .replace(/&/g, "&amp;")
-
     .replace(/</g, "&lt;")
-
     .replace(/>/g, "&gt;")
-
     .replace(/"/g, "&quot;");
-
 }
-
-
