@@ -5,7 +5,8 @@
  *   npm run postcard:score-addresses -- --dry-run --limit 20
  *   npm run postcard:score-addresses -- --force --limit 50
  *
- * Env: LOB_API_KEY must be a live_ secret (test keys cannot score real addresses).
+ * Env: LOB_SECRET_KEY (or LOB_API_KEY) must be a live_ secret.
+ * Do not use LOB_PUBLISHABLE_KEY — test/publishable keys cannot score real addresses.
  * Optional: POSTCARD_ADDRESS_BACKFILL_BATCH (default 25), POSTCARD_ADDRESS_SLEEP_MS (default 300).
  *
  * Prerequisite: run scrape/sql/add-postcard-address-kind.sql in the Supabase SQL editor.
@@ -45,9 +46,19 @@ function parseLimit(argv) {
 }
 
 function resolveLiveLobKey() {
-  const key =
-    process.env.LOB_API_KEY?.trim() || process.env.lob_api_key?.trim() || "";
-  return key || null;
+  const candidates = [
+    process.env.LOB_SECRET_KEY,
+    process.env.LOB_API_KEY,
+    process.env.lob_api_key,
+  ];
+  for (const raw of candidates) {
+    const key = raw?.trim();
+    if (!key) continue;
+    // Publishable keys (live_pub_ / test_pub_) cannot call USAV.
+    if (key.startsWith("live_pub") || key.startsWith("test_pub")) continue;
+    return key;
+  }
+  return null;
 }
 
 function zip5(value) {
@@ -87,11 +98,13 @@ async function main() {
   const apiKey = resolveLiveLobKey();
   if (!dryRun) {
     if (!apiKey) {
-      throw new Error("LOB_API_KEY is required in .env.local");
+      throw new Error(
+        "LOB_SECRET_KEY (or LOB_API_KEY) is required in .env.local. Use the live secret key (live_…), not LOB_PUBLISHABLE_KEY.",
+      );
     }
     if (!isLobLiveMode(apiKey)) {
       throw new Error(
-        "LOB_API_KEY must be a live_ secret key (test keys cannot score real US addresses)",
+        "LOB_SECRET_KEY must be a live_ secret key (test keys cannot score real US addresses)",
       );
     }
   }
