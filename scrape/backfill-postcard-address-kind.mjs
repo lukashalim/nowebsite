@@ -1,5 +1,6 @@
 /**
  * Score existing Maps streets with Lob USAV (residential vs commercial / CMRA / PO Box).
+ * Only Home Services — High opportunity listings (mail-first trades).
  *
  *   npm run postcard:score-addresses
  *   npm run postcard:score-addresses -- --dry-run --limit 20
@@ -13,6 +14,7 @@
  */
 
 import { loadEnvLocal, getSupabase } from "./lib/scrape-pipeline/index.mjs";
+import { fetchHighOpportunityHomeServicesSlugs } from "./lib/fetch-home-services-slugs.mjs";
 import { isLobLiveMode, verifyUsAddress } from "../src/lib/lob.ts";
 import { isMailableLeadAddress } from "../src/lib/postcard/address.ts";
 import {
@@ -111,6 +113,18 @@ async function main() {
   }
 
   const supabase = getSupabase();
+  const highOpportunitySlugs = await fetchHighOpportunityHomeServicesSlugs(
+    supabase,
+  );
+  if (highOpportunitySlugs.length === 0) {
+    throw new Error(
+      "No Home Services — High opportunity slugs in category_group_members.",
+    );
+  }
+  console.log(
+    `postcard:score-addresses: industry=home-services-high-opportunity slugs=${highOpportunitySlugs.length}`,
+  );
+
   const candidates = [];
   let offset = 0;
 
@@ -119,10 +133,11 @@ async function main() {
     let q = supabase
       .from(TABLE)
       .select(
-        "place_id, name, address, city, state, postal_code, country, postcard_address_kind",
+        "place_id, name, address, city, state, postal_code, country, directory_category_slug, postcard_address_kind",
       )
       .eq("is_invalid", false)
       .eq("has_website", false)
+      .in("directory_category_slug", highOpportunitySlugs)
       .or("country.eq.US,country.is.null")
       .not("address", "is", null)
       .not("city", "is", null)
@@ -192,6 +207,7 @@ async function main() {
         JSON.stringify({
           place_id: row.place_id,
           name: row.name,
+          category: row.directory_category_slug,
           city: row.city,
           zip: zip5(row.postal_code),
           occupancyKey: key,
