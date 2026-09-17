@@ -24,15 +24,17 @@ const BATCH_ROWS = 1000;
 const CLASSIFY_CHUNK = 50;
 
 const GROUP_DEFINITIONS = `
-1. home-services — ANY business where a service provider comes TO the customer's home or property (on-site / mobile service at the customer's location). Includes trades and home maintenance such as: plumbing, electrical, HVAC, landscaping, roofing, handyman, mobile mechanics, concrete work, power washing, mobile car detailing, chimney cleaning, carpet cleaning, home repair, dryer vent cleaning, appliance repair, pest control, tree service, garage door repair, fencing, pool service, and similar on-site work. NOT businesses where the customer must visit a shop or storefront.
+1. home-services-high-opportunity — Mail-first emergency / high-ticket / owner-operator trades that come to the customer's home: roofer, siding-contractor, plumber, electrician, electrical-installation-service, hvac-contractor, air-conditioning-contractor, air-conditioning-repair-service, furnace-repair-service, tree-service, arborist-service, pest-control-service, gutter-service (install/repair, NOT gutter-cleaning-service), chimney-services, chimney-sweep, water-damage-restoration-service, fire-damage-restoration-service, building-restoration-service, septic-system-service, well-drilling-contractor, waterproofing-service, swimming-pool-contractor, swimming-pool-repair-service, bathroom-remodeler, kitchen-remodeler, remodeler, window-installation-service, fence-contractor, deck-builder, paving-contractor, concrete-contractor, masonry-contractor, insulation-contractor. Do NOT put garage-door-supplier here (cannot tell installer vs store).
 
-2. food-hospitality — Restaurants, bars, cafes, catering, grocery stores, convenience stores, bakeries, food trucks with a fixed hospitality focus.
+2. home-services — Other on-site home/property work that is NOT the high-opportunity list: landscaping, painting, cleaning, handyman, carpet cleaning, appliance repair, gutter-cleaning-service, garage-door-supplier, stores/suppliers, movers, and similar. NOT shop-based auto repair.
 
-3. professional — Accountants, real estate agents/brokers, tax preparation, lawyers, insurance agents, financial advisors, and similar office-based professional services.
+3. food-hospitality — Restaurants, bars, cafes, catering, grocery stores, convenience stores, bakeries, food trucks with a fixed hospitality focus.
 
-4. health-wellness — Chiropractors, dentists, doctors/clinics, spas, massage, salons, barbers, nail salons, gyms, yoga, mental health, personal care and body wellness.
+4. professional — Accountants, real estate agents/brokers, tax preparation, lawyers, insurance agents, financial advisors, and similar office-based professional services.
 
-5. other — Customer visits the business location (laundromat, dry cleaner, shop-based auto repair, retail stores, shopping malls, pet stores without mobile grooming), or anything that clearly does not fit above. Shop-based auto repair = other; mobile car detailing / mobile mechanic = home-services.
+5. health-wellness — Chiropractors, dentists, doctors/clinics, spas, massage, salons, barbers, nail salons, gyms, yoga, mental health, personal care and body wellness.
+
+6. other — Customer visits the business location (laundromat, dry cleaner, shop-based auto repair, retail stores, shopping malls, pet stores without mobile grooming), or anything that clearly does not fit above. Shop-based auto repair = other; mobile car detailing / mobile mechanic = home-services.
 `.trim();
 
 interface SlugCandidate {
@@ -152,7 +154,8 @@ ${GROUP_DEFINITIONS}
 
 Rules:
 - Each slug must map to exactly one group id.
-- Prefer on-site/mobile-to-customer for home-services when the slug suggests the provider travels to the customer.
+- Prefer home-services-high-opportunity for the emergency/high-ticket trades listed above.
+- Prefer on-site/mobile-to-customer for remaining home-services when the slug suggests the provider travels to the customer.
 - Use sample_label as extra context when the slug alone is ambiguous.
 
 Respond with JSON only: { "mappings": { "<slug>": "<group-id>", ... } }
@@ -194,10 +197,7 @@ async function ensureCategoryGroups(supabase: SupabaseClient): Promise<void> {
   const rows = FALLBACK_CATEGORY_GROUPS.map((g, index) => ({
     id: g.id,
     label: g.label,
-    description:
-      g.id === "home-services"
-        ? "Any business where a service provider comes to the customer's home or property — plumbing, roofing, power washing, mobile car detailing, carpet cleaning, appliance repair, concrete work, chimney cleaning, and similar on-site trades."
-        : g.description,
+    description: g.description,
     display_order: index + 1,
   }));
 

@@ -24,7 +24,7 @@ export async function fetchHomeServicesSlugs(supabase) {
   const { data, error } = await supabase
     .from("category_group_members")
     .select("category_slug")
-    .eq("group_id", "home-services")
+    .in("group_id", ["home-services", "home-services-high-opportunity"])
     .order("category_slug", { ascending: true });
 
   if (error) {

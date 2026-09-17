@@ -21,11 +21,12 @@ import { deepseekChat } from "../src/lib/deepseek";
 config({ path: resolve(process.cwd(), ".env.local") });
 
 const GROUP_DEFINITIONS = `
-1. home-services — A professional comes TO the customer's home or property (plumber, electrician, roofer, HVAC, landscaper, handyman, mobile mechanic). NOT laundromat, dry-cleaner, or shop-based auto repair.
-2. food-hospitality — Restaurants, bars, grocery stores, convenience stores.
-3. professional — Accountants, real estate agents, tax preparation, office professional services.
-4. health-wellness — Chiropractors, dentists, spas, salons, barbers, nail salons, personal care.
-5. other — Customer visits the business (laundromat, dry-cleaner, shop auto-repair), or anything that does not fit above. Generic auto-repair = other; mobile-mechanic slugs = home-services.
+1. home-services-high-opportunity — Mail-first emergency / high-ticket / owner-operator trades: roofer, siding-contractor, plumber, electrician, electrical-installation-service, HVAC / AC repair / furnace, tree-service, arborist-service, pest-control-service, gutter-service (not gutter-cleaning-service), chimney, restoration, septic, well-drilling, waterproofing, pool contractor/repair, bathroom/kitchen remodeler, window-installation, fence, deck, paving, concrete, masonry, insulation. Do NOT include garage-door-supplier.
+2. home-services — Other on-site home/property work not in the high-opportunity list (landscaper, painter, handyman, cleaning, gutter-cleaning-service, garage-door-supplier, mobile mechanic). NOT laundromat, dry-cleaner, or shop-based auto repair.
+3. food-hospitality — Restaurants, bars, grocery stores, convenience stores.
+4. professional — Accountants, real estate agents, tax preparation, office professional services.
+5. health-wellness — Chiropractors, dentists, spas, salons, barbers, nail salons, personal care.
+6. other — Customer visits the business (laundromat, dry-cleaner, shop auto-repair), or anything that does not fit above. Generic auto-repair = other; mobile-mechanic slugs = home-services.
 `.trim();
 
 interface SlugCandidate {
