@@ -280,6 +280,7 @@ async function main() {
       JSON.stringify({
         place_id: row.place_id,
         name: row.name,
+        category: row.directory_category_slug,
         kind,
         record_type: verified.record_type,
         address_type: verified.address_type,
